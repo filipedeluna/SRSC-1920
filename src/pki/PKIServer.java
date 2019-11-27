@@ -2,13 +2,15 @@ package pki;
 
 import pki.props.PKIProperties;
 import pki.props.PKIProperty;
+import shared.errors.properties.InvalidPropertyValueException;
 import shared.errors.properties.PropertyException;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
-import java.io.IOException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 class PKIServer {
   private static final String PROPS_PATH = "pki/props/pki.properties";
@@ -16,14 +18,14 @@ class PKIServer {
 
   public static void main(String[] args) {
     // Get properties from file
-    PKIProperties props = null;
+    PKIProperties properties = null;
     // initial props
     boolean debugMode = false;
 
     try {
-      props = new PKIProperties(PROPS_PATH);
+      properties = new PKIProperties(PROPS_PATH);
 
-      debugMode = props.getBoolean(PKIProperty.DEBUG);
+      debugMode = properties.getBoolean(PKIProperty.DEBUG);
     } catch (PropertyException e) {
       System.err.println(e.getMessage());
       System.exit(-1);
@@ -31,22 +33,37 @@ class PKIServer {
 
     // Start main thread
     try {
-      int port = props.getInt(PKIProperty.PORT);
+      // Create thread pool for clients
+      int threadPoolSize = properties.getInt(PKIProperty.THREAD_POOL_SIZE);
+
+      if (!validateThreadCount(threadPoolSize))
+        throw new InvalidPropertyValueException(PKIProperty.THREAD_POOL_SIZE.val());
+
+      Executor executor = Executors.newFixedThreadPool(threadPoolSize);
+
+      // Create SSL Socket and initialize server
+      int port = properties.getInt(PKIProperty.PORT);
 
       SSLContext sslContext = SSLContext.getInstance("TLS", PROVIDER);
       SSLServerSocketFactory ssf = sslContext.getServerSocketFactory();
 
       SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port);
 
-      String[] enabledProtocols = props.getStringArray(PKIProperty.PROTOCOLS);
-      String[] enabledCipherSuites = props.getStringArray(PKIProperty.CIPHERSUITES);
+      String[] enabledProtocols = properties.getStringArray(PKIProperty.PROTOCOLS);
+      String[] enabledCipherSuites = properties.getStringArray(PKIProperty.CIPHERSUITES);
 
       serverSocket.setEnabledProtocols(enabledProtocols);
       serverSocket.setEnabledCipherSuites(enabledCipherSuites);
 
       System.out.print("Started server on port " + port + "\n");
 
-      initServerThread(serverSocket);
+      // Client serving loop
+      while (true) {
+        SSLSocket sslClient = (SSLSocket) serverSocket.accept();
+
+        PKIServerResources pkiServerResources = new PKIServerResources(sslClient, properties, debugMode);
+        executor.execute(new Thread(pkiServerResources));
+      }
     } catch (Exception e) {
       handleException(e, debugMode);
     } finally {
@@ -55,21 +72,8 @@ class PKIServer {
   }
 
   /*
-     Utils
+    Utils
   */
-  private static void initServerThread(SSLServerSocket sslServerSocket) throws IOException {
-    PKIServerControl serverControl = new PKIServerControl();
-
-    while (true) {
-      SSLSocket sslClient = (SSLSocket) sslServerSocket.accept();
-
-      PKIServerResources pkiServerResources = new PKIServerResources(sslClient, serverControl);
-      Thread t = new Thread(pkiServerResources);
-
-      t.start();
-    }
-  }
-
   private static void handleException(Exception e, boolean debugMode) {
     boolean expected = false;
 
@@ -84,5 +88,12 @@ class PKIServer {
 
     if (debugMode)
       e.printStackTrace();
+  }
+
+  private static boolean validateThreadCount(int threadCount) {
+    int totalThreads = Runtime.getRuntime().availableProcessors();
+
+    // Keep threads between 0 < threads < CPUTOTAL
+    return totalThreads > threadCount && threadCount > 0;
   }
 }

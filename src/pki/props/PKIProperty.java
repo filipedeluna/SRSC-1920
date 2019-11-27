@@ -12,6 +12,7 @@ public enum PKIProperty {
   // Add properties here
 
   PORT("port", PropertyType.INT),
+  THREAD_POOL_SIZE("thread_pool_size", PropertyType.INT),
 
   DEBUG("debug", PropertyType.BOOL),
 
@@ -28,7 +29,7 @@ public enum PKIProperty {
     this.type = type;
   }
 
-  String val() {
+  public String val() {
     return val;
   }
 

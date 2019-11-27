@@ -63,7 +63,6 @@ public class PKIProperties extends Properties {
     return value.split(",");
   }
 
-
   private String getValue(PKIProperty prop) throws PropertyException {
     String value = getProperty(prop.val());
 
