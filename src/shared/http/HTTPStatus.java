@@ -1,0 +1,32 @@
+package shared.http;
+
+public enum HTTPStatus {
+  OK(200, "OK"),
+
+  BAD_REQUEST(400, "BAD REQUEST"),
+  UNAUTHORIZED(401, "UNAUTHORIZED"),
+  FORBIDDEN(403, "FORBIDDEN"),
+  NOT_FOUND(404, "NOT FOUND"),
+
+  INTERNAL_SERVER_ERROR(500, "INTERNAL_SERVER_ERROR");
+
+  private int code;
+  private String message;
+
+  HTTPStatus(int code, String message) {
+    this.code = code;
+    this.message = message;
+  }
+
+  public int code() {
+    return code;
+  }
+
+  public String message() {
+    return message;
+  }
+
+  public HTTPStatusPair build() {
+    return new HTTPStatusPair(code, message);
+  }
+}

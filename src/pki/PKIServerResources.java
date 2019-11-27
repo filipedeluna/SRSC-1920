@@ -1,5 +1,6 @@
 package pki;
 
+import java.io.IOException;
 import java.lang.Thread;
 import java.io.OutputStream;
 import java.io.InputStreamReader;
@@ -7,22 +8,31 @@ import java.nio.charset.StandardCharsets;
 
 import com.google.gson.*;
 import com.google.gson.stream.*;
+import pki.payload.ErrorResponse;
 import pki.props.PKIProperties;
-import pki.props.PKIProperty;
 import shared.errors.properties.PropertyException;
+import shared.errors.request.RequestException;
+import shared.http.HTTPStatus;
+import shared.http.HTTPStatusPair;
 
 import javax.net.ssl.SSLSocket;
 
 class PKIServerResources implements Runnable {
+  private PKIProperties properties;
+  private boolean debugMode;
+
   private SSLSocket client;
   private JsonReader input;
   private OutputStream output;
-  private PKIProperties properties;
+
+  private Gson gson;
   // private PKIServerControl registry;
 
   PKIServerResources(SSLSocket client, PKIProperties properties, boolean debugMode) {
     this.client = client;
     this.properties = properties;
+    this.debugMode = debugMode;
+    this.gson = buildGsonInstance();
 
     try {
       input = new JsonReader(new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8));
@@ -34,29 +44,32 @@ class PKIServerResources implements Runnable {
   }
 
   public void run() {
-    while (true) {
-      JsonObject cmd = readCommand();
-      if (cmd == null) {
-        try {
-          client.close();
-        } catch (Exception e) {
-        }
-        return;
-      }
-      executeCommand(cmd);
-    }
+    try {
+      JsonObject command = readCommand();
 
+      //executeCommand(cmd);
+
+      //if (cmd == null)
+      //  throw new InvalidRequestRouteException();
+
+
+      client.close();
+    } catch (Exception e) {
+      handleException(e, debugMode);
+    }
   }
 
 
-  JsonObject
-  readCommand() {
+  JsonObject readCommand() {
     try {
       JsonElement data = new JsonParser().parse(input);
+
       if (data.isJsonObject()) {
         return data.getAsJsonObject();
       }
+
       System.err.print("Error while reading command from socket (not a JSON object), connection will be shutdown\n");
+
       return null;
     } catch (Exception e) {
       System.err.print("Error while reading JSON command from socket, connection will be shutdown\n");
@@ -309,25 +322,50 @@ class PKIServerResources implements Runnable {
     return;
   }
 
-
   /*
     UTILS
   */
-  private void handleException(Exception e, boolean debugMode) {
-    boolean expected = false;
+  private void handleException(Exception exception, boolean debugMode) {
+    ErrorResponse response;
 
-    if (e instanceof PropertyException)
-      expected = true;
-
-    if (expected) {
-      System.err.println(e.getMessage());
+    if (exception instanceof RequestException) {
+      HTTPStatus status = ((RequestException) exception).status();
+      response = new ErrorResponse(status, exception.getMessage());
     } else {
-      System.err.println("Client disconnected due to critical error");
-    }
+      System.err.println("Client disconnected due to critical error: " + exception.getMessage());
 
-    if (debugMode)
-      e.printStackTrace();
+      if (debugMode)
+        exception.printStackTrace();
+
+      HTTPStatus status = HTTPStatus.INTERNAL_SERVER_ERROR;
+      response = new ErrorResponse(status, status.message());
+    }
+    String responseJson = response.json(gson);
+
+    try {
+      send(responseJson);
+    } catch (IOException e) {
+      System.err.println("Failed to send error response to client");
+
+      if (debugMode)
+        e.printStackTrace();
+    }
   }
 
+  private void send(String message) throws IOException {
+    output.write(message.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private void receive() {
+    input.getPath();
+  }
+
+  private Gson buildGsonInstance() {
+    return new GsonBuilder()
+        .serializeNulls()
+        .setFieldNamingPolicy(FieldNamingPolicy.IDENTITY)
+        .setPrettyPrinting()
+        .create();
+  }
 }
 
