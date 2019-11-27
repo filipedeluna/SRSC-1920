@@ -1,81 +1,88 @@
 package pki;
 
-import shared.errors.properties.PropertiesException;
-import shared.errors.properties.PropertiesFileErrorException;
-import shared.errors.properties.PropertiesFileNotFoundException;
-import shared.utils.PropertiesUtils;
+import pki.props.PKIProperties;
+import pki.props.PKIProperty;
+import shared.errors.properties.PropertyException;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
-import javax.xml.ws.Response;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.InetAddress;
-import java.util.Properties;
 
 class PKIServer {
-  private static final String PROPS_PATH = "pki/pki.properties";
-
+  private static final String PROPS_PATH = "pki/props/pki.properties";
+  private static final String PROVIDER = "BC";
 
   public static void main(String[] args) {
-    Properties props;
+    // Get properties from file
+    PKIProperties props = null;
+    // initial props
+    boolean debugMode = false;
 
     try {
-      props = PropertiesUtils.load(PROPS_PATH);
-    } catch (PropertiesException e) {
+      props = new PKIProperties(PROPS_PATH);
+
+      debugMode = props.getBoolean(PKIProperty.DEBUG);
+    } catch (PropertyException e) {
       System.err.println(e.getMessage());
+      System.exit(-1);
     }
 
+    // Start main thread
+    try {
+      int port = props.getInt(PKIProperty.PORT);
 
-      if (args.length < 1) {
-        System.err.print("Usage: port\n");
-        System.exit(1);
-      }
+      SSLContext sslContext = SSLContext.getInstance("TLS", PROVIDER);
+      SSLServerSocketFactory ssf = sslContext.getServerSocketFactory();
 
-      int port = Integer.parseInt(args[0]);
+      SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port);
 
-      try {
-        ServerSocket s = new ServerSocket(port, 5, InetAddress.getByName("localhost"));
-        System.out.print("Started server on port " + port + "\n");
+      String[] enabledProtocols = props.getStringArray(PKIProperty.PROTOCOLS);
+      String[] enabledCipherSuites = props.getStringArray(PKIProperty.CIPHERSUITES);
 
-        initServerThread(s);
+      serverSocket.setEnabledProtocols(enabledProtocols);
+      serverSocket.setEnabledCipherSuites(enabledCipherSuites);
 
-      } catch (Exception e) {
-        System.err.print("Cannot open socket: " + e);
-        System.exit(-1);
-      }
+      System.out.print("Started server on port " + port + "\n");
 
-     catch (Exception e) {
-      handleException(e);
+      initServerThread(serverSocket);
+    } catch (Exception e) {
+      handleException(e, debugMode);
     } finally {
       System.exit(-1);
     }
   }
 
-
   /*
      Utils
   */
-  private static void initServerThread(ServerSocket s) {
-    PKIServerControl registry = new PKIServerControl();
+  private static void initServerThread(SSLServerSocket sslServerSocket) throws IOException {
+    PKIServerControl serverControl = new PKIServerControl();
 
-    SSLSocket c = s.accept();
-    PKIServerActions handler = new PKIServerActions(c, registry);
-    Thread t = new Thread(handler).start();
+    while (true) {
+      SSLSocket sslClient = (SSLSocket) sslServerSocket.accept();
+
+      PKIServerResources pkiServerResources = new PKIServerResources(sslClient, serverControl);
+      Thread t = new Thread(pkiServerResources);
+
+      t.start();
+    }
   }
 
-  private static void handleException(Exception e) {
+  private static void handleException(Exception e, boolean debugMode) {
     boolean expected = false;
 
-    if (e instanceof PropertiesException)
+    if (e instanceof PropertyException)
       expected = true;
-
 
     if (expected) {
       System.err.println(e.getMessage());
     } else {
-      e.printStackTrace();
+      System.err.println("CRITICAL ERROR.");
     }
+
+    if (debugMode)
+      e.printStackTrace();
   }
 }

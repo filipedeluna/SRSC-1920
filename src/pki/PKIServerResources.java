@@ -8,13 +8,13 @@ import java.nio.charset.StandardCharsets;
 import com.google.gson.*;
 import com.google.gson.stream.*;
 
-class PKIServerActions implements Runnable {
+class PKIServerResources implements Runnable {
     Socket client;
     JsonReader in;
     OutputStream out;
     PKIServerControl registry;
 
-    PKIServerActions(Socket c, PKIServerControl r ) {
+    PKIServerResources(Socket c, PKIServerControl r ) {
         client = c;
         registry = r;
 

@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 import java.util.Date;
 import com.google.gson.*;
 
+/*
 class PKIServerControl {
     ConcurrentSkipListSet<UserDescription> users = null;
     final String mboxesPath = "mboxes";
@@ -412,5 +413,5 @@ class PKIServerControl {
     }
 
 }
-
+*/
 
