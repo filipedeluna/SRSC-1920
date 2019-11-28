@@ -1,12 +1,6 @@
 package pki.props;
 
 import shared.PropertyType;
-import shared.errors.properties.InvalidPropertyTypeException;
-import shared.errors.properties.InvalidPropertyValueException;
-import shared.errors.properties.PropertyException;
-import shared.errors.properties.PropertyNotFoundException;
-
-import java.util.Properties;
 
 public enum PKIProperty {
   // Add properties here

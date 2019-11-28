@@ -1,13 +1,13 @@
-package shared.gson;
+package shared.response;
 
 import com.google.gson.Gson;
 import shared.http.HTTPStatus;
 import shared.http.HTTPStatusPair;
 
-public abstract class GsonPayload {
+abstract class GsonResponse {
   private HTTPStatusPair status;
 
-  public GsonPayload(HTTPStatus status) {
+  GsonResponse(HTTPStatus status) {
     this.status = status.build();
   }
 

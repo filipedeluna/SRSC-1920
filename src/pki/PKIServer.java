@@ -2,7 +2,7 @@ package pki;
 
 import pki.props.PKIProperties;
 import pki.props.PKIProperty;
-import shared.errors.properties.InvalidPropertyValueException;
+import shared.errors.properties.InvalidValueException;
 import shared.errors.properties.PropertyException;
 
 import javax.net.ssl.SSLContext;
@@ -37,7 +37,7 @@ class PKIServer {
       int threadPoolSize = properties.getInt(PKIProperty.THREAD_POOL_SIZE);
 
       if (!validateThreadCount(threadPoolSize))
-        throw new InvalidPropertyValueException(PKIProperty.THREAD_POOL_SIZE.val());
+        throw new InvalidValueException(PKIProperty.THREAD_POOL_SIZE.val());
 
       Executor executor = Executors.newFixedThreadPool(threadPoolSize);
 

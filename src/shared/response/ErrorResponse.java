@@ -1,9 +1,8 @@
-package pki.payload;
+package shared.response;
 
-import shared.gson.GsonPayload;
 import shared.http.HTTPStatus;
 
-public class ErrorResponse extends GsonPayload {
+public class ErrorResponse extends GsonResponse {
   private String error;
 
   public ErrorResponse(HTTPStatus code, String error) {
