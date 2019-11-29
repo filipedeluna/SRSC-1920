@@ -1,14 +1,14 @@
 package pki;
 
+import pki.db.PKIDatabaseDriver;
 import pki.props.PKIProperties;
 import pki.props.PKIProperty;
 import shared.errors.properties.InvalidValueException;
 import shared.errors.properties.PropertyException;
 
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLServerSocket;
-import javax.net.ssl.SSLServerSocketFactory;
-import javax.net.ssl.SSLSocket;
+import javax.net.ssl.*;
+import java.io.FileInputStream;
+import java.security.KeyStore;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
@@ -16,7 +16,11 @@ class PKIServer {
   private static final String PROPS_PATH = "src/pki/props/pki.properties";
   private static final String PROVIDER = "BC";
 
+  private static final char[] GLOBAL_PASS = "123asd".toCharArray();
+
   public static void main(String[] args) {
+    System.setProperty("java.net.preferIPv4Stack", "true");
+
     // Get properties from file
     PKIProperties properties = null;
     // initial props
@@ -41,30 +45,40 @@ class PKIServer {
 
       Executor executor = Executors.newFixedThreadPool(threadPoolSize);
 
+      // Load Keystore
+      KeyStore keyStore = KeyStore.getInstance("JCEKS");
+      keyStore.load(new FileInputStream(properties.getString(PKIProperty.KEYSTORE)), GLOBAL_PASS);
+
+      // Initiate KMF
+      KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509", PROVIDER);
+      keyManagerFactory.init(keyStore, GLOBAL_PASS);
+
       // Create SSL Socket and initialize server
       int port = properties.getInt(PKIProperty.PORT);
 
-      SSLContext sslContext = (SSLContext) SSLContext.getInstance("TLS");
+      SSLContext sslContext = SSLContext.getInstance("TLS", PROVIDER);
+      sslContext.init(keyManagerFactory.getKeyManagers(), null, null);
 
       SSLServerSocketFactory ssf = sslContext.getServerSocketFactory();
-
       SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port);
 
+      // Set enabled protocols and cipher suites
       String[] enabledProtocols = properties.getStringArray(PKIProperty.PROTOCOLS);
       String[] enabledCipherSuites = properties.getStringArray(PKIProperty.CIPHERSUITES);
 
       serverSocket.setEnabledProtocols(enabledProtocols);
       serverSocket.setEnabledCipherSuites(enabledCipherSuites);
+      serverSocket.setNeedClientAuth(false); // Unilateral
 
       System.out.print("Started server on port " + port + "\n");
+
+      PKIDatabaseDriver db = new PKIDatabaseDriver(properties.getString(PKIProperty.DATABASE));
 
       // Client serving loop
       while (true) {
         SSLSocket sslClient = (SSLSocket) serverSocket.accept();
-        byte[] b = new byte[7000];
-        sslClient.getInputStream().read(b);
 
-        PKIServerResources pkiServerResources = new PKIServerResources(sslClient, properties, debugMode);
+        PKIServerResources pkiServerResources = new PKIServerResources(sslClient, properties, keyStore, db, debugMode);
         executor.execute(new Thread(pkiServerResources));
       }
     } catch (Exception e) {

@@ -5,6 +5,12 @@ import shared.PropertyType;
 public enum PKIProperty {
   // Add properties here
   PORT("port", PropertyType.INT),
+
+  KEYSTORE("keystore", PropertyType.STRING),
+  KEYSTORE_PASS("keystore_pass", PropertyType.STRING),
+
+  DATABASE("database", PropertyType.STRING),
+
   THREAD_POOL_SIZE("thread_pool_size", PropertyType.INT),
 
   DEBUG("debug", PropertyType.BOOL),

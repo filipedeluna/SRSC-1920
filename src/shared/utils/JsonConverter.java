@@ -1,4 +1,4 @@
-package pki.utils;
+package shared.utils;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;

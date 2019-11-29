@@ -5,10 +5,14 @@ import java.lang.Thread;
 import java.io.OutputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.security.*;
+import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
 
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
-import pki.utils.JsonConverter;
+import pki.db.PKIDatabaseDriver;
+import shared.utils.JsonConverter;
 import shared.response.EchoResponse;
 import shared.response.ErrorResponse;
 import pki.props.PKIProperties;
@@ -16,24 +20,32 @@ import shared.errors.request.InvalidFormatException;
 import shared.errors.request.InvalidRouteException;
 import shared.errors.request.RequestException;
 import shared.http.HTTPStatus;
+import sun.security.provider.X509Factory;
 
 import javax.net.ssl.SSLSocket;
 
 class PKIServerResources implements Runnable {
+  private static final char[] GLOBAL_PASSWORD = "123asd".toCharArray();
+  private static final String PUB_KEY = "pkipub";
+
   private PKIProperties properties;
+  private PKIDatabaseDriver db;
   private boolean debugMode;
+  private KeyStore keyStore;
 
   private SSLSocket client;
   private com.google.gson.stream.JsonReader input;
   private OutputStream output;
 
   private Gson gson;
-  // private PKIServerControl registry;
 
-  PKIServerResources(SSLSocket client, PKIProperties properties, boolean debugMode) {
+  PKIServerResources(SSLSocket client, PKIProperties properties, KeyStore keyStore, PKIDatabaseDriver db, boolean debugMode) {
     this.client = client;
     this.properties = properties;
+    this.db = db;
     this.debugMode = debugMode;
+    this.keyStore = keyStore;
+
     this.gson = buildGsonInstance();
 
     try {
@@ -65,6 +77,12 @@ class PKIServerResources implements Runnable {
         case "echo":
           echo(requestData);
           break;
+        case "register":
+          break;
+        case "revoked":
+          break;
+        case "revoke":
+          break;
         default:
           throw new InvalidRouteException();
       }
@@ -82,6 +100,41 @@ class PKIServerResources implements Runnable {
     send(response.json(gson));
   }
 
+  // Register
+  private synchronized void register(JsonObject requestData) throws RequestException, IOException, GeneralSecurityException {
+    String username = JsonConverter.getString(requestData, "username");
+    String cert = JsonConverter.getString(requestData, "cert");
+    String token = JsonConverter.getString(requestData, "token");
+
+    // token validity should be verified but is out of work scope.
+    // users could purchase a valid token to certify one certificate
+
+
+    Certificate x509Cert = keyStore.
+    //
+    PrivateKey key = (PrivateKey) keyStore.getKey(PUB_KEY, GLOBAL_PASSWORD);
+
+
+    send(response.json(gson));
+  }
+
+  // Is Revoked
+  private void isRevoked(JsonObject requestData) throws RequestException, IOException {
+    String message = JsonConverter.getString(requestData, "message");
+
+    EchoResponse response = new EchoResponse(message);
+
+    send(response.json(gson));
+  }
+
+  // Revoke
+  private void revoke(JsonObject requestData) throws RequestException, IOException {
+    String message = JsonConverter.getString(requestData, "message");
+
+    EchoResponse response = new EchoResponse(message);
+
+    send(response.json(gson));
+  }
 
   /*
     UTILS
