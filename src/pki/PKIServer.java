@@ -13,7 +13,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 class PKIServer {
-  private static final String PROPS_PATH = "pki/props/pki.properties";
+  private static final String PROPS_PATH = "src/pki/props/pki.properties";
   private static final String PROVIDER = "BC";
 
   public static void main(String[] args) {
@@ -36,7 +36,7 @@ class PKIServer {
       // Create thread pool for clients
       int threadPoolSize = properties.getInt(PKIProperty.THREAD_POOL_SIZE);
 
-      if (!validateThreadCount(threadPoolSize))
+      if (validateThreadCount(threadPoolSize))
         throw new InvalidValueException(PKIProperty.THREAD_POOL_SIZE.val());
 
       Executor executor = Executors.newFixedThreadPool(threadPoolSize);
@@ -44,7 +44,8 @@ class PKIServer {
       // Create SSL Socket and initialize server
       int port = properties.getInt(PKIProperty.PORT);
 
-      SSLContext sslContext = SSLContext.getInstance("TLS", PROVIDER);
+      SSLContext sslContext = (SSLContext) SSLContext.getInstance("TLS");
+
       SSLServerSocketFactory ssf = sslContext.getServerSocketFactory();
 
       SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port);
@@ -60,6 +61,8 @@ class PKIServer {
       // Client serving loop
       while (true) {
         SSLSocket sslClient = (SSLSocket) serverSocket.accept();
+        byte[] b = new byte[7000];
+        sslClient.getInputStream().read(b);
 
         PKIServerResources pkiServerResources = new PKIServerResources(sslClient, properties, debugMode);
         executor.execute(new Thread(pkiServerResources));
