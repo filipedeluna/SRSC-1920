@@ -16,8 +16,7 @@ class PKIServer {
   private static final String PROPS_PATH = "src/pki/props/pki.properties";
   private static final String PROVIDER = "BC";
 
-  private static final char[] GLOBAL_PASS = "123asd".toCharArray();
-
+  @SuppressWarnings("InfiniteLoopStatement")
   public static void main(String[] args) {
     System.setProperty("java.net.preferIPv4Stack", "true");
 
@@ -46,12 +45,14 @@ class PKIServer {
       Executor executor = Executors.newFixedThreadPool(threadPoolSize);
 
       // Load Keystore
-      KeyStore keyStore = KeyStore.getInstance("JCEKS");
-      keyStore.load(new FileInputStream(properties.getString(PKIProperty.KEYSTORE)), GLOBAL_PASS);
+      String keyStorePass = properties.getString(PKIProperty.KEYSTORE_PASS);
+      String keyStoreType = properties.getString(PKIProperty.KEYSTORE_TYPE);
+      KeyStore keyStore = KeyStore.getInstance(keyStoreType);
+      keyStore.load(new FileInputStream(properties.getString(PKIProperty.KEYSTORE)), keyStorePass.toCharArray());
 
       // Initiate KMF
       KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509", PROVIDER);
-      keyManagerFactory.init(keyStore, GLOBAL_PASS);
+      keyManagerFactory.init(keyStore, keyStorePass.toCharArray());
 
       // Create SSL Socket and initialize server
       int port = properties.getInt(PKIProperty.PORT);

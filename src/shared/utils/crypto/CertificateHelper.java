@@ -18,7 +18,7 @@ public class CertificateHelper {
   private static final String CERTIFICATE_FORMAT = "X.509";
   private static final String CERTIFICATE_KEY_ALG = "RSA";
 
-  private static final long CERTIFICATE_VALIDITY = 365L * 24L * 60L * 60L * 1000L; // 1 year
+  private static final long ONE_DAY = 24L * 60L * 60L * 1000L; // 1 year
 
   private CertificateFactory certificateFactory;
   private KeyFactory RSAKeyFactory;
@@ -44,14 +44,14 @@ public class CertificateHelper {
     return (X509Certificate) certificateFactory.generateCertificate(new FileInputStream(file));
   }
 
-  public X509Certificate signCertificate(X509Certificate cert, X509Certificate issuerCert, PrivateKey issuerPrivateKey) throws GeneralSecurityException {
+  public X509Certificate signCertificate(X509Certificate cert, X509Certificate issuerCert, PrivateKey issuerPrivateKey, int validityDays) throws GeneralSecurityException {
     byte[] inCertBytes = cert.getTBSCertificate();
     X509CertInfo info = new X509CertInfo(inCertBytes);
 
     long currentTime = System.currentTimeMillis();
 
     try {
-      info.set("validity", new CertificateValidity(new Date(currentTime), new Date(currentTime + CERTIFICATE_VALIDITY)));
+      info.set("validity", new CertificateValidity(new Date(currentTime), new Date(currentTime + ONE_DAY * validityDays)));
       info.set(X509CertInfo.ISSUER, issuerCert.getSubjectDN());
     } catch (IOException e) {
       throw new InvalidCertificateInfoException();

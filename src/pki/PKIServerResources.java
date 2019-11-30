@@ -33,13 +33,6 @@ import shared.utils.crypto.HashHelper;
 import javax.net.ssl.SSLSocket;
 
 class PKIServerResources implements Runnable {
-  private static final String GLOBAL_PASSWORD_STRING = "123asd";
-  private static final char[] GLOBAL_PASSWORD = GLOBAL_PASSWORD_STRING.toCharArray();
-
-  private static final String PKI_PUB_KEY = "pkipub";
-  private static final String PKI_CERT = "pkicert";
-
-  private PKIProperties properties;
   private PKIDatabaseDriver db;
   private boolean debugMode;
   private KeyStore keyStore;
@@ -53,9 +46,14 @@ class PKIServerResources implements Runnable {
   private HashHelper hashHelper;
   private Base64Helper base64Helper;
 
+  private String keystorePassword;
+  private String pkiPubKey;
+  private String pkiCert;
+  private String token;
+  private int certificateValidityDays;
+
   PKIServerResources(SSLSocket client, PKIProperties properties, KeyStore keyStore, PKIDatabaseDriver db, boolean debugMode) throws GeneralSecurityException, PropertyException {
     this.client = client;
-    this.properties = properties;
     this.keyStore = keyStore;
     this.db = db;
     this.debugMode = debugMode;
@@ -65,6 +63,11 @@ class PKIServerResources implements Runnable {
     gson = buildGsonInstance();
     base64Helper = new Base64Helper();
 
+    keystorePassword = properties.getString(PKIProperty.KEYSTORE_PASS);
+    token = properties.getString(PKIProperty.TOKEN_VALUE);
+    pkiPubKey = properties.getString(PKIProperty.PKI_PUB_KEY);
+    pkiCert = properties.getString(PKIProperty.PKI_CERT);
+    certificateValidityDays = properties.getInt(PKIProperty.CERTIFICATE_VALIDITY);
     try {
       input = new JsonReader(new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8));
       output = client.getOutputStream();
@@ -127,7 +130,7 @@ class PKIServerResources implements Runnable {
     String token = JsonConverter.getString(requestData, "token");
 
     // We will use a predefined token value for test purposes
-    if (!token.equals(GLOBAL_PASSWORD_STRING))
+    if (!token.equals(this.token))
       throw new CustomRequestException("Invalid token", HTTPStatus.UNAUTHORIZED);
 
     // Get public key and certificate and decode them
@@ -144,10 +147,11 @@ class PKIServerResources implements Runnable {
       throw new CustomRequestException("Public key does not match certificate", HTTPStatus.BAD_REQUEST);
 
     // Get private key and sign certificate
-    PrivateKey pkiPrivateKey = (PrivateKey) keyStore.getKey(PKI_PUB_KEY, GLOBAL_PASSWORD);
-    X509Certificate pkiCertificate = (X509Certificate) keyStore.getCertificate(PKI_CERT);
+    PrivateKey pkiPrivateKey = (PrivateKey) keyStore.getKey(pkiPubKey, keystorePassword.toCharArray());
+    X509Certificate pkiCertificate = (X509Certificate) keyStore.getCertificate(pkiCert);
 
-    X509Certificate signedCertificate = certificateHelper.signCertificate(certificate, pkiCertificate, pkiPrivateKey);
+    X509Certificate signedCertificate =
+        certificateHelper.signCertificate(certificate, pkiCertificate, pkiPrivateKey, certificateValidityDays);
 
     // Hash and encode certificate to register entry in db
     byte[] signedCertBytes = certificateHelper.toBytes(signedCertificate);
@@ -162,7 +166,7 @@ class PKIServerResources implements Runnable {
   }
 
   // Is Revoked
-  private void validate(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException {
+  private synchronized void validate(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException {
     // Get certificate and decode to bytes
     String certificateEncoded = JsonConverter.getString(requestData, "certificate");
     byte[] certificateBytes = base64Helper.decode(certificateEncoded);
@@ -180,13 +184,13 @@ class PKIServerResources implements Runnable {
   }
 
   // Revoke
-  private void revoke(JsonObject requestData) throws RequestException, IOException, DatabaseException, CriticalDatabaseException {
+  private synchronized void revoke(JsonObject requestData) throws RequestException, IOException, DatabaseException, CriticalDatabaseException {
     // token validity should be verified but is out of work scope.
     // this token would be issued to an admin so he could revoke certificates at will
     String token = JsonConverter.getString(requestData, "token");
 
     // We will use a predefined token value for test purposes
-    if (!token.equals(GLOBAL_PASSWORD_STRING))
+    if (!token.equals(this.token))
       throw new CustomRequestException("Invalid token", HTTPStatus.UNAUTHORIZED);
 
     // Get certificate and public key
