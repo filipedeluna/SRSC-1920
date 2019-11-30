@@ -1,6 +1,6 @@
 package pki.props;
 
-import shared.PropertyType;
+import shared.utils.properties.PropertyType;
 import shared.errors.properties.*;
 
 import java.io.FileInputStream;

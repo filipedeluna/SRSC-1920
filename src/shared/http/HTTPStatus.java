@@ -1,5 +1,7 @@
 package shared.http;
 
+import shared.response.ErrorResponse;
+
 public enum HTTPStatus {
   OK(200, "OK"),
 
@@ -7,6 +9,7 @@ public enum HTTPStatus {
   UNAUTHORIZED(401, "UNAUTHORIZED"),
   FORBIDDEN(403, "FORBIDDEN"),
   NOT_FOUND(404, "NOT FOUND"),
+  CONFLICT(409, "CONFLICT"),
 
   INTERNAL_SERVER_ERROR(500, "INTERNAL_SERVER_ERROR");
 
@@ -26,7 +29,15 @@ public enum HTTPStatus {
     return message;
   }
 
-  public HTTPStatusPair build() {
+  public HTTPStatusPair buildPair() {
     return new HTTPStatusPair(code, message);
+  }
+
+  public ErrorResponse buildErrorResponse() {
+    return new ErrorResponse(this, message);
+  }
+
+  public ErrorResponse buildErrorResponse(String message) {
+    return new ErrorResponse(this, message);
   }
 }

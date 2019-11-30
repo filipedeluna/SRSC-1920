@@ -1,6 +1,6 @@
 package pki.props;
 
-import shared.PropertyType;
+import shared.utils.properties.PropertyType;
 
 public enum PKIProperty {
   // Add properties here
@@ -8,6 +8,8 @@ public enum PKIProperty {
 
   KEYSTORE("keystore", PropertyType.STRING),
   KEYSTORE_PASS("keystore_pass", PropertyType.STRING),
+
+  HASH_ALGORITHM("hash_algorithm", PropertyType.STRING),
 
   DATABASE("database", PropertyType.STRING),
 

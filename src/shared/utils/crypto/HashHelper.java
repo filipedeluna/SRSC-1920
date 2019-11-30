@@ -2,6 +2,8 @@ package shared.utils.crypto;
 
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
+import java.util.Base64;
+
 
 public class HashHelper {
   private static final String PROVIDER = "BC";
@@ -10,9 +12,15 @@ public class HashHelper {
 
   public HashHelper(String algorithm) throws GeneralSecurityException {
     this.messageDigest = MessageDigest.getInstance(algorithm, PROVIDER);
+
+
   }
 
   public byte[] hash(byte[] data) {
+    return messageDigest.digest(data);
+  }
+
+  public byte[] hashAndEncode(byte[] data) {
     return messageDigest.digest(data);
   }
 

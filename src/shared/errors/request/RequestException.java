@@ -1,9 +1,9 @@
 package shared.errors.request;
 
+import shared.errors.IHTTPStatusException;
 import shared.http.HTTPStatus;
-import shared.http.HTTPStatusPair;
 
-public abstract class RequestException extends Exception {
+public abstract class RequestException extends Exception implements IHTTPStatusException {
   private HTTPStatus status;
 
   RequestException(String s, HTTPStatus status) {
