@@ -13,7 +13,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 class PKIServer {
-  private static final String PROPS_PATH = "src/pki/props/pki.properties";
+  private static final String PROPS_PATH = "pki/props/pki.properties";
   private static final String PROVIDER = "BC";
 
   @SuppressWarnings("InfiniteLoopStatement")

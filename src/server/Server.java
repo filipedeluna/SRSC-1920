@@ -14,12 +14,11 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 class Server {
-  private static final String PROPS_PATH = "src/pki/props/server.properties";
+  private static final String PROPS_PATH = "server/props/server.properties";
   private static final String PROVIDER = "BC";
 
   @SuppressWarnings("InfiniteLoopStatement")
   public static void main(String[] args) {
-    System.setProperty("java.net.preferIPv4Stack", "true");
 
     // Get properties from file
     CustomProperties properties = null;
@@ -46,6 +45,12 @@ class Server {
       Executor executor = Executors.newFixedThreadPool(threadPoolSize);
 
       // Load Keystore
+      String keyStorePass = properties.getString(PKIProperty.KEYSTORE_PASS);
+      String keyStoreType = properties.getString(PKIProperty.KEYSTORE_TYPE);
+      KeyStore keyStore = KeyStore.getInstance(keyStoreType);
+      keyStore.load(new FileInputStream(properties.getString(PKIProperty.KEYSTORE)), keyStorePass.toCharArray());
+
+      // Load Truststore
       String keyStorePass = properties.getString(PKIProperty.KEYSTORE_PASS);
       String keyStoreType = properties.getString(PKIProperty.KEYSTORE_TYPE);
       KeyStore keyStore = KeyStore.getInstance(keyStoreType);
@@ -117,5 +122,26 @@ class Server {
 
     // Keep threads between 0 < threads < CPUTOTAL
     return totalThreads > threadCount && threadCount > 0;
+  }
+
+  private void setJavaProperties(CustomProperties properties) throws PropertyException {
+    System.setProperty("java.net.preferIPv4Stack", "true");
+
+    // Keystore
+    String keyStore = properties.getString(ServerProperty.KEYSTORE_LOC);
+    System.setProperty("javax.net.ssl.keyStore", keyStore);
+    String keyStorePassword = properties.getString(ServerProperty.KEYSTORE_PASS);
+    System.setProperty("javax.net.ssl.keyStorePassword", keyStorePassword);
+    String keyStoreType = properties.getString(ServerProperty.KEYSTORE_TYPE);
+    System.setProperty("javax.net.ssl.keyStoreType", keyStoreType);
+
+    // Truststore
+    String trustStore = properties.getString(ServerProperty.TRUSTSTORE_LOC);
+    System.setProperty("javax.net.ssl.trustStore", trustStore);
+    String trustStorePassword = properties.getString(ServerProperty.TRUSTSTORE_PASS);
+    System.setProperty("javax.net.ssl.trustStorePassword", trustStorePassword);
+    String trustStoreType = properties.getString(ServerProperty.TRUSTSTORE_TYPE);
+    System.setProperty("javax.net.ssl.trustStoreType", trustStoreType);
+
   }
 }
