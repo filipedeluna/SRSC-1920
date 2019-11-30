@@ -48,7 +48,7 @@ class PKIServer {
       String keyStorePass = properties.getString(PKIProperty.KEYSTORE_PASS);
       String keyStoreType = properties.getString(PKIProperty.KEYSTORE_TYPE);
       KeyStore keyStore = KeyStore.getInstance(keyStoreType);
-      keyStore.load(new FileInputStream(properties.getString(PKIProperty.KEYSTORE)), keyStorePass.toCharArray());
+      keyStore.load(new FileInputStream(properties.getString(PKIProperty.KEYSTORE_LOC)), keyStorePass.toCharArray());
 
       // Initiate KMF
       KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509", PROVIDER);
@@ -64,16 +64,16 @@ class PKIServer {
       SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port);
 
       // Set enabled protocols and cipher suites
-      String[] enabledProtocols = properties.getStringArray(PKIProperty.PROTOCOLS);
-      String[] enabledCipherSuites = properties.getStringArray(PKIProperty.CIPHERSUITES);
+      String[] enabledProtocols = properties.getStringArray(PKIProperty.TLS_PROTOCOLS);
+      String[] enabledCipherSuites = properties.getStringArray(PKIProperty.TLS_CIPHERSUITES);
 
       serverSocket.setEnabledProtocols(enabledProtocols);
       serverSocket.setEnabledCipherSuites(enabledCipherSuites);
       serverSocket.setNeedClientAuth(false); // Unilateral
 
-      System.out.print("Started server on port " + port + "\n");
+      System.out.print("Started pki server on port " + port + "\n");
 
-      PKIDatabaseDriver db = new PKIDatabaseDriver(properties.getString(PKIProperty.DATABASE));
+      PKIDatabaseDriver db = new PKIDatabaseDriver(properties.getString(PKIProperty.DATABASE_LOC));
 
       // Client serving loop
       while (true) {

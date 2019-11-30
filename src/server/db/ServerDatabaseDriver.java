@@ -1,17 +1,20 @@
-package pki.db;
+package server.db;
 
 import org.sqlite.JDBC;
-import shared.errors.db.*;
+import shared.errors.db.CriticalDatabaseException;
+import shared.errors.db.DatabaseException;
+import shared.errors.db.DuplicateEntryException;
+import shared.errors.db.EntryNotFoundException;
 
 import java.sql.*;
 
-public final class PKIDatabaseDriver {
+public final class ServerDatabaseDriver {
   private static final int ERR_UNIQUE_CONSTRAINT = 19;
   private static final int ERR_NOT_FOUND = 12;
 
   private Connection connection;
 
-  public PKIDatabaseDriver(String path) throws CriticalDatabaseException {
+  public ServerDatabaseDriver(String path) throws CriticalDatabaseException {
     // Connect to file
     connection = connect(path);
 
@@ -59,7 +62,7 @@ public final class PKIDatabaseDriver {
     }
   }
 
-  public boolean isValid(String certHash) throws CriticalDatabaseException, DatabaseException {
+  public boolean isValid(String certHash) throws CriticalDatabaseException {
     try {
       String selectUser = "SELECT * FROM entries WHERE cert_hash = ? AND revoked = 0;";
 
@@ -69,9 +72,6 @@ public final class PKIDatabaseDriver {
       ResultSet rs = ps.executeQuery();
       return rs.next();
     } catch (SQLException e) {
-      if (e.getErrorCode() == ERR_NOT_FOUND)
-        throw new EntryNotFoundException();
-
       throw new CriticalDatabaseException(e);
     }
   }
@@ -89,9 +89,6 @@ public final class PKIDatabaseDriver {
         throw new EntryNotFoundException();
 
     } catch (SQLException e) {
-      if (e.getErrorCode() == ERR_NOT_FOUND)
-        throw new EntryNotFoundException();
-
       throw new CriticalDatabaseException(e);
     }
   }

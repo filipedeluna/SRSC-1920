@@ -1,10 +1,4 @@
-package pki;
-
-import java.io.*;
-import java.lang.Thread;
-import java.nio.charset.StandardCharsets;
-import java.security.*;
-import java.security.cert.X509Certificate;
+package server;
 
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
@@ -17,28 +11,37 @@ import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
 import shared.errors.properties.PropertyException;
 import shared.errors.request.CustomRequestException;
-import shared.response.OKResponse;
-import shared.utils.JsonConverter;
-import shared.response.EchoResponse;
-import shared.response.ErrorResponse;
 import shared.errors.request.InvalidFormatException;
 import shared.errors.request.InvalidRouteException;
 import shared.errors.request.RequestException;
 import shared.http.HTTPStatus;
+import shared.response.EchoResponse;
+import shared.response.ErrorResponse;
+import shared.response.OKResponse;
+import shared.utils.JsonConverter;
 import shared.utils.crypto.Base64Helper;
 import shared.utils.crypto.CertificateHelper;
 import shared.utils.crypto.HashHelper;
 import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.SSLSocket;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.cert.X509Certificate;
 
-class PKIServerResources implements Runnable {
+class ServerResources implements Runnable {
   private PKIDatabaseDriver db;
   private boolean debugMode;
   private KeyStore keyStore;
 
   private SSLSocket client;
-  private com.google.gson.stream.JsonReader input;
+  private JsonReader input;
   private OutputStream output;
 
   private Gson gson;
@@ -52,7 +55,7 @@ class PKIServerResources implements Runnable {
   private String token;
   private int certificateValidityDays;
 
-  PKIServerResources(SSLSocket client, CustomProperties properties, KeyStore keyStore, PKIDatabaseDriver db, boolean debugMode) throws GeneralSecurityException, PropertyException {
+  ServerResources(SSLSocket client, CustomProperties properties, KeyStore keyStore, PKIDatabaseDriver db, boolean debugMode) throws GeneralSecurityException, PropertyException {
     this.client = client;
     this.keyStore = keyStore;
     this.db = db;
@@ -166,7 +169,7 @@ class PKIServerResources implements Runnable {
   }
 
   // Is Revoked
-  private synchronized void validate(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
+  private synchronized void validate(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException {
     // Get certificate and decode to bytes
     String certificateEncoded = JsonConverter.getString(requestData, "certificate");
     byte[] certificateBytes = base64Helper.decode(certificateEncoded);
