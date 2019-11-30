@@ -1,10 +1,10 @@
 package pki;
 
 import pki.db.PKIDatabaseDriver;
-import pki.props.PKIProperties;
 import pki.props.PKIProperty;
 import shared.errors.properties.InvalidValueException;
 import shared.errors.properties.PropertyException;
+import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.*;
 import java.io.FileInputStream;
@@ -21,12 +21,12 @@ class PKIServer {
     System.setProperty("java.net.preferIPv4Stack", "true");
 
     // Get properties from file
-    PKIProperties properties = null;
+    CustomProperties properties = null;
     // initial props
     boolean debugMode = false;
 
     try {
-      properties = new PKIProperties(PROPS_PATH);
+      properties = new CustomProperties(PROPS_PATH);
 
       debugMode = properties.getBoolean(PKIProperty.DEBUG);
     } catch (PropertyException e) {

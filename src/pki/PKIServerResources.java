@@ -21,7 +21,6 @@ import shared.response.OKResponse;
 import shared.utils.JsonConverter;
 import shared.response.EchoResponse;
 import shared.response.ErrorResponse;
-import pki.props.PKIProperties;
 import shared.errors.request.InvalidFormatException;
 import shared.errors.request.InvalidRouteException;
 import shared.errors.request.RequestException;
@@ -29,6 +28,7 @@ import shared.http.HTTPStatus;
 import shared.utils.crypto.Base64Helper;
 import shared.utils.crypto.CertificateHelper;
 import shared.utils.crypto.HashHelper;
+import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.SSLSocket;
 
@@ -52,7 +52,7 @@ class PKIServerResources implements Runnable {
   private String token;
   private int certificateValidityDays;
 
-  PKIServerResources(SSLSocket client, PKIProperties properties, KeyStore keyStore, PKIDatabaseDriver db, boolean debugMode) throws GeneralSecurityException, PropertyException {
+  PKIServerResources(SSLSocket client, CustomProperties properties, KeyStore keyStore, PKIDatabaseDriver db, boolean debugMode) throws GeneralSecurityException, PropertyException {
     this.client = client;
     this.keyStore = keyStore;
     this.db = db;

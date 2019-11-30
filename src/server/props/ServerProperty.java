@@ -1,9 +1,9 @@
-package pki.props;
+package server.props;
 
 import shared.utils.properties.ICustomProperty;
 import shared.utils.properties.CustomPropertyType;
 
-public enum PKIProperty implements ICustomProperty {
+enum ServerProperty implements ICustomProperty {
   // Add properties here
   PORT("port", CustomPropertyType.INT),
 
@@ -28,10 +28,11 @@ public enum PKIProperty implements ICustomProperty {
   CIPHERSUITES("ciphersuites", CustomPropertyType.STRING_ARRAY),
   PROTOCOLS("protocols", CustomPropertyType.STRING_ARRAY);
   /////////////////////////////////////////////////
+
   private String val;
   private CustomPropertyType type;
 
-  PKIProperty(String val, CustomPropertyType type) {
+  ServerProperty(String val, CustomPropertyType type) {
     this.val = val;
     this.type = type;
   }

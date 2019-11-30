@@ -1,6 +1,6 @@
 package shared.utils.properties;
 
-public enum PropertyType {
+public enum CustomPropertyType {
   INT,
   BOOL,
   STRING,

@@ -1,15 +1,13 @@
-package pki.props;
+package shared.utils.properties;
 
-import shared.utils.properties.PropertyType;
 import shared.errors.properties.*;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.Properties;
 
-public class PKIProperties extends Properties {
+public class CustomProperties extends java.util.Properties {
 
-  public PKIProperties(String path) throws PropertyException {
+  public CustomProperties(String path) throws PropertyException {
     super();
 
     try {
@@ -21,15 +19,15 @@ public class PKIProperties extends Properties {
     }
   }
 
-  public String getString(PKIProperty prop) throws PropertyException {
-    if (prop.type() != PropertyType.STRING)
+  public String getString(ICustomProperty prop) throws PropertyException {
+    if (prop.type() != CustomPropertyType.STRING)
       throw new InvalidTypeException(prop.val(), "string");
 
     return getValue(prop);
   }
 
-  public int getInt(PKIProperty prop) throws PropertyException {
-    if (prop.type() != PropertyType.INT)
+  public int getInt(ICustomProperty prop) throws PropertyException {
+    if (prop.type() != CustomPropertyType.INT)
       throw new InvalidTypeException(prop.val(), "int");
 
     String value = getValue(prop);
@@ -41,8 +39,8 @@ public class PKIProperties extends Properties {
     }
   }
 
-  public boolean getBoolean(PKIProperty prop) throws PropertyException {
-    if (prop.type() != PropertyType.BOOL)
+  public boolean getBoolean(ICustomProperty prop) throws PropertyException {
+    if (prop.type() != CustomPropertyType.BOOL)
       throw new InvalidTypeException(prop.val(), "bool");
 
     String value = getValue(prop);
@@ -53,8 +51,8 @@ public class PKIProperties extends Properties {
     return Boolean.parseBoolean(value);
   }
 
-  public String[] getStringArray(PKIProperty prop) throws PropertyException {
-    if (prop.type() != PropertyType.STRING_ARRAY)
+  public String[] getStringArray(ICustomProperty prop) throws PropertyException {
+    if (prop.type() != CustomPropertyType.STRING_ARRAY)
       throw new InvalidTypeException(prop.val(), "string array");
 
     String value = getValue(prop);
@@ -62,7 +60,7 @@ public class PKIProperties extends Properties {
     return value.split(",");
   }
 
-  private String getValue(PKIProperty prop) throws PropertyException {
+  private String getValue(ICustomProperty prop) throws PropertyException {
     String value = getProperty(prop.val());
 
     if (value == null)

@@ -1,7 +1,5 @@
 package  client;
 
-import pki.props.PKIProperty;
-
 import javax.net.ssl.*;
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -10,7 +8,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 
 public class Client {
-  private static final String PROPS_PATH = "client/client.properties";
+  private static final String PROPS_PATH = "client/props/client.properties";
   private static final String PROVIDER = "BC";
   public static void main(String[] args) {
 
