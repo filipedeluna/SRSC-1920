@@ -36,6 +36,10 @@ public class CertificateHelper {
     return (X509Certificate) certificateFactory.generateCertificate(new ByteArrayInputStream(certBytes));
   }
 
+  public byte[] toBytes(X509Certificate certificate) throws GeneralSecurityException {
+    return certificate.getTBSCertificate();
+  }
+
   public X509Certificate fromFile(String file) throws GeneralSecurityException, FileNotFoundException {
     return (X509Certificate) certificateFactory.generateCertificate(new FileInputStream(file));
   }

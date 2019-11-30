@@ -10,4 +10,8 @@ public class ErrorResponse extends GsonResponse {
 
     this.error = error;
   }
+
+  public String getError() {
+    return error;
+  }
 }

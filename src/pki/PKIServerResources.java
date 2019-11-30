@@ -5,7 +5,6 @@ import java.lang.Thread;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.cert.X509Certificate;
-import java.util.Base64;
 
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
@@ -18,6 +17,7 @@ import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
 import shared.errors.properties.PropertyException;
 import shared.errors.request.CustomRequestException;
+import shared.response.OKResponse;
 import shared.utils.JsonConverter;
 import shared.response.EchoResponse;
 import shared.response.ErrorResponse;
@@ -63,6 +63,7 @@ class PKIServerResources implements Runnable {
     hashHelper = new HashHelper(properties.getString(PKIProperty.HASH_ALGORITHM));
     certificateHelper = new CertificateHelper();
     gson = buildGsonInstance();
+    base64Helper = new Base64Helper();
 
     try {
       input = new JsonReader(new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8));
@@ -97,8 +98,10 @@ class PKIServerResources implements Runnable {
           sign(requestData);
           break;
         case "validate":
+          validate(requestData);
           break;
         case "revoke":
+          revoke(requestData);
           break;
         default:
           throw new InvalidRouteException();
@@ -140,21 +143,18 @@ class PKIServerResources implements Runnable {
     if (!certificateHelper.validate(certPublicKey, certificate))
       throw new CustomRequestException("Public key does not match certificate", HTTPStatus.BAD_REQUEST);
 
-    // Sign certificate
+    // Get private key and sign certificate
     PrivateKey pkiPrivateKey = (PrivateKey) keyStore.getKey(PKI_PUB_KEY, GLOBAL_PASSWORD);
     X509Certificate pkiCertificate = (X509Certificate) keyStore.getCertificate(PKI_CERT);
 
     X509Certificate signedCertificate = certificateHelper.signCertificate(certificate, pkiCertificate, pkiPrivateKey);
 
-    // Hash and encode certificate and public key to register entry in db
-    byte[] signedCertBytes = signedCertificate.getTBSCertificate();
+    // Hash and encode certificate to register entry in db
+    byte[] signedCertBytes = certificateHelper.toBytes(signedCertificate);
     byte[] signedCertHashBytes = hashHelper.hash(signedCertBytes);
-    byte[] publicKeyHashBytes = hashHelper.hash(publicKeyBytes);
-
     String signedCertHashEncoded = base64Helper.encode(signedCertHashBytes);
-    String publicKeyHashEncoded = base64Helper.encode(publicKeyHashBytes);
 
-    db.register(publicKeyHashEncoded, signedCertHashEncoded);
+    db.register(signedCertHashEncoded);
 
     // Create payload and send response
     SignResponse response = new SignResponse(signedCertHashEncoded);
@@ -180,18 +180,21 @@ class PKIServerResources implements Runnable {
   }
 
   // Revoke
-  private void revoke(JsonObject requestData) throws RequestException, IOException {
+  private void revoke(JsonObject requestData) throws RequestException, IOException, DatabaseException, CriticalDatabaseException {
     // token validity should be verified but is out of work scope.
-    // users could purchase a valid token to certify one certificate
+    // this token would be issued to an admin so he could revoke certificates at will
     String token = JsonConverter.getString(requestData, "token");
 
     // We will use a predefined token value for test purposes
     if (!token.equals(GLOBAL_PASSWORD_STRING))
       throw new CustomRequestException("Invalid token", HTTPStatus.UNAUTHORIZED);
 
+    // Get certificate and public key
     String certificateEncoded = JsonConverter.getString(requestData, "certificate");
 
-    EchoResponse response = new EchoResponse(message);
+    db.revoke(certificateEncoded);
+
+    OKResponse response = new OKResponse();
 
     send(response.json(gson));
   }

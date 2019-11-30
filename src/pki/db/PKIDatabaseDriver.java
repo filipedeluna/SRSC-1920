@@ -32,10 +32,9 @@ public final class PKIDatabaseDriver {
     try {
       String query =
           "CREATE TABLE IF NOT EXISTS entries (" +
-              "pkey_hash       TEXT    NOT NULL UNIQUE, " +
               "cert_hash       TEXT    NOT NULL UNIQUE, " +
               "revoked         INTEGER NOT NULL, " +
-              "PRIMARY KEY (pkey_hash, cert_hash)" +
+              "PRIMARY KEY (cert_hash)" +
               ");";
 
       connection.createStatement().execute(query);
@@ -44,14 +43,12 @@ public final class PKIDatabaseDriver {
     }
   }
 
-  public void register(String pkeyHash, String certHash) throws DatabaseException, CriticalDatabaseException {
+  public void register(String certHash) throws DatabaseException, CriticalDatabaseException {
     try {
-      String insertQuery = "INSERT INTO entries (pkey_hash, cert_hash, revoked) VALUES (?, ?, ?);";
+      String insertQuery = "INSERT INTO entries (cert_hash, revoked) VALUES (?, 0);";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
-      ps.setString(1, pkeyHash);
-      ps.setString(2, certHash);
-      ps.setInt(3, 0);
+      ps.setString(1, certHash);
 
       ps.executeUpdate();
     } catch (SQLException e) {
@@ -76,13 +73,12 @@ public final class PKIDatabaseDriver {
     }
   }
 
-  public void revoke(String pkeyHash, String certHash) throws DatabaseException, CriticalDatabaseException {
+  public void revoke(String certHash) throws DatabaseException, CriticalDatabaseException {
     try {
-      String selectUser = "UPDATE entries SET revoked = 1 WHERE pkey_hash = ? AND cert_hash = ?;";
+      String selectUser = "UPDATE entries SET revoked = 1 WHERE cert_hash = ?;";
 
       PreparedStatement ps = connection.prepareStatement(selectUser);
-      ps.setString(1, pkeyHash);
-      ps.setString(2, certHash);
+      ps.setString(1, certHash);
 
       int updated = ps.executeUpdate();
 

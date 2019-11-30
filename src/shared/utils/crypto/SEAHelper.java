@@ -10,13 +10,15 @@ public class SEAHelper {
 
   private static final SecureRandom secureRandom = new SecureRandom();
 
+  private String spec;
   private String mode;
   private Cipher cipher;
   private KeyGenerator keyGen;
 
   public SEAHelper(String algorithm, String mode, String padding) throws GeneralSecurityException {
-    String spec = algorithm + "/" + mode + "/" + padding;
+    this.mode = mode;
 
+    spec = algorithm + "/" + mode + "/" + padding;
     cipher = Cipher.getInstance(spec, PROVIDER);
     keyGen = KeyGenerator.getInstance(cipher.getAlgorithm(), PROVIDER);
   }
@@ -69,5 +71,9 @@ public class SEAHelper {
     keyGen.init(cipher.getBlockSize(), secureRandom);
 
     return keyGen.generateKey();
+  }
+
+  public String spec() {
+    return spec;
   }
 }

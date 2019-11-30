@@ -7,4 +7,8 @@ public class EchoResponse extends OKResponse {
     super();
     this.message = message;
   }
+
+  public String getMessage() {
+    return message;
+  }
 }

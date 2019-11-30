@@ -8,4 +8,12 @@ public class HTTPStatusPair {
     this.code = code;
     this.message = message;
   }
+
+  public String getMessage() {
+    return message;
+  }
+
+  public int getCode() {
+    return code;
+  }
 }

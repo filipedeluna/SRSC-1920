@@ -6,7 +6,7 @@ public class ValidateResponse extends OKResponse {
   private String valid;
 
   public ValidateResponse(boolean validation) {
-    this.valid = validation ? "true : false";
+    this.valid = String.valueOf(validation);
   }
 
   public String getValid() {
