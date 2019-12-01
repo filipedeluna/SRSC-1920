@@ -5,12 +5,14 @@ import java.security.*;
 import java.util.Base64;
 
 public abstract class CryptoUtils {
+  private static final String PROVIDER = "BC";
+
   private static final SecureRandom secureRandom = new SecureRandom();
 
-  public static KeyStore loadKeystore(String file, char[] pass) throws IOException, GeneralSecurityException {
+  public static KeyStore loadKeystore(String file, String type, char[] pass) throws IOException, GeneralSecurityException {
     FileInputStream stream = new FileInputStream(file);
 
-    KeyStore ks = KeyStore.getInstance("jceks");
+    KeyStore ks = KeyStore.getInstance(type, PROVIDER);
     ks.load(stream, pass);
 
     return ks;

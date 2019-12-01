@@ -2,10 +2,10 @@ package server;
 
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
-import pki.db.PKIDatabaseDriver;
 import pki.props.PKIProperty;
 import pki.responses.SignResponse;
 import pki.responses.ValidateResponse;
+import server.db.ServerDatabaseDriver;
 import shared.errors.IHTTPStatusException;
 import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
@@ -18,13 +18,16 @@ import shared.http.HTTPStatus;
 import shared.response.EchoResponse;
 import shared.response.ErrorResponse;
 import shared.response.OKResponse;
-import shared.utils.JsonConverter;
+import shared.utils.GsonUtils;
 import shared.utils.crypto.Base64Helper;
 import shared.utils.crypto.CertificateHelper;
 import shared.utils.crypto.HashHelper;
 import shared.utils.properties.CustomProperties;
 
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocket;
+import javax.security.cert.CertificateEncodingException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -33,10 +36,11 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
 class ServerResources implements Runnable {
-  private PKIDatabaseDriver db;
+  private ServerDatabaseDriver db;
   private boolean debugMode;
   private KeyStore keyStore;
 
@@ -45,7 +49,7 @@ class ServerResources implements Runnable {
   private OutputStream output;
 
   private Gson gson;
-  private CertificateHelper certificateHelper;
+  private CertificateHelper certHelper;
   private HashHelper hashHelper;
   private Base64Helper base64Helper;
 
@@ -55,15 +59,17 @@ class ServerResources implements Runnable {
   private String token;
   private int certificateValidityDays;
 
-  ServerResources(SSLSocket client, CustomProperties properties, KeyStore keyStore, PKIDatabaseDriver db, boolean debugMode) throws GeneralSecurityException, PropertyException {
+  ServerResources(SSLSocket client, CustomProperties properties, KeyStore keyStore, ServerDatabaseDriver db, boolean debugMode) throws GeneralSecurityException, PropertyException {
     this.client = client;
     this.keyStore = keyStore;
     this.db = db;
     this.debugMode = debugMode;
 
+    // Before running any code, check the certificate is not revoked
+
     hashHelper = new HashHelper(properties.getString(PKIProperty.HASH_ALGORITHM));
-    certificateHelper = new CertificateHelper();
-    gson = buildGsonInstance();
+    certHelper = new CertificateHelper();
+    gson = GsonUtils.buildGsonInstance();
     base64Helper = new Base64Helper();
 
     keystorePassword = properties.getString(PKIProperty.KEYSTORE_PASS);
@@ -94,7 +100,7 @@ class ServerResources implements Runnable {
 
   private void handleRequest(JsonObject requestData) throws RequestException, IOException, DatabaseException, GeneralSecurityException, CriticalDatabaseException {
     try {
-      String requestType = JsonConverter.getString(requestData, "type");
+      String requestType = GsonUtils.getString(requestData, "type");
 
       switch (requestType) {
         case "echo":
@@ -119,7 +125,7 @@ class ServerResources implements Runnable {
 
   // Echo
   private void echo(JsonObject requestData) throws RequestException, IOException {
-    String message = JsonConverter.getString(requestData, "message");
+    String message = GsonUtils.getString(requestData, "message");
 
     EchoResponse response = new EchoResponse(message);
 
@@ -130,23 +136,23 @@ class ServerResources implements Runnable {
   private synchronized void sign(JsonObject requestData) throws RequestException, GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException {
     // token validity should be verified but is out of work scope.
     // users could purchase a valid token to certify one certificate
-    String token = JsonConverter.getString(requestData, "token");
+    String token = GsonUtils.getString(requestData, "token");
 
     // We will use a predefined token value for test purposes
     if (!token.equals(this.token))
       throw new CustomRequestException("Invalid token", HTTPStatus.UNAUTHORIZED);
 
     // Get public key and certificate and decode them
-    String publicKeyEncoded = JsonConverter.getString(requestData, "publicKey");
-    String certificateEncoded = JsonConverter.getString(requestData, "certificate");
+    String publicKeyEncoded = GsonUtils.getString(requestData, "publicKey");
+    String certificateEncoded = GsonUtils.getString(requestData, "certificate");
     byte[] publicKeyBytes = base64Helper.decode(publicKeyEncoded);
     byte[] certificateBytes = base64Helper.decode(certificateEncoded);
 
     // Generate cert and public key and verify if public key and cert match
-    PublicKey certPublicKey = certificateHelper.RSAKeyFromBytes(publicKeyBytes);
-    X509Certificate certificate = certificateHelper.fromBytes(certificateBytes);
+    PublicKey certPublicKey = certHelper.RSAKeyFromBytes(publicKeyBytes);
+    X509Certificate certificate = certHelper.fromBytes(certificateBytes);
 
-    if (!certificateHelper.validate(certPublicKey, certificate))
+    if (!certHelper.validate(certPublicKey, certificate))
       throw new CustomRequestException("Public key does not match certificate", HTTPStatus.BAD_REQUEST);
 
     // Get private key and sign certificate
@@ -154,10 +160,10 @@ class ServerResources implements Runnable {
     X509Certificate pkiCertificate = (X509Certificate) keyStore.getCertificate(pkiCert);
 
     X509Certificate signedCertificate =
-        certificateHelper.signCertificate(certificate, pkiCertificate, pkiPrivateKey, certificateValidityDays);
+        certHelper.signCertificate(certificate, pkiCertificate, pkiPrivateKey, certificateValidityDays);
 
     // Hash and encode certificate to register entry in db
-    byte[] signedCertBytes = certificateHelper.toBytes(signedCertificate);
+    byte[] signedCertBytes = certHelper.toBytes(signedCertificate);
     byte[] signedCertHashBytes = hashHelper.hash(signedCertBytes);
     String signedCertHashEncoded = base64Helper.encode(signedCertHashBytes);
 
@@ -171,7 +177,7 @@ class ServerResources implements Runnable {
   // Is Revoked
   private synchronized void validate(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException {
     // Get certificate and decode to bytes
-    String certificateEncoded = JsonConverter.getString(requestData, "certificate");
+    String certificateEncoded = GsonUtils.getString(requestData, "certificate");
     byte[] certificateBytes = base64Helper.decode(certificateEncoded);
 
     // Hash certificate and check if valid
@@ -190,14 +196,14 @@ class ServerResources implements Runnable {
   private synchronized void revoke(JsonObject requestData) throws RequestException, IOException, DatabaseException, CriticalDatabaseException {
     // token validity should be verified but is out of work scope.
     // this token would be issued to an admin so he could revoke certificates at will
-    String token = JsonConverter.getString(requestData, "token");
+    String token = GsonUtils.getString(requestData, "token");
 
     // We will use a predefined token value for test purposes
     if (!token.equals(this.token))
       throw new CustomRequestException("Invalid token", HTTPStatus.UNAUTHORIZED);
 
     // Get certificate and public key
-    String certificateEncoded = JsonConverter.getString(requestData, "certificate");
+    String certificateEncoded = GsonUtils.getString(requestData, "certificate");
 
     db.revoke(certificateEncoded);
 
@@ -247,13 +253,5 @@ class ServerResources implements Runnable {
 
   private void send(String message) throws IOException {
     output.write(message.getBytes(StandardCharsets.UTF_8));
-  }
-
-  private Gson buildGsonInstance() {
-    return new GsonBuilder()
-        .serializeNulls()
-        .setFieldNamingPolicy(FieldNamingPolicy.IDENTITY)
-        .setPrettyPrinting()
-        .create();
   }
 }

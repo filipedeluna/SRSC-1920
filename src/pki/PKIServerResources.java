@@ -2,6 +2,7 @@ package pki;
 
 import java.io.*;
 import java.lang.Thread;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.cert.X509Certificate;
@@ -18,7 +19,7 @@ import shared.errors.db.DatabaseException;
 import shared.errors.properties.PropertyException;
 import shared.errors.request.CustomRequestException;
 import shared.response.OKResponse;
-import shared.utils.JsonConverter;
+import shared.utils.GsonUtils;
 import shared.response.EchoResponse;
 import shared.response.ErrorResponse;
 import shared.errors.request.InvalidFormatException;
@@ -60,7 +61,7 @@ class PKIServerResources implements Runnable {
 
     hashHelper = new HashHelper(properties.getString(PKIProperty.HASH_ALGORITHM));
     certificateHelper = new CertificateHelper();
-    gson = buildGsonInstance();
+    gson = GsonUtils.buildGsonInstance();
     base64Helper = new Base64Helper();
 
     keystorePassword = properties.getString(PKIProperty.KEYSTORE_PASS);
@@ -79,7 +80,7 @@ class PKIServerResources implements Runnable {
 
   public void run() {
     try {
-      JsonObject parsedRequest = parseRequest(input);
+      JsonObject parsedRequest = GsonUtils.parseRequest(input);
 
       handleRequest(parsedRequest);
 
@@ -91,7 +92,7 @@ class PKIServerResources implements Runnable {
 
   private void handleRequest(JsonObject requestData) throws RequestException, IOException, DatabaseException, GeneralSecurityException, CriticalDatabaseException {
     try {
-      String requestType = JsonConverter.getString(requestData, "type");
+      String requestType = GsonUtils.getString(requestData, "type");
 
       switch (requestType) {
         case "echo":
@@ -116,7 +117,7 @@ class PKIServerResources implements Runnable {
 
   // Echo
   private void echo(JsonObject requestData) throws RequestException, IOException {
-    String message = JsonConverter.getString(requestData, "message");
+    String message = GsonUtils.getString(requestData, "message");
 
     EchoResponse response = new EchoResponse(message);
 
@@ -127,15 +128,15 @@ class PKIServerResources implements Runnable {
   private synchronized void sign(JsonObject requestData) throws RequestException, GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException {
     // token validity should be verified but is out of work scope.
     // users could purchase a valid token to certify one certificate
-    String token = JsonConverter.getString(requestData, "token");
+    String token = GsonUtils.getString(requestData, "token");
 
     // We will use a predefined token value for test purposes
     if (!token.equals(this.token))
       throw new CustomRequestException("Invalid token", HTTPStatus.UNAUTHORIZED);
 
     // Get public key and certificate and decode them
-    String publicKeyEncoded = JsonConverter.getString(requestData, "publicKey");
-    String certificateEncoded = JsonConverter.getString(requestData, "certificate");
+    String publicKeyEncoded = GsonUtils.getString(requestData, "publicKey");
+    String certificateEncoded = GsonUtils.getString(requestData, "certificate");
     byte[] publicKeyBytes = base64Helper.decode(publicKeyEncoded);
     byte[] certificateBytes = base64Helper.decode(certificateEncoded);
 
@@ -153,12 +154,17 @@ class PKIServerResources implements Runnable {
     X509Certificate signedCertificate =
         certificateHelper.signCertificate(certificate, pkiCertificate, pkiPrivateKey, certificateValidityDays);
 
+    // Get serial number and add to db
+    BigInteger serialNumber = signedCertificate.getSerialNumber();
+    byte[] serialNumberBytes = serialNumber.toByteArray();
+    String serialNumberEncoded = base64Helper.encode(serialNumberBytes);
+
     // Hash and encode certificate to register entry in db
     byte[] signedCertBytes = certificateHelper.toBytes(signedCertificate);
     byte[] signedCertHashBytes = hashHelper.hash(signedCertBytes);
     String signedCertHashEncoded = base64Helper.encode(signedCertHashBytes);
 
-    db.register(signedCertHashEncoded);
+    db.register(serialNumberEncoded);
 
     // Create payload and send response
     SignResponse response = new SignResponse(signedCertHashEncoded);
@@ -168,15 +174,10 @@ class PKIServerResources implements Runnable {
   // Is Revoked
   private synchronized void validate(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
     // Get certificate and decode to bytes
-    String certificateEncoded = JsonConverter.getString(requestData, "certificate");
-    byte[] certificateBytes = base64Helper.decode(certificateEncoded);
-
-    // Hash certificate and check if valid
-    byte[] certificateHash = hashHelper.hash(certificateBytes);
-    String certificateHashEncoded = base64Helper.encode(certificateHash);
+    String serialNumber = GsonUtils.getString(requestData, "serialNumber");
 
     // Validate, build and send response
-    boolean valid = db.isValid(certificateHashEncoded);
+    boolean valid = db.isValid(serialNumber);
 
     ValidateResponse response = new ValidateResponse(valid);
 
@@ -187,16 +188,16 @@ class PKIServerResources implements Runnable {
   private synchronized void revoke(JsonObject requestData) throws RequestException, IOException, DatabaseException, CriticalDatabaseException {
     // token validity should be verified but is out of work scope.
     // this token would be issued to an admin so he could revoke certificates at will
-    String token = JsonConverter.getString(requestData, "token");
+    String token = GsonUtils.getString(requestData, "token");
 
     // We will use a predefined token value for test purposes
     if (!token.equals(this.token))
       throw new CustomRequestException("Invalid token", HTTPStatus.UNAUTHORIZED);
 
     // Get certificate and public key
-    String certificateEncoded = JsonConverter.getString(requestData, "certificate");
+    String serialNumber = GsonUtils.getString(requestData, "serialNumber");
 
-    db.revoke(certificateEncoded);
+    db.revoke(serialNumber);
 
     OKResponse response = new OKResponse();
 
@@ -206,14 +207,7 @@ class PKIServerResources implements Runnable {
   /*
     UTILS
   */
-  private JsonObject parseRequest(JsonReader reader) throws InvalidFormatException {
-    JsonElement data = new JsonParser().parse(reader);
 
-    if (!data.isJsonObject())
-      throw new InvalidFormatException();
-
-    return data.getAsJsonObject();
-  }
 
   private void handleException(Exception exception, boolean debugMode) {
     ErrorResponse response;
@@ -244,13 +238,5 @@ class PKIServerResources implements Runnable {
 
   private void send(String message) throws IOException {
     output.write(message.getBytes(StandardCharsets.UTF_8));
-  }
-
-  private Gson buildGsonInstance() {
-    return new GsonBuilder()
-        .serializeNulls()
-        .setFieldNamingPolicy(FieldNamingPolicy.IDENTITY)
-        .setPrettyPrinting()
-        .create();
   }
 }

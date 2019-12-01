@@ -9,7 +9,8 @@ public enum ServerProperty implements ICustomProperty {
   // System
   DEBUG("port", CustomPropertyType.BOOL),
   THREAD_POOL_SIZE("thread_pool_size", CustomPropertyType.INT),
-  DATABASE("database_location", CustomPropertyType.INT),
+  DATABASE_LOC("database_location", CustomPropertyType.STRING),
+  DATABASE_FILES_LOC("database_files_location", CustomPropertyType.STRING),
 
   // Network
   PORT("port", CustomPropertyType.INT),
@@ -25,7 +26,11 @@ public enum ServerProperty implements ICustomProperty {
   TRUSTSTORE_TYPE("truststore_type", CustomPropertyType.STRING),
   TRUSTSTORE_PASS("truststore_pass", CustomPropertyType.STRING),
 
-  HASH_ALG("hash_algorithm", CustomPropertyType.STRING);
+  HASH_ALG("hash_algorithm", CustomPropertyType.STRING),
+
+  // PKI Server
+  PKI_SERVER_ADDRESS("pki_server_address", CustomPropertyType.STRING),
+  PKI_SERVER_PORT("pki_server_port", CustomPropertyType.INT);
 
   /////////////////////////////////////////////////
 

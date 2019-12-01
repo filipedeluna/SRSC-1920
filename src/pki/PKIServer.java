@@ -47,7 +47,7 @@ class PKIServer {
       // Load Keystore
       String keyStorePass = properties.getString(PKIProperty.KEYSTORE_PASS);
       String keyStoreType = properties.getString(PKIProperty.KEYSTORE_TYPE);
-      KeyStore keyStore = KeyStore.getInstance(keyStoreType);
+      KeyStore keyStore = KeyStore.getInstance(keyStoreType, PROVIDER);
       keyStore.load(new FileInputStream(properties.getString(PKIProperty.KEYSTORE_LOC)), keyStorePass.toCharArray());
 
       // Initiate KMF

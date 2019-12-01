@@ -13,10 +13,13 @@ public final class ServerDatabaseDriver {
   private static final int ERR_NOT_FOUND = 12;
 
   private Connection connection;
+  private String filesPath;
 
-  public ServerDatabaseDriver(String path) throws CriticalDatabaseException {
+  public ServerDatabaseDriver(String dbPath, String filesPath) throws CriticalDatabaseException {
+    this.filesPath = filesPath;
+
     // Connect to file
-    connection = connect(path);
+    connection = connect(dbPath);
 
     // Create table if it does not exist
     createTables();
@@ -35,7 +38,7 @@ public final class ServerDatabaseDriver {
     try {
       String query =
           "CREATE TABLE IF NOT EXISTS entries (" +
-              "cert_hash       TEXT    NOT NULL UNIQUE, " +
+              "serial_number   TEXT    NOT NULL UNIQUE, " +
               "revoked         INTEGER NOT NULL, " +
               "PRIMARY KEY (cert_hash)" +
               ");";
@@ -46,12 +49,12 @@ public final class ServerDatabaseDriver {
     }
   }
 
-  public void register(String certHash) throws DatabaseException, CriticalDatabaseException {
+  public void register(String serialNumber) throws DatabaseException, CriticalDatabaseException {
     try {
-      String insertQuery = "INSERT INTO entries (cert_hash, revoked) VALUES (?, 0);";
+      String insertQuery = "INSERT INTO entries (serial_number, revoked) VALUES (?, 0);";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
-      ps.setString(1, certHash);
+      ps.setString(1, serialNumber);
 
       ps.executeUpdate();
     } catch (SQLException e) {
@@ -62,12 +65,12 @@ public final class ServerDatabaseDriver {
     }
   }
 
-  public boolean isValid(String certHash) throws CriticalDatabaseException {
+  public boolean isValid(String serialNumber) throws CriticalDatabaseException {
     try {
-      String selectUser = "SELECT * FROM entries WHERE cert_hash = ? AND revoked = 0;";
+      String selectUser = "SELECT * FROM entries WHERE serial_number = ? AND revoked = 0;";
 
       PreparedStatement ps = connection.prepareStatement(selectUser);
-      ps.setString(1, certHash);
+      ps.setString(1, serialNumber);
 
       ResultSet rs = ps.executeQuery();
       return rs.next();
@@ -76,12 +79,12 @@ public final class ServerDatabaseDriver {
     }
   }
 
-  public void revoke(String certHash) throws DatabaseException, CriticalDatabaseException {
+  public void revoke(String serialNumber) throws DatabaseException, CriticalDatabaseException {
     try {
-      String selectUser = "UPDATE entries SET revoked = 1 WHERE cert_hash = ?;";
+      String selectUser = "UPDATE entries SET revoked = 1 WHERE serial_number = ?;";
 
       PreparedStatement ps = connection.prepareStatement(selectUser);
-      ps.setString(1, certHash);
+      ps.setString(1, serialNumber);
 
       int updated = ps.executeUpdate();
 

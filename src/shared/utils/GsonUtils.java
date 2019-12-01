@@ -1,15 +1,15 @@
 package shared.utils;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.google.gson.*;
+import com.google.gson.stream.JsonReader;
+import shared.errors.request.InvalidFormatException;
 import shared.errors.request.InvalidValueTypeException;
 import shared.errors.request.MissingValueException;
 import shared.errors.request.RequestException;
 
 import java.util.ArrayList;
 
-public abstract class JsonConverter {
+public abstract class GsonUtils {
   public static String getString(JsonObject obj, String val) throws RequestException {
     try {
       return getElement(obj, val).getAsString();
@@ -95,5 +95,22 @@ public abstract class JsonConverter {
       throw new MissingValueException(val);
 
     return elem;
+  }
+
+  public static Gson buildGsonInstance() {
+    return new GsonBuilder()
+        .serializeNulls()
+        .setFieldNamingPolicy(FieldNamingPolicy.IDENTITY)
+        .setPrettyPrinting()
+        .create();
+  }
+
+  public static JsonObject parseRequest(JsonReader reader) throws InvalidFormatException {
+    JsonElement data = new JsonParser().parse(reader);
+
+    if (!data.isJsonObject())
+      throw new InvalidFormatException();
+
+    return data.getAsJsonObject();
   }
 }
