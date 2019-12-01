@@ -10,6 +10,7 @@ public enum ClientProperty implements ICustomProperty {
   CIPHERSUITES("ciphersuites", CustomPropertyType.STRING_ARRAY),
   PROTOCOLS("protocols", CustomPropertyType.STRING_ARRAY);
   /////////////////////////////////////////////////
+
   private String val;
   private CustomPropertyType type;
 
