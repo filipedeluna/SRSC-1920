@@ -6,19 +6,16 @@ import server.db.ServerDatabaseDriver;
 import server.props.ServerProperty;
 import shared.errors.properties.InvalidValueException;
 import shared.errors.properties.PropertyException;
-import shared.utils.CryptoUtils;
+import shared.utils.CryptUtil;
 import shared.utils.GsonUtils;
 import shared.utils.crypto.Base64Helper;
 import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.*;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
@@ -56,7 +53,6 @@ class Server {
       // Set java properties and get Keystore
       setJavaProperties();
       KeyStore keyStore = getKeyStore(properties);
-
 
       // Create SSL Socket
       int port = properties.getInt(ServerProperty.PORT);
@@ -141,7 +137,7 @@ class Server {
     String trustStorePass = properties.getString(ServerProperty.TRUSTSTORE_PASS);
     String trustStoreType = properties.getString(ServerProperty.TRUSTSTORE_TYPE);
 
-    KeyStore trustStore = CryptoUtils.loadKeystore(trustStoreLoc, trustStoreType, trustStorePass.toCharArray());
+    KeyStore trustStore = CryptUtil.loadKeystore(trustStoreLoc, trustStoreType, trustStorePass.toCharArray());
 
     TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("SunX509", PROVIDER);
     trustManagerFactory.init(trustStore);
@@ -154,7 +150,7 @@ class Server {
     String keyStorePass = properties.getString(ServerProperty.KEYSTORE_PASS);
     String keyStoreType = properties.getString(ServerProperty.KEYSTORE_TYPE);
 
-    return CryptoUtils.loadKeystore(keyStoreLoc, keyStoreType, keyStorePass.toCharArray());
+    return CryptUtil.loadKeystore(keyStoreLoc, keyStoreType, keyStorePass.toCharArray());
   }
 
   private static SSLContext buildSSLContext(CustomProperties properties, KeyStore keyStore) throws GeneralSecurityException, IOException, PropertyException {

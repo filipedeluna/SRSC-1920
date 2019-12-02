@@ -1,14 +1,16 @@
 package shared.utils.crypto;
 
+import shared.utils.CryptUtil;
+
 import javax.crypto.KeyAgreement;
 import javax.crypto.spec.DHParameterSpec;
 import java.math.BigInteger;
 import java.security.*;
 
 public class DHHelper {
-  private static final String PROVIDER = "BC";
+  private static final String PROVIDER = CryptUtil.PROVIDER;
 
-  private static final SecureRandom secureRandom = new SecureRandom();
+  private static final SecureRandom secureRandom = CryptUtil.RANDOM;
 
   private String dhAlg;
   private KeyPairGenerator keyPairGenerator;

@@ -106,15 +106,31 @@ class ServerResources implements Runnable {
         case "echo":
           echo(requestData);
           break;
-        case "sign":
+        case "create":
           sign(requestData);
           break;
-        case "validate":
+        case "list":
           validate(requestData);
           break;
-        case "revoke":
+        case "new":
           revoke(requestData);
           break;
+        case "all":
+          revoke(requestData);
+          break;
+        case "send":
+          revoke(requestData);
+          break;
+        case "recv":
+          revoke(requestData);
+          break;
+        case "receipt":
+          revoke(requestData);
+          break;
+        case "status":
+          revoke(requestData);
+          break;
+
         default:
           throw new InvalidRouteException();
       }

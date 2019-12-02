@@ -1,19 +1,18 @@
 package shared.utils.crypto;
 
+import shared.utils.CryptUtil;
+
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
-import java.util.Base64;
 
 
 public class HashHelper {
-  private static final String PROVIDER = "BC";
+  private static final String PROVIDER = CryptUtil.PROVIDER;
 
   private MessageDigest messageDigest;
 
   public HashHelper(String algorithm) throws GeneralSecurityException {
     this.messageDigest = MessageDigest.getInstance(algorithm, PROVIDER);
-
-
   }
 
   public byte[] hash(byte[] data) {

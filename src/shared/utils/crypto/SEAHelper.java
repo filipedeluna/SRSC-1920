@@ -1,15 +1,13 @@
 package shared.utils.crypto;
 
+import shared.utils.CryptUtil;
+
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.*;
 
 public class SEAHelper {
-  private static final String PROVIDER = "BC";
-
-  private static final SecureRandom secureRandom = new SecureRandom();
-
   private String spec;
   private String mode;
   private Cipher cipher;
@@ -19,8 +17,8 @@ public class SEAHelper {
     this.mode = mode;
 
     spec = algorithm + "/" + mode + "/" + padding;
-    cipher = Cipher.getInstance(spec, PROVIDER);
-    keyGen = KeyGenerator.getInstance(cipher.getAlgorithm(), PROVIDER);
+    cipher = Cipher.getInstance(spec, CryptUtil.PROVIDER);
+    keyGen = KeyGenerator.getInstance(cipher.getAlgorithm(), CryptUtil.PROVIDER);
   }
 
   public byte[] decryptSymmetric(byte[] buff, Key key, byte[] iv) throws GeneralSecurityException {
@@ -62,13 +60,13 @@ public class SEAHelper {
   public byte[] generateIV() {
     byte[] iv = new byte[cipher.getBlockSize()];
 
-    secureRandom.nextBytes(iv);
+    CryptUtil.RANDOM.nextBytes(iv);
 
     return iv;
   }
 
   public SecretKey generateKey() {
-    keyGen.init(cipher.getBlockSize(), secureRandom);
+    keyGen.init(cipher.getBlockSize(), CryptUtil.RANDOM);
 
     return keyGen.generateKey();
   }

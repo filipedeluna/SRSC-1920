@@ -1,5 +1,7 @@
 package shared.utils.crypto;
 
+import shared.utils.CryptUtil;
+
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
@@ -7,9 +9,9 @@ import javax.crypto.spec.SecretKeySpec;
 import java.security.*;
 
 public class MacHelper {
-  private static final String PROVIDER = "BC";
+  private static final String PROVIDER = CryptUtil.PROVIDER;
 
-  private static final SecureRandom secureRandom = new SecureRandom();
+  private static final SecureRandom secureRandom = CryptUtil.RANDOM;
 
   private Mac mac;
   private KeyGenerator keyGen;
