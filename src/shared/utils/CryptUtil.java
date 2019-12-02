@@ -3,7 +3,6 @@ package shared.utils;
 import java.io.*;
 import java.security.*;
 import java.util.Base64;
-import java.util.Random;
 
 public abstract class CryptUtil {
   public static final String PROVIDER = "BC";
@@ -13,7 +12,7 @@ public abstract class CryptUtil {
   public static KeyStore loadKeystore(String file, String type, char[] pass) throws IOException, GeneralSecurityException {
     FileInputStream stream = new FileInputStream(file);
 
-    KeyStore ks = KeyStore.getInstance(type, PROVIDER);
+    KeyStore ks = KeyStore.getInstance(type);
     ks.load(stream, pass);
 
     return ks;

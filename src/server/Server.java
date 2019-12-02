@@ -1,6 +1,7 @@
 package server;
 
 import com.google.gson.Gson;
+import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 import server.crypt.CustomTrustManager;
 import server.db.ServerDatabaseDriver;
 import server.props.ServerProperty;
@@ -16,15 +17,18 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
+import java.security.Security;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 class Server {
-  private static final String PROPS_PATH = "server/props/server.properties";
+  private static final String PROPS_PATH = "src/server/props/server.properties";
   private static final String PROVIDER = "BC";
+  private static final String PROVIDER_TLS = "BCJSSE";
 
   @SuppressWarnings("InfiniteLoopStatement")
   public static void main(String[] args) {
+    Security.addProvider(new BouncyCastleJsseProvider());
 
     // Get properties from file
     CustomProperties properties = null;
@@ -45,7 +49,7 @@ class Server {
       // Create thread pool for clients
       int threadPoolSize = properties.getInt(ServerProperty.THREAD_POOL_SIZE);
 
-      if (validateThreadCount(threadPoolSize))
+      if (!validateThreadCount(threadPoolSize))
         throw new InvalidValueException(ServerProperty.THREAD_POOL_SIZE.val());
 
       Executor executor = Executors.newFixedThreadPool(threadPoolSize);
@@ -70,7 +74,7 @@ class Server {
       serverSocket.setEnabledCipherSuites(enabledCipherSuites);
 
       // Set up auth unilateral or mutual
-      boolean mutualAuth = properties.getBoolean(ServerProperty.TLS_CIPHERSUITES);
+      boolean mutualAuth = properties.getBoolean(ServerProperty.TLS_MUTUAL_AUTH);
       serverSocket.setNeedClientAuth(mutualAuth);
 
       System.out.print("Started server on port " + port + "\n");
@@ -126,7 +130,7 @@ class Server {
   private static KeyManagerFactory getKeyManagerFactory(CustomProperties properties, KeyStore keyStore) throws PropertyException, GeneralSecurityException {
     String keyStorePass = properties.getString(ServerProperty.KEYSTORE_PASS);
 
-    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509", PROVIDER);
+    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509", PROVIDER_TLS);
     keyManagerFactory.init(keyStore, keyStorePass.toCharArray());
 
     return keyManagerFactory;
@@ -139,7 +143,7 @@ class Server {
 
     KeyStore trustStore = CryptUtil.loadKeystore(trustStoreLoc, trustStoreType, trustStorePass.toCharArray());
 
-    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("SunX509", PROVIDER);
+    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("X509", PROVIDER_TLS);
     trustManagerFactory.init(trustStore);
 
     return trustManagerFactory;
@@ -154,7 +158,7 @@ class Server {
   }
 
   private static SSLContext buildSSLContext(CustomProperties properties, KeyStore keyStore) throws GeneralSecurityException, IOException, PropertyException {
-    SSLContext defaultSSLContext = SSLContext.getInstance("TLS", PROVIDER);
+    SSLContext defaultSSLContext = SSLContext.getInstance("TLS", PROVIDER_TLS);
 
     // Build default context for use with custom trust manager (OCSP) Extension
     KeyManagerFactory keyManagerFactory = getKeyManagerFactory(properties, keyStore);
@@ -172,7 +176,7 @@ class Server {
     extendedTrustManagers[trustManagers.length] =
         new CustomTrustManager(properties, defaultSSLContext.getSocketFactory(), base64Helper, gson);
 
-    SSLContext serverSSLContext = SSLContext.getInstance("TLS", PROVIDER);
+    SSLContext serverSSLContext = SSLContext.getInstance("TLS", PROVIDER_TLS);
     serverSSLContext.init(keyManagers, extendedTrustManagers, new SecureRandom());
 
     return serverSSLContext;

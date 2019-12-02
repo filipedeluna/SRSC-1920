@@ -7,7 +7,7 @@ public enum ServerProperty implements ICustomProperty {
   // Add properties here
 
   // System
-  DEBUG("port", CustomPropertyType.BOOL),
+  DEBUG("debug", CustomPropertyType.BOOL),
   THREAD_POOL_SIZE("thread_pool_size", CustomPropertyType.INT),
   DATABASE_LOC("database_location", CustomPropertyType.STRING),
   DATABASE_FILES_LOC("database_files_location", CustomPropertyType.STRING),
