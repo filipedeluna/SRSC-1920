@@ -26,7 +26,11 @@ public enum ServerProperty implements ICustomProperty {
   TRUSTSTORE_TYPE("truststore_type", CustomPropertyType.STRING),
   TRUSTSTORE_PASS("truststore_pass", CustomPropertyType.STRING),
 
-  HASH_ALG("hash_algorithm", CustomPropertyType.STRING),
+  PUB_KEY_ALG("pub_key_alg", CustomPropertyType.STRING),
+  PUB_KEY_SIZE("pub_key_size", CustomPropertyType.INT),
+  CERT_SIGN_ALG("cert_sign_alg", CustomPropertyType.STRING),
+
+  HASH_ALG("hash_alg", CustomPropertyType.STRING),
 
   // PKI Server
   PKI_SERVER_ADDRESS("pki_server_address", CustomPropertyType.STRING),

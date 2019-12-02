@@ -25,15 +25,15 @@ public enum PKIProperty implements ICustomProperty {
   PKI_PUB_KEY("pki_public_key", CustomPropertyType.STRING),
   PKI_CERT("pki_cert", CustomPropertyType.STRING),
 
+  PUB_KEY_ALG("pub_key_alg", CustomPropertyType.STRING),
+  PUB_KEY_SIZE("pub_key_size", CustomPropertyType.INT),
+  CERT_SIGN_ALG("cert_sign_alg", CustomPropertyType.STRING),
+
   HASH_ALGORITHM("hash_algorithm", CustomPropertyType.STRING),
 
   // PKI Properties
   TOKEN_VALUE("token_value", CustomPropertyType.STRING),
   CERTIFICATE_VALIDITY("certificate_validity", CustomPropertyType.INT);
-
-
-
-
 
   /////////////////////////////////////////////////
   private String val;

@@ -58,15 +58,11 @@ public class SEAHelper {
   }
 
   public byte[] generateIV() {
-    byte[] iv = new byte[cipher.getBlockSize()];
-
-    CryptUtil.RANDOM.nextBytes(iv);
-
-    return iv;
+    return CryptUtil.randomBytes(cipher.getBlockSize());
   }
 
   public SecretKey generateKey() {
-    keyGen.init(cipher.getBlockSize(), CryptUtil.RANDOM);
+    keyGen.init(cipher.getBlockSize(), new SecureRandom());
 
     return keyGen.generateKey();
   }

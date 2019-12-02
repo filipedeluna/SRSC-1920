@@ -11,8 +11,6 @@ import java.security.*;
 public class MacHelper {
   private static final String PROVIDER = CryptUtil.PROVIDER;
 
-  private static final SecureRandom secureRandom = CryptUtil.RANDOM;
-
   private Mac mac;
   private KeyGenerator keyGen;
 
@@ -42,7 +40,7 @@ public class MacHelper {
   }
 
   public SecretKey generateKey() {
-    keyGen.init(mac.getMacLength(), secureRandom);
+    keyGen.init(mac.getMacLength(), new SecureRandom());
 
     return keyGen.generateKey();
   }

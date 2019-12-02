@@ -10,8 +10,6 @@ import java.security.*;
 public class DHHelper {
   private static final String PROVIDER = CryptUtil.PROVIDER;
 
-  private static final SecureRandom secureRandom = CryptUtil.RANDOM;
-
   private String dhAlg;
   private KeyPairGenerator keyPairGenerator;
   private MessageDigest hash;
@@ -40,6 +38,6 @@ public class DHHelper {
   }
 
   public static BigInteger generatePrime(int size) {
-    return BigInteger.probablePrime(size, secureRandom);
+    return BigInteger.probablePrime(size, new SecureRandom());
   }
 }

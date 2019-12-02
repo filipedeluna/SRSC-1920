@@ -7,7 +7,7 @@ public class TestGson {
   private String error;
 
   public TestGson(String error) {
-    this.status = HTTPStatus.FORBIDDEN.build();
+    this.status = HTTPStatus.FORBIDDEN.buildPair();
     this.error = error;
   }
 }

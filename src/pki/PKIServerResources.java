@@ -9,6 +9,9 @@ import java.security.cert.X509Certificate;
 
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
+import org.bouncycastle.operator.OperatorException;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+import org.bouncycastle.pkcs.PKCSException;
 import pki.db.PKIDatabaseDriver;
 import pki.props.PKIProperty;
 import pki.responses.SignResponse;
@@ -22,12 +25,11 @@ import shared.response.OKResponse;
 import shared.utils.GsonUtils;
 import shared.response.EchoResponse;
 import shared.response.ErrorResponse;
-import shared.errors.request.InvalidFormatException;
 import shared.errors.request.InvalidRouteException;
 import shared.errors.request.RequestException;
 import shared.http.HTTPStatus;
+import shared.utils.crypto.AEAHelper;
 import shared.utils.crypto.Base64Helper;
-import shared.utils.crypto.CertificateHelper;
 import shared.utils.crypto.HashHelper;
 import shared.utils.properties.CustomProperties;
 
@@ -43,7 +45,7 @@ class PKIServerResources implements Runnable {
   private OutputStream output;
 
   private Gson gson;
-  private CertificateHelper certificateHelper;
+  private AEAHelper aeaHelper;
   private HashHelper hashHelper;
   private Base64Helper base64Helper;
 
@@ -60,15 +62,20 @@ class PKIServerResources implements Runnable {
     this.debugMode = debugMode;
 
     hashHelper = new HashHelper(properties.getString(PKIProperty.HASH_ALGORITHM));
-    certificateHelper = new CertificateHelper();
     gson = GsonUtils.buildGsonInstance();
     base64Helper = new Base64Helper();
+
+    String pubKeyAlg = properties.getString(PKIProperty.PUB_KEY_ALG);
+    String certSignAlg = properties.getString(PKIProperty.CERT_SIGN_ALG);
+    int pubKeySize = properties.getInt(PKIProperty.PUB_KEY_SIZE);
+
+    aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize);
 
     keystorePassword = properties.getString(PKIProperty.KEYSTORE_PASS);
     token = properties.getString(PKIProperty.TOKEN_VALUE);
     pkiPubKey = properties.getString(PKIProperty.PKI_PUB_KEY);
     pkiCert = properties.getString(PKIProperty.PKI_CERT);
-    certificateValidityDays = properties.getInt(PKIProperty.CERTIFICATE_VALIDITY);
+
     try {
       input = new JsonReader(new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8));
       output = client.getOutputStream();
@@ -90,7 +97,7 @@ class PKIServerResources implements Runnable {
     }
   }
 
-  private void handleRequest(JsonObject requestData) throws RequestException, IOException, DatabaseException, GeneralSecurityException, CriticalDatabaseException {
+  private void handleRequest(JsonObject requestData) throws RequestException, IOException, DatabaseException, GeneralSecurityException, CriticalDatabaseException, OperatorException, PKCSException {
     try {
       String requestType = GsonUtils.getString(requestData, "type");
 
@@ -125,7 +132,7 @@ class PKIServerResources implements Runnable {
   }
 
   // Register
-  private synchronized void sign(JsonObject requestData) throws RequestException, GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException {
+  private synchronized void sign(JsonObject requestData) throws RequestException, GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException, OperatorException, PKCSException {
     // token validity should be verified but is out of work scope.
     // users could purchase a valid token to certify one certificate
     String token = GsonUtils.getString(requestData, "token");
@@ -134,46 +141,37 @@ class PKIServerResources implements Runnable {
     if (!token.equals(this.token))
       throw new CustomRequestException("Invalid token", HTTPStatus.UNAUTHORIZED);
 
-    // Get public key and certificate and decode them
-    String publicKeyEncoded = GsonUtils.getString(requestData, "publicKey");
-    String certificateEncoded = GsonUtils.getString(requestData, "certificate");
-    byte[] publicKeyBytes = base64Helper.decode(publicKeyEncoded);
-    byte[] certificateBytes = base64Helper.decode(certificateEncoded);
+    // Get csr encoded from request and decode it
+    String certRequestEncoded = GsonUtils.getString(requestData, "certificationRequest");
+    byte[] certRequestBytes = base64Helper.decode(certRequestEncoded);
 
-    // Generate cert and public key and verify if public key and cert match
-    PublicKey certPublicKey = certificateHelper.RSAKeyFromBytes(publicKeyBytes);
-    X509Certificate certificate = certificateHelper.fromBytes(certificateBytes);
+    PKCS10CertificationRequest certRequest = new PKCS10CertificationRequest(certRequestBytes);
 
-    if (!certificateHelper.validate(certPublicKey, certificate))
-      throw new CustomRequestException("Public key does not match certificate", HTTPStatus.BAD_REQUEST);
-
-    // Get private key and sign certificate
+    // Get pki private key and cert and sign csr
     PrivateKey pkiPrivateKey = (PrivateKey) keyStore.getKey(pkiPubKey, keystorePassword.toCharArray());
     X509Certificate pkiCertificate = (X509Certificate) keyStore.getCertificate(pkiCert);
 
-    X509Certificate signedCertificate =
-        certificateHelper.signCertificate(certificate, pkiCertificate, pkiPrivateKey, certificateValidityDays);
+    X509Certificate signedCert =
+        aeaHelper.signCSR(certRequest, pkiCertificate, pkiPrivateKey, certificateValidityDays);
 
     // Get serial number and add to db
-    BigInteger serialNumber = signedCertificate.getSerialNumber();
-    byte[] serialNumberBytes = serialNumber.toByteArray();
-    String serialNumberEncoded = base64Helper.encode(serialNumberBytes);
+    BigInteger serialNumber = signedCert.getSerialNumber();
+    String serialNumberString = serialNumber.toString();
 
-    // Hash and encode certificate to register entry in db
-    byte[] signedCertBytes = certificateHelper.toBytes(signedCertificate);
-    byte[] signedCertHashBytes = hashHelper.hash(signedCertBytes);
-    String signedCertHashEncoded = base64Helper.encode(signedCertHashBytes);
+    db.register(serialNumberString);
 
-    db.register(serialNumberEncoded);
+    // encode signed certificate
+    byte[] signedCertBytes = aeaHelper.getCertBytes(signedCert);
+    String signedCertEncoded = base64Helper.encode(signedCertBytes);
 
     // Create payload and send response
-    SignResponse response = new SignResponse(signedCertHashEncoded);
+    SignResponse response = new SignResponse(signedCertEncoded);
     send(response.json(gson));
   }
 
   // Is Revoked
   private synchronized void validate(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
-    // Get certificate and decode to bytes
+    // Get certificate serial number
     String serialNumber = GsonUtils.getString(requestData, "serialNumber");
 
     // Validate, build and send response

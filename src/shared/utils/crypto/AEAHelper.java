@@ -122,11 +122,11 @@ public class AEAHelper {
 
   // Certificates --------------------------------------------------------------------------
 
-  public X509Certificate getCertFromBytes(byte[] certBytes) throws GeneralSecurityException {
+  public X509Certificate certFromBytes(byte[] certBytes) throws GeneralSecurityException {
     return (X509Certificate) certFactory.generateCertificate(new ByteArrayInputStream(certBytes));
   }
 
-  public byte[] getBytesFromCert(X509Certificate certificate) throws GeneralSecurityException {
+  public byte[] getCertBytes(X509Certificate certificate) throws GeneralSecurityException {
     return certificate.getTBSCertificate();
   }
 
@@ -138,10 +138,10 @@ public class AEAHelper {
     byte[] inCertBytes = cert.getTBSCertificate();
     X509CertInfo info = new X509CertInfo(inCertBytes);
 
-    long currentTime = System.currentTimeMillis();
+    long now = System.currentTimeMillis();
 
     try {
-      info.set("validity", new CertificateValidity(new Date(currentTime), new Date(currentTime + ONE_DAY * validityDays)));
+      info.set("validity", new CertificateValidity(new Date(now), new Date(now + ONE_DAY * validityDays)));
       info.set(X509CertInfo.ISSUER, issuerCert.getSubjectDN());
     } catch (IOException e) {
       throw new InvalidCertificateInfoException();
