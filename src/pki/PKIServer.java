@@ -1,5 +1,7 @@
 package pki;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 import pki.db.PKIDatabaseDriver;
 import pki.props.PKIProperty;
 import shared.errors.properties.InvalidValueException;
@@ -9,15 +11,18 @@ import shared.utils.properties.CustomProperties;
 import javax.net.ssl.*;
 import java.io.FileInputStream;
 import java.security.KeyStore;
+import java.security.Security;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 class PKIServer {
-  private static final String PROPS_PATH = "pki/props/pki.properties";
+  private static final String PROPS_PATH = "src/pki/props/pki.properties";
   private static final String PROVIDER = "BC";
+  private static final String PROVIDER_TLS = "BCJSSE";
 
   @SuppressWarnings("InfiniteLoopStatement")
   public static void main(String[] args) {
+    Security.addProvider(new BouncyCastleJsseProvider());
     System.setProperty("java.net.preferIPv4Stack", "true");
 
     // Get properties from file
@@ -39,7 +44,7 @@ class PKIServer {
       // Create thread pool for clients
       int threadPoolSize = properties.getInt(PKIProperty.THREAD_POOL_SIZE);
 
-      if (validateThreadCount(threadPoolSize))
+      if (!validateThreadCount(threadPoolSize))
         throw new InvalidValueException(PKIProperty.THREAD_POOL_SIZE.val());
 
       Executor executor = Executors.newFixedThreadPool(threadPoolSize);
@@ -47,17 +52,17 @@ class PKIServer {
       // Load Keystore
       String keyStorePass = properties.getString(PKIProperty.KEYSTORE_PASS);
       String keyStoreType = properties.getString(PKIProperty.KEYSTORE_TYPE);
-      KeyStore keyStore = KeyStore.getInstance(keyStoreType, PROVIDER);
+      KeyStore keyStore = KeyStore.getInstance(keyStoreType);
       keyStore.load(new FileInputStream(properties.getString(PKIProperty.KEYSTORE_LOC)), keyStorePass.toCharArray());
 
       // Initiate KMF
-      KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509", PROVIDER);
+      KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509", PROVIDER_TLS);
       keyManagerFactory.init(keyStore, keyStorePass.toCharArray());
 
       // Create SSL Socket and initialize server
       int port = properties.getInt(PKIProperty.PORT);
 
-      SSLContext sslContext = SSLContext.getInstance("TLS", PROVIDER);
+      SSLContext sslContext = SSLContext.getInstance("TLS", PROVIDER_TLS);
       sslContext.init(keyManagerFactory.getKeyManagers(), null, null);
 
       SSLServerSocketFactory ssf = sslContext.getServerSocketFactory();

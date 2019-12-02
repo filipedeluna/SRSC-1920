@@ -13,12 +13,12 @@ public enum PKIProperty implements ICustomProperty {
 
   // Network,
   PORT("port", CustomPropertyType.INT),
-  TLS_CIPHERSUITES("ciphersuites", CustomPropertyType.STRING_ARRAY),
-  TLS_PROTOCOLS("protocols", CustomPropertyType.STRING_ARRAY),
+  TLS_CIPHERSUITES("tls_ciphersuites", CustomPropertyType.STRING_ARRAY),
+  TLS_PROTOCOLS("tls_protocols", CustomPropertyType.STRING_ARRAY),
 
 
   // Crypt
-  KEYSTORE_LOC("keystore", CustomPropertyType.STRING),
+  KEYSTORE_LOC("keystore_location", CustomPropertyType.STRING),
   KEYSTORE_TYPE("keystore_type", CustomPropertyType.STRING),
   KEYSTORE_PASS("keystore_pass", CustomPropertyType.STRING),
 
