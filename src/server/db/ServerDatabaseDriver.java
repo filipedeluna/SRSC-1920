@@ -22,7 +22,7 @@ public final class ServerDatabaseDriver {
     connection = connect(dbPath);
 
     // Create table if it does not exist
-    createTables();
+    // createTables();
   }
 
   private Connection connect(String path) throws CriticalDatabaseException {
@@ -40,7 +40,7 @@ public final class ServerDatabaseDriver {
           "CREATE TABLE IF NOT EXISTS entries (" +
               "serial_number   TEXT    NOT NULL UNIQUE, " +
               "revoked         INTEGER NOT NULL, " +
-              "PRIMARY KEY (cert_hash)" +
+              "PRIMARY KEY (serial_number)" +
               ");";
 
       connection.createStatement().execute(query);

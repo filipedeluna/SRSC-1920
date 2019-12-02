@@ -8,12 +8,14 @@ import shared.errors.IHTTPStatusException;
 import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
 import shared.errors.properties.PropertyException;
+import shared.errors.request.CustomRequestException;
 import shared.errors.request.InvalidFormatException;
 import shared.errors.request.InvalidRouteException;
 import shared.errors.request.RequestException;
 import shared.http.HTTPStatus;
 import shared.response.EchoResponse;
 import shared.response.ErrorResponse;
+import shared.utils.CryptUtil;
 import shared.utils.GsonUtils;
 import shared.utils.crypto.AEAHelper;
 import shared.utils.crypto.Base64Helper;
@@ -21,6 +23,8 @@ import shared.utils.crypto.HashHelper;
 import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.SSLSocket;
+import java.security.PublicKey;
+import java.security.cert.X509Certificate;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -40,7 +44,7 @@ class ServerResources implements Runnable {
   private Gson gson;
   private AEAHelper aeaHelper;
   private HashHelper hashHelper;
-  private Base64Helper base64Helper;
+  private Base64Helper b64Helper;
 
   private String keystorePassword;
   private String token;
@@ -60,7 +64,7 @@ class ServerResources implements Runnable {
     aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize);
 
     gson = GsonUtils.buildGsonInstance();
-    base64Helper = new Base64Helper();
+    b64Helper = new Base64Helper();
     try {
       input = new JsonReader(new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8));
       output = client.getOutputStream();
@@ -91,7 +95,7 @@ class ServerResources implements Runnable {
           echo(requestData);
           break;
         case "create":
-          sign(requestData);
+          create(requestData);
           break;
         case "list":
           validate(requestData);
@@ -132,8 +136,32 @@ class ServerResources implements Runnable {
     send(response.json(gson));
   }
 
-  // Register
-  private synchronized void sign(JsonObject requestData) throws RequestException, GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException {
+  // Create user message box
+  private synchronized void create(JsonObject requestData) throws RequestException, GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException {
+    // Get public key and certificate from user
+    X509Certificate certificate = (X509Certificate) client.getSession().getPeerCertificates()[0];
+    PublicKey publicKey = certificate.getPublicKey();
+
+    String uuid = GsonUtils.getString(requestData, "uuid");
+
+
+    // Get extra fields
+    String diffieP = GsonUtils.getString(requestData, "diffieP");
+    String diffieG = GsonUtils.getString(requestData, "diffieG");
+
+    // Get extra fields signature
+    String signature = GsonUtils.getString(requestData, "signature");
+    byte[] signatureBytes = b64Helper.decode(signature);
+
+    // Join extra fields bytes and verify signature
+    byte[] extraFieldsBytes = CryptUtil.joinByteArrays(
+        diffieP.getBytes(),
+        diffieG.getBytes()
+    );
+
+    if (!aeaHelper.verifySignature(publicKey, extraFieldsBytes, signatureBytes))
+      throw new CustomRequestException("Data signature is not valid.", HTTPStatus.UNAUTHORIZED);
+
 
   }
 

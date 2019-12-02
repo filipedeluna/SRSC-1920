@@ -22,6 +22,7 @@ import sun.security.x509.X509CertInfo;
 import org.bouncycastle.asn1.x509.Extension;
 
 import javax.crypto.*;
+import javax.crypto.spec.DHParameterSpec;
 import javax.security.cert.CertificateEncodingException;
 import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
@@ -73,7 +74,7 @@ public class AEAHelper {
     return keyFactory.generatePublic(new X509EncodedKeySpec(keyBytes));
   }
 
-  public byte[] dsaSign(PrivateKey key, byte[] data) throws GeneralSecurityException {
+  public byte[] sign(PrivateKey key, byte[] data) throws GeneralSecurityException {
     signature.initSign(key, new SecureRandom());
 
     signature.update(data);
@@ -81,7 +82,7 @@ public class AEAHelper {
     return signature.sign();
   }
 
-  public boolean dsaVerify(PublicKey key, byte[] data, byte[] dataSignature) throws GeneralSecurityException {
+  public boolean verifySignature(PublicKey key, byte[] data, byte[] dataSignature) throws GeneralSecurityException {
     signature.initVerify(key);
 
     signature.update(data);

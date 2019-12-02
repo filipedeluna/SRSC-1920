@@ -39,7 +39,7 @@ public class CustomProperties extends java.util.Properties {
     }
   }
 
-  public boolean getBoolean(ICustomProperty prop) throws PropertyException {
+  public boolean getBool(ICustomProperty prop) throws PropertyException {
     if (prop.type() != CustomPropertyType.BOOL)
       throw new InvalidTypeException(prop.val(), "bool");
 
@@ -51,7 +51,7 @@ public class CustomProperties extends java.util.Properties {
     return Boolean.parseBoolean(value);
   }
 
-  public String[] getStringArray(ICustomProperty prop) throws PropertyException {
+  public String[] getStringArr(ICustomProperty prop) throws PropertyException {
     if (prop.type() != CustomPropertyType.STRING_ARRAY)
       throw new InvalidTypeException(prop.val(), "string array");
 

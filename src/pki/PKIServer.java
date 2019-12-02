@@ -1,6 +1,5 @@
 package pki;
 
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 import pki.db.PKIDatabaseDriver;
 import pki.props.PKIProperty;
@@ -33,7 +32,7 @@ class PKIServer {
     try {
       properties = new CustomProperties(PROPS_PATH);
 
-      debugMode = properties.getBoolean(PKIProperty.DEBUG);
+      debugMode = properties.getBool(PKIProperty.DEBUG);
     } catch (PropertyException e) {
       System.err.println(e.getMessage());
       System.exit(-1);
@@ -69,8 +68,8 @@ class PKIServer {
       SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port);
 
       // Set enabled protocols and cipher suites
-      String[] enabledProtocols = properties.getStringArray(PKIProperty.TLS_PROTOCOLS);
-      String[] enabledCipherSuites = properties.getStringArray(PKIProperty.TLS_CIPHERSUITES);
+      String[] enabledProtocols = properties.getStringArr(PKIProperty.TLS_PROTOCOLS);
+      String[] enabledCipherSuites = properties.getStringArr(PKIProperty.TLS_CIPHERSUITES);
 
       serverSocket.setEnabledProtocols(enabledProtocols);
       serverSocket.setEnabledCipherSuites(enabledCipherSuites);

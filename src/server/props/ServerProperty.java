@@ -14,7 +14,7 @@ public enum ServerProperty implements ICustomProperty {
 
   // Network
   PORT("port", CustomPropertyType.INT),
-  TLS_MUTUAL_AUTH("tls_mutual_auth", CustomPropertyType.STRING),
+  TLS_MUTUAL_AUTH("tls_mutual_auth", CustomPropertyType.BOOL),
   TLS_CIPHERSUITES("tls_ciphersuites", CustomPropertyType.STRING_ARRAY),
   TLS_PROTOCOLS("tls_protocols", CustomPropertyType.STRING_ARRAY),
 

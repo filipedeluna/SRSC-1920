@@ -28,6 +28,7 @@ class Server {
 
   @SuppressWarnings("InfiniteLoopStatement")
   public static void main(String[] args) {
+    System.setProperty("java.net.preferIPv4Stack", "true");
     Security.addProvider(new BouncyCastleJsseProvider());
 
     // Get properties from file
@@ -38,7 +39,7 @@ class Server {
     try {
       properties = new CustomProperties(PROPS_PATH);
 
-      debugMode = properties.getBoolean(ServerProperty.DEBUG);
+      debugMode = properties.getBool(ServerProperty.DEBUG);
     } catch (PropertyException e) {
       System.err.println(e.getMessage());
       System.exit(-1);
@@ -54,8 +55,7 @@ class Server {
 
       Executor executor = Executors.newFixedThreadPool(threadPoolSize);
 
-      // Set java properties and get Keystore
-      setJavaProperties();
+      // Get Keystore
       KeyStore keyStore = getKeyStore(properties);
 
       // Create SSL Socket
@@ -67,14 +67,14 @@ class Server {
       SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port);
 
       // Set enabled protocols and cipher suites
-      String[] enabledProtocols = properties.getStringArray(ServerProperty.TLS_PROTOCOLS);
-      String[] enabledCipherSuites = properties.getStringArray(ServerProperty.TLS_CIPHERSUITES);
+      String[] enabledProtocols = properties.getStringArr(ServerProperty.TLS_PROTOCOLS);
+      String[] enabledCipherSuites = properties.getStringArr(ServerProperty.TLS_CIPHERSUITES);
 
       serverSocket.setEnabledProtocols(enabledProtocols);
       serverSocket.setEnabledCipherSuites(enabledCipherSuites);
 
       // Set up auth unilateral or mutual
-      boolean mutualAuth = properties.getBoolean(ServerProperty.TLS_MUTUAL_AUTH);
+      boolean mutualAuth = properties.getBool(ServerProperty.TLS_MUTUAL_AUTH);
       serverSocket.setNeedClientAuth(mutualAuth);
 
       System.out.print("Started server on port " + port + "\n");
@@ -123,10 +123,6 @@ class Server {
     return totalThreads > threadCount && threadCount > 0;
   }
 
-  private static void setJavaProperties() {
-    System.setProperty("java.net.preferIPv4Stack", "true");
-  }
-
   private static KeyManagerFactory getKeyManagerFactory(CustomProperties properties, KeyStore keyStore) throws PropertyException, GeneralSecurityException {
     String keyStorePass = properties.getString(ServerProperty.KEYSTORE_PASS);
 
@@ -171,10 +167,9 @@ class Server {
     // Build server context with custom trust manager
     TrustManager[] extendedTrustManagers = new TrustManager[trustManagers.length + 1];
     System.arraycopy(trustManagers, 0, extendedTrustManagers, 0, trustManagers.length);
-    Base64Helper base64Helper = new Base64Helper();
     Gson gson = GsonUtils.buildGsonInstance();
     extendedTrustManagers[trustManagers.length] =
-        new CustomTrustManager(properties, defaultSSLContext.getSocketFactory(), base64Helper, gson);
+        new CustomTrustManager(properties, defaultSSLContext.getSocketFactory(), new Base64Helper(), gson);
 
     SSLContext serverSSLContext = SSLContext.getInstance("TLS", PROVIDER_TLS);
     serverSSLContext.init(keyManagers, extendedTrustManagers, new SecureRandom());

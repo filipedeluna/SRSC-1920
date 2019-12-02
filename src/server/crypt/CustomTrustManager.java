@@ -15,10 +15,8 @@ import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.*;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -38,7 +36,7 @@ public class CustomTrustManager implements X509TrustManager {
     int pkiServerPort = properties.getInt(ServerProperty.PKI_SERVER_PORT);
 
     socket = (SSLSocket) socketFactory.createSocket(pkiServerAddress, pkiServerPort);
-    debug = properties.getBoolean(ServerProperty.DEBUG);
+    debug = properties.getBool(ServerProperty.DEBUG);
     this.b64Helper = b64Helper;
     this.gson = gson;
   }
@@ -52,10 +50,9 @@ public class CustomTrustManager implements X509TrustManager {
       OutputStream output = socket.getOutputStream();
       JsonReader input = new JsonReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
 
-
       // Get cert sn, build and send request
-      byte[] certSN = clientCert.getSerialNumber().toByteArray();
-      ValidateCertificateRequest request = new ValidateCertificateRequest(b64Helper.encode(certSN));
+      String certSN = clientCert.getSerialNumber().toString();
+      ValidateCertificateRequest request = new ValidateCertificateRequest(certSN);
 
       String message = request.json(gson);
       output.write(message.getBytes(StandardCharsets.UTF_8));
