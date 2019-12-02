@@ -6,6 +6,7 @@ import java.util.Base64;
 
 public abstract class CryptUtil {
   public static final String PROVIDER = "BC";
+  public static final String PROVIDER_TLS = "BCJSSE";
 
   private static final SecureRandom RANDOM = new SecureRandom();
 

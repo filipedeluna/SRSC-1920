@@ -9,7 +9,7 @@ import shared.errors.properties.InvalidValueException;
 import shared.errors.properties.PropertyException;
 import shared.utils.CryptUtil;
 import shared.utils.GsonUtils;
-import shared.utils.crypto.Base64Helper;
+import shared.utils.crypto.B4Helper;
 import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.*;
@@ -23,8 +23,6 @@ import java.util.concurrent.Executors;
 
 class Server {
   private static final String PROPS_PATH = "src/server/props/server.properties";
-  private static final String PROVIDER = "BC";
-  private static final String PROVIDER_TLS = "BCJSSE";
 
   @SuppressWarnings("InfiniteLoopStatement")
   public static void main(String[] args) {
@@ -79,15 +77,18 @@ class Server {
 
       System.out.print("Started server on port " + port + "\n");
 
+      // Build DB and create shared properties class
       String databaseLocation = properties.getString(ServerProperty.DATABASE_LOC);
       String databaseFilesLocation = properties.getString(ServerProperty.DATABASE_FILES_LOC);
       ServerDatabaseDriver db = new ServerDatabaseDriver(databaseLocation, databaseFilesLocation);
 
+      ServerProperties svParams = new ServerProperties(properties, keyStore, db);
+
       // Client serving loop
       while (true) {
         SSLSocket sslClient = (SSLSocket) serverSocket.accept();
+        ServerResources serverResources = new ServerResources(sslClient, svParams);
 
-        ServerResources serverResources = new ServerResources(sslClient, properties, keyStore, db, debugMode);
         executor.execute(new Thread(serverResources));
       }
     } catch (Exception e) {
@@ -126,7 +127,7 @@ class Server {
   private static KeyManagerFactory getKeyManagerFactory(CustomProperties properties, KeyStore keyStore) throws PropertyException, GeneralSecurityException {
     String keyStorePass = properties.getString(ServerProperty.KEYSTORE_PASS);
 
-    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509", PROVIDER_TLS);
+    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509", CryptUtil.PROVIDER_TLS);
     keyManagerFactory.init(keyStore, keyStorePass.toCharArray());
 
     return keyManagerFactory;
@@ -139,7 +140,7 @@ class Server {
 
     KeyStore trustStore = CryptUtil.loadKeystore(trustStoreLoc, trustStoreType, trustStorePass.toCharArray());
 
-    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("X509", PROVIDER_TLS);
+    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("X509", CryptUtil.PROVIDER_TLS);
     trustManagerFactory.init(trustStore);
 
     return trustManagerFactory;
@@ -154,7 +155,7 @@ class Server {
   }
 
   private static SSLContext buildSSLContext(CustomProperties properties, KeyStore keyStore) throws GeneralSecurityException, IOException, PropertyException {
-    SSLContext defaultSSLContext = SSLContext.getInstance("TLS", PROVIDER_TLS);
+    SSLContext defaultSSLContext = SSLContext.getInstance("TLS", CryptUtil.PROVIDER_TLS);
 
     // Build default context for use with custom trust manager (OCSP) Extension
     KeyManagerFactory keyManagerFactory = getKeyManagerFactory(properties, keyStore);
@@ -169,9 +170,9 @@ class Server {
     System.arraycopy(trustManagers, 0, extendedTrustManagers, 0, trustManagers.length);
     Gson gson = GsonUtils.buildGsonInstance();
     extendedTrustManagers[trustManagers.length] =
-        new CustomTrustManager(properties, defaultSSLContext.getSocketFactory(), new Base64Helper(), gson);
+        new CustomTrustManager(properties, defaultSSLContext.getSocketFactory(), new B4Helper(), gson);
 
-    SSLContext serverSSLContext = SSLContext.getInstance("TLS", PROVIDER_TLS);
+    SSLContext serverSSLContext = SSLContext.getInstance("TLS", CryptUtil.PROVIDER_TLS);
     serverSSLContext.init(keyManagers, extendedTrustManagers, new SecureRandom());
 
     return serverSSLContext;

@@ -8,8 +8,4 @@ public class SignResponse extends OKResponse {
   public SignResponse(String certificate) {
     this.certificate = certificate;
   }
-
-  public String getCertificate() {
-    return certificate;
-  }
 }

@@ -2,8 +2,7 @@ package server;
 
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
-import server.db.ServerDatabaseDriver;
-import server.props.ServerProperty;
+import server.response.ParametersResponse;
 import shared.errors.IHTTPStatusException;
 import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
@@ -17,59 +16,32 @@ import shared.response.EchoResponse;
 import shared.response.ErrorResponse;
 import shared.utils.CryptUtil;
 import shared.utils.GsonUtils;
-import shared.utils.crypto.AEAHelper;
-import shared.utils.crypto.Base64Helper;
-import shared.utils.crypto.HashHelper;
-import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.SSLSocket;
-import java.security.PublicKey;
+import java.security.*;
 import java.security.cert.X509Certificate;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.security.GeneralSecurityException;
-import java.security.KeyStore;
+import java.util.HashMap;
 
 class ServerResources implements Runnable {
-  private ServerDatabaseDriver db;
-  private boolean debugMode;
-  private KeyStore keyStore;
-
   private SSLSocket client;
   private JsonReader input;
   private OutputStream output;
 
-  private Gson gson;
-  private AEAHelper aeaHelper;
-  private HashHelper hashHelper;
-  private Base64Helper b64Helper;
+  private ServerProperties props;
 
-  private String keystorePassword;
-  private String token;
-
-  ServerResources(SSLSocket client, CustomProperties properties, KeyStore keyStore, ServerDatabaseDriver db, boolean debugMode) throws GeneralSecurityException, PropertyException {
+  ServerResources(SSLSocket client, ServerProperties props) {
     this.client = client;
-    this.keyStore = keyStore;
-    this.db = db;
-    this.debugMode = debugMode;
+    this.props = props;
 
-    hashHelper = new HashHelper(properties.getString(ServerProperty.HASH_ALG));
-
-    String pubKeyAlg = properties.getString(ServerProperty.PUB_KEY_ALG);
-    String certSignAlg = properties.getString(ServerProperty.CERT_SIGN_ALG);
-    int pubKeySize = properties.getInt(ServerProperty.PUB_KEY_SIZE);
-
-    aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize);
-
-    gson = GsonUtils.buildGsonInstance();
-    b64Helper = new Base64Helper();
     try {
       input = new JsonReader(new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8));
       output = client.getOutputStream();
     } catch (Exception e) {
-      handleException(e, debugMode);
+      handleException(e);
       Thread.currentThread().interrupt();
     }
   }
@@ -82,7 +54,7 @@ class ServerResources implements Runnable {
 
       client.close();
     } catch (Exception e) {
-      handleException(e, debugMode);
+      handleException(e);
     }
   }
 
@@ -101,24 +73,26 @@ class ServerResources implements Runnable {
           validate(requestData);
           break;
         case "new":
-          revoke(requestData);
+          validate(requestData);
           break;
         case "all":
-          revoke(requestData);
+          validate(requestData);
           break;
         case "send":
-          revoke(requestData);
+          validate(requestData);
           break;
         case "recv":
-          revoke(requestData);
+          validate(requestData);
           break;
         case "receipt":
-          revoke(requestData);
+          validate(requestData);
           break;
         case "status":
-          revoke(requestData);
+          validate(requestData);
           break;
-
+        case "params":
+          params(requestData);
+          break;
         default:
           throw new InvalidRouteException();
       }
@@ -133,7 +107,7 @@ class ServerResources implements Runnable {
 
     EchoResponse response = new EchoResponse(message);
 
-    send(response.json(gson));
+    send(response.json(props.GSON));
   }
 
   // Create user message box
@@ -142,26 +116,26 @@ class ServerResources implements Runnable {
     X509Certificate certificate = (X509Certificate) client.getSession().getPeerCertificates()[0];
     PublicKey publicKey = certificate.getPublicKey();
 
+    // Get user intended uuid and message verification nonce
     String uuid = GsonUtils.getString(requestData, "uuid");
-
+    String nonce = GsonUtils.getString(requestData, "nonce");
 
     // Get extra fields
-    String diffieP = GsonUtils.getString(requestData, "diffieP");
-    String diffieG = GsonUtils.getString(requestData, "diffieG");
+    String dhValue = GsonUtils.getString(requestData, "dhValue");
 
     // Get extra fields signature
     String signature = GsonUtils.getString(requestData, "signature");
-    byte[] signatureBytes = b64Helper.decode(signature);
+    byte[] signatureBytes = props.B64.decode(signature);
 
     // Join extra fields bytes and verify signature
     byte[] extraFieldsBytes = CryptUtil.joinByteArrays(
-        diffieP.getBytes(),
-        diffieG.getBytes()
+        dhValue.getBytes()
     );
 
-    if (!aeaHelper.verifySignature(publicKey, extraFieldsBytes, signatureBytes))
+    if (!props.AEA.verifySignature(publicKey, extraFieldsBytes, signatureBytes))
       throw new CustomRequestException("Data signature is not valid.", HTTPStatus.UNAUTHORIZED);
 
+    // TODO insert user
 
   }
 
@@ -171,8 +145,20 @@ class ServerResources implements Runnable {
   }
 
   // Revoke
-  private synchronized void revoke(JsonObject requestData) throws RequestException, IOException, DatabaseException, CriticalDatabaseException {
+  private synchronized void params(JsonObject requestData) throws GeneralSecurityException, CriticalDatabaseException, RequestException, IOException {
+    String nonce = GsonUtils.getString(requestData, "nonce");
 
+    // Get params and parse to json object
+    HashMap<String, String> params = props.DB.getAllParameters();
+    String paramsJSON = props.GSON.toJson(params);
+
+    PrivateKey privateKey = props.privateKey();
+    byte[] paramsJSONSigBytes = props.AEA.sign(privateKey, paramsJSON.getBytes());
+    String paramsJSONSigEncoded = props.B64.encode(paramsJSONSigBytes);
+
+    ParametersResponse response = new ParametersResponse(nonce, paramsJSON, paramsJSONSigEncoded);
+
+    send(response.json(props.GSON));
   }
 
   /*
@@ -187,7 +173,7 @@ class ServerResources implements Runnable {
     return data.getAsJsonObject();
   }
 
-  private void handleException(Exception exception, boolean debugMode) {
+  private void handleException(Exception exception) {
     ErrorResponse response;
 
     if (exception instanceof IHTTPStatusException) {
@@ -196,20 +182,20 @@ class ServerResources implements Runnable {
     } else {
       System.err.println("Client disconnected due to critical error: " + exception.getMessage());
 
-      if (debugMode)
+      if (props.DEBUG_MODE)
         exception.printStackTrace();
 
       response = HTTPStatus.INTERNAL_SERVER_ERROR.buildErrorResponse();
     }
 
-    String responseJson = response.json(gson);
+    String responseJson = response.json(props.GSON);
 
     try {
       send(responseJson);
     } catch (IOException e) {
       System.err.println("Failed to send error response to client");
 
-      if (debugMode)
+      if (props.DEBUG_MODE)
         e.printStackTrace();
     }
   }

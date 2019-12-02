@@ -8,8 +8,4 @@ public class ValidateResponse extends OKResponse {
   public ValidateResponse(boolean validation) {
     this.valid = String.valueOf(validation);
   }
-
-  public String getValid() {
-    return valid;
-  }
 }

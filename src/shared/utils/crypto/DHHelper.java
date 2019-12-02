@@ -13,6 +13,8 @@ public class DHHelper {
   private KeyPairGenerator keyPairGenerator;
   private KeyAgreement keyAgreement;
   private AlgorithmParameterGenerator algParamsGenerator;
+  private int keySize;
+  private String dhAlg;
 
   public DHHelper(String dhAlg, String hashAlg, int keySize) throws GeneralSecurityException {
     keyPairGenerator = KeyPairGenerator.getInstance(dhAlg, CryptUtil.PROVIDER);
@@ -21,6 +23,9 @@ public class DHHelper {
     algParamsGenerator = AlgorithmParameterGenerator.getInstance(dhAlg, CryptUtil.PROVIDER);
 
     algParamsGenerator.init(keySize);
+
+    this.keySize = keySize;
+    this.dhAlg = dhAlg;
   }
 
   public KeyPair genKeyPair(DHParameterSpec spec) throws GeneralSecurityException {
@@ -40,10 +45,17 @@ public class DHHelper {
     return BigInteger.probablePrime(size, new SecureRandom());
   }
 
-
   public DHParameterSpec genParams() throws GeneralSecurityException {
     AlgorithmParameters algParams = algParamsGenerator.generateParameters();
 
     return algParams.getParameterSpec(DHParameterSpec.class);
+  }
+
+  public int keySize() {
+    return keySize;
+  }
+
+  public String alg() {
+    return dhAlg;
   }
 }

@@ -29,7 +29,7 @@ public enum PKIProperty implements ICustomProperty {
   PUB_KEY_SIZE("pub_key_size", CustomPropertyType.INT),
   CERT_SIGN_ALG("cert_sign_alg", CustomPropertyType.STRING),
 
-  HASH_ALGORITHM("hash_algorithm", CustomPropertyType.STRING),
+  HASH_ALG("hash_algorithm", CustomPropertyType.STRING),
 
   // PKI Properties
   TOKEN_VALUE("token_value", CustomPropertyType.STRING),

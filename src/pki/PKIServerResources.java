@@ -29,58 +29,27 @@ import shared.errors.request.InvalidRouteException;
 import shared.errors.request.RequestException;
 import shared.http.HTTPStatus;
 import shared.utils.crypto.AEAHelper;
-import shared.utils.crypto.Base64Helper;
+import shared.utils.crypto.B4Helper;
 import shared.utils.crypto.HashHelper;
-import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.SSLSocket;
 
 class PKIServerResources implements Runnable {
-  private PKIDatabaseDriver db;
-  private boolean debugMode;
-  private KeyStore keyStore;
-
   private SSLSocket client;
   private com.google.gson.stream.JsonReader input;
   private OutputStream output;
 
-  private Gson gson;
-  private AEAHelper aeaHelper;
-  private HashHelper hashHelper;
-  private Base64Helper base64Helper;
+  private PKIServerProperties props;
 
-  private String keystorePassword;
-  private String pkiPubKey;
-  private String pkiCert;
-  private String token;
-  private int certificateValidityDays;
-
-  PKIServerResources(SSLSocket client, CustomProperties properties, KeyStore keyStore, PKIDatabaseDriver db, boolean debugMode) throws GeneralSecurityException, PropertyException {
+  PKIServerResources(SSLSocket client, PKIServerProperties props) {
     this.client = client;
-    this.keyStore = keyStore;
-    this.db = db;
-    this.debugMode = debugMode;
-
-    hashHelper = new HashHelper(properties.getString(PKIProperty.HASH_ALGORITHM));
-    gson = GsonUtils.buildGsonInstance();
-    base64Helper = new Base64Helper();
-
-    String pubKeyAlg = properties.getString(PKIProperty.PUB_KEY_ALG);
-    String certSignAlg = properties.getString(PKIProperty.CERT_SIGN_ALG);
-    int pubKeySize = properties.getInt(PKIProperty.PUB_KEY_SIZE);
-
-    aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize);
-
-    keystorePassword = properties.getString(PKIProperty.KEYSTORE_PASS);
-    token = properties.getString(PKIProperty.TOKEN_VALUE);
-    pkiPubKey = properties.getString(PKIProperty.PKI_PUB_KEY);
-    pkiCert = properties.getString(PKIProperty.PKI_CERT);
+    this.props = props;
 
     try {
       input = new JsonReader(new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8));
       output = client.getOutputStream();
     } catch (Exception e) {
-      handleException(e, debugMode);
+      handleException(e, props.DEBUG_MODE);
       Thread.currentThread().interrupt();
     }
   }
@@ -93,7 +62,7 @@ class PKIServerResources implements Runnable {
 
       client.close();
     } catch (Exception e) {
-      handleException(e, debugMode);
+      handleException(e, props.DEBUG_MODE);
     }
   }
 
@@ -128,7 +97,7 @@ class PKIServerResources implements Runnable {
 
     EchoResponse response = new EchoResponse(message);
 
-    send(response.json(gson));
+    send(response.json(props.GSON));
   }
 
   // Register
@@ -138,48 +107,45 @@ class PKIServerResources implements Runnable {
     String token = GsonUtils.getString(requestData, "token");
 
     // We will use a predefined token value for test purposes
-    if (!token.equals(this.token))
+    if (!props.validToken(token))
       throw new CustomRequestException("Invalid token", HTTPStatus.UNAUTHORIZED);
 
     // Get csr encoded from request and decode it
     String certRequestEncoded = GsonUtils.getString(requestData, "certificationRequest");
-    byte[] certRequestBytes = base64Helper.decode(certRequestEncoded);
+    byte[] certRequestBytes = props.B64.decode(certRequestEncoded);
 
     PKCS10CertificationRequest certRequest = new PKCS10CertificationRequest(certRequestBytes);
 
-    // Get pki private key and cert and sign csr
-    PrivateKey pkiPrivateKey = (PrivateKey) keyStore.getKey(pkiPubKey, keystorePassword.toCharArray());
-    X509Certificate pkiCertificate = (X509Certificate) keyStore.getCertificate(pkiCert);
-
+    // Sign csr
     X509Certificate signedCert =
-        aeaHelper.signCSR(certRequest, pkiCertificate, pkiPrivateKey, certificateValidityDays);
+        props.AEA.signCSR(certRequest, props.CERT, props.privateKey(), props.CERT_VALIDATY);
 
     // Get serial number and add to db
     BigInteger serialNumber = signedCert.getSerialNumber();
     String serialNumberString = serialNumber.toString();
 
-    db.register(serialNumberString);
+    props.DB.register(serialNumberString);
 
     // encode signed certificate
-    byte[] signedCertBytes = aeaHelper.getCertBytes(signedCert);
-    String signedCertEncoded = base64Helper.encode(signedCertBytes);
+    byte[] signedCertBytes = props.AEA.getCertBytes(signedCert);
+    String signedCertEncoded = props.B64.encode(signedCertBytes);
 
     // Create payload and send response
     SignResponse response = new SignResponse(signedCertEncoded);
-    send(response.json(gson));
+    send(response.json(props.GSON));
   }
 
   // Is Revoked
-  private synchronized void validate(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
+  private void validate(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
     // Get certificate serial number
     String serialNumber = GsonUtils.getString(requestData, "serialNumber");
 
     // Validate, build and send response
-    boolean valid = db.isValid(serialNumber);
+    boolean valid = props.DB.isValid(serialNumber);
 
     ValidateResponse response = new ValidateResponse(valid);
 
-    send(response.json(gson));
+    send(response.json(props.GSON));
   }
 
   // Revoke
@@ -189,24 +155,22 @@ class PKIServerResources implements Runnable {
     String token = GsonUtils.getString(requestData, "token");
 
     // We will use a predefined token value for test purposes
-    if (!token.equals(this.token))
+    if (!props.validToken(token))
       throw new CustomRequestException("Invalid token", HTTPStatus.UNAUTHORIZED);
 
     // Get certificate and public key
     String serialNumber = GsonUtils.getString(requestData, "serialNumber");
 
-    db.revoke(serialNumber);
+    props.DB.revoke(serialNumber);
 
     OKResponse response = new OKResponse();
 
-    send(response.json(gson));
+    send(response.json(props.GSON));
   }
 
   /*
     UTILS
   */
-
-
   private void handleException(Exception exception, boolean debugMode) {
     ErrorResponse response;
 
@@ -222,7 +186,7 @@ class PKIServerResources implements Runnable {
       response = HTTPStatus.INTERNAL_SERVER_ERROR.buildErrorResponse();
     }
 
-    String responseJson = response.json(gson);
+    String responseJson = response.json(props.GSON);
 
     try {
       send(responseJson);

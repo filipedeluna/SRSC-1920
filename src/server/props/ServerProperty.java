@@ -11,6 +11,7 @@ public enum ServerProperty implements ICustomProperty {
   THREAD_POOL_SIZE("thread_pool_size", CustomPropertyType.INT),
   DATABASE_LOC("database_location", CustomPropertyType.STRING),
   DATABASE_FILES_LOC("database_files_location", CustomPropertyType.STRING),
+  PARAMS_RESET("params_reset", CustomPropertyType.BOOL),
 
   // Network
   PORT("port", CustomPropertyType.INT),
@@ -18,7 +19,7 @@ public enum ServerProperty implements ICustomProperty {
   TLS_CIPHERSUITES("tls_ciphersuites", CustomPropertyType.STRING_ARRAY),
   TLS_PROTOCOLS("tls_protocols", CustomPropertyType.STRING_ARRAY),
 
-  // Crypt
+  // Crypt,
   KEYSTORE_LOC("keystore_location", CustomPropertyType.STRING),
   KEYSTORE_TYPE("keystore_type", CustomPropertyType.STRING),
   KEYSTORE_PASS("keystore_pass", CustomPropertyType.STRING),
@@ -28,7 +29,12 @@ public enum ServerProperty implements ICustomProperty {
 
   PUB_KEY_ALG("pub_key_alg", CustomPropertyType.STRING),
   PUB_KEY_SIZE("pub_key_size", CustomPropertyType.INT),
+  PUB_KEY_NAME("pub_key_name", CustomPropertyType.STRING),
   CERT_SIGN_ALG("cert_sign_alg", CustomPropertyType.STRING),
+
+  DH_KEY_ALG("dh_key_alg", CustomPropertyType.STRING),
+  DH_KEY_HASH_ALG("dh_key_hash_alg", CustomPropertyType.STRING),
+  DH_KEY_SIZE("dh_key_size", CustomPropertyType.INT),
 
   HASH_ALG("hash_alg", CustomPropertyType.STRING),
 

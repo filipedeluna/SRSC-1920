@@ -135,6 +135,10 @@ public class AEAHelper {
     return (X509Certificate) certFactory.generateCertificate(new FileInputStream(file));
   }
 
+  public X509Certificate getCertFromKeystore(String alias, KeyStore keyStore) throws GeneralSecurityException {
+    return (X509Certificate) keyStore.getCertificate(alias);
+  }
+
   public X509Certificate signCert(X509Certificate cert, X509Certificate issuerCert, PrivateKey issuerPrivateKey, int validityDays) throws GeneralSecurityException {
     byte[] inCertBytes = cert.getTBSCertificate();
     X509CertInfo info = new X509CertInfo(inCertBytes);

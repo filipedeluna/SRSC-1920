@@ -10,7 +10,7 @@ import shared.errors.properties.PropertyException;
 import shared.errors.request.InvalidFormatException;
 import shared.errors.request.RequestException;
 import shared.utils.GsonUtils;
-import shared.utils.crypto.Base64Helper;
+import shared.utils.crypto.B4Helper;
 import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.*;
@@ -25,12 +25,12 @@ import java.util.ArrayList;
 public class CustomTrustManager implements X509TrustManager {
   private ArrayList<X509Certificate> acceptedIssuers;
 
-  private Base64Helper b64Helper;
+  private B4Helper b64Helper;
   private Gson gson;
   private SSLSocket socket;
   private boolean debug;
 
-  public CustomTrustManager(CustomProperties properties, SSLSocketFactory socketFactory, Base64Helper b64Helper, Gson gson) throws PropertyException, IOException {
+  public CustomTrustManager(CustomProperties properties, SSLSocketFactory socketFactory, B4Helper b64Helper, Gson gson) throws PropertyException, IOException {
     // Create socket
     String pkiServerAddress = properties.getString(ServerProperty.PKI_SERVER_ADDRESS);
     int pkiServerPort = properties.getInt(ServerProperty.PKI_SERVER_PORT);

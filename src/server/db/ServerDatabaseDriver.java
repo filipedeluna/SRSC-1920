@@ -1,12 +1,11 @@
 package server.db;
 
 import org.sqlite.JDBC;
-import shared.errors.db.CriticalDatabaseException;
-import shared.errors.db.DatabaseException;
-import shared.errors.db.DuplicateEntryException;
-import shared.errors.db.EntryNotFoundException;
+import shared.errors.db.*;
 
 import java.sql.*;
+import java.util.HashMap;
+import java.util.Map;
 
 public final class ServerDatabaseDriver {
   private static final int ERR_UNIQUE_CONSTRAINT = 19;
@@ -44,6 +43,15 @@ public final class ServerDatabaseDriver {
               ");";
 
       connection.createStatement().execute(query);
+
+      query =
+          "CREATE TABLE IF NOT EXISTS server_params (" +
+              "name     TEXT    NOT NULL, " +
+              "value    TEXT    NOT NULL, " +
+              ");";
+
+      connection.createStatement().execute(query);
+
     } catch (SQLException e) {
       throw new CriticalDatabaseException(e);
     }
@@ -81,7 +89,7 @@ public final class ServerDatabaseDriver {
 
   public void revoke(String serialNumber) throws DatabaseException, CriticalDatabaseException {
     try {
-      String selectUser = "UPDATE entries SET revoked = 1 WHERE serial_number = ?;";
+      String selectUser = "UPDATE entries SET dh_params_sig WHERE serial_number = ?;";
 
       PreparedStatement ps = connection.prepareStatement(selectUser);
       ps.setString(1, serialNumber);
@@ -91,6 +99,84 @@ public final class ServerDatabaseDriver {
       if (updated == 0)
         throw new EntryNotFoundException();
 
+    } catch (SQLException e) {
+      throw new CriticalDatabaseException(e);
+    }
+  }
+
+  /*
+    Server Parameters
+  */
+  public void insertParameter(ServerParameter parameter, String value) throws DatabaseException, CriticalDatabaseException {
+    try {
+      String paramName = parameter.val();
+
+      // Check Parameter exists
+      String statement = "SELECT * FROM server_params WHERE name = ?;";
+      PreparedStatement ps = connection.prepareStatement(statement);
+      ps.setString(1, paramName);
+
+      ResultSet rs = ps.executeQuery();
+
+      // Check exists
+      if (rs.next()) {
+        // Exists so we update it
+        statement = "UPDATE server_params SET value = ? WHERE name = ?;";
+        ps = connection.prepareStatement(statement);
+        ps.setString(1, value);
+        ps.setString(2, paramName);
+
+      } else {
+        // Does not exist so we create it
+        statement = "INSERT INTO server_params (name, value) VALUES (?, ?);";
+        ps = connection.prepareStatement(statement);
+        ps.setString(1, paramName);
+        ps.setString(2, value);
+      }
+
+      int updated = ps.executeUpdate();
+
+      if (updated == 0)
+        throw new FailedToInsertOrUpdateException();
+    } catch (SQLException e) {
+      throw new CriticalDatabaseException(e);
+    }
+  }
+
+  public String getParameter(ServerParameter parameter) throws DatabaseException, CriticalDatabaseException {
+    try {
+      String selectUser = "SELECT value FROM server_params WHERE name = ?;";
+
+      PreparedStatement ps = connection.prepareStatement(selectUser);
+      ps.setString(1, parameter.val());
+
+      ResultSet rs = ps.executeQuery();
+
+      // Param was not found
+      if (!rs.next())
+        throw new EntryNotFoundException();
+
+      return rs.getString("value");
+    } catch (SQLException e) {
+      throw new CriticalDatabaseException(e);
+    }
+  }
+
+  public HashMap<String, String> getAllParameters() throws CriticalDatabaseException {
+    try {
+      String selectUser = "SELECT * FROM server_params;";
+
+      PreparedStatement ps = connection.prepareStatement(selectUser);
+
+      ResultSet rs = ps.executeQuery();
+
+      HashMap<String, String> params = new HashMap<>();
+
+      while (rs.next()) {
+        params.put(rs.getString("name"), rs.getString("value"));
+      }
+
+      return params;
     } catch (SQLException e) {
       throw new CriticalDatabaseException(e);
     }

@@ -9,8 +9,4 @@ public class ValidateCertificateRequest extends GsonRequest {
     super("validate");
     this.serialNumber = serialNumber;
   }
-
-  public String getSerialNumber() {
-    return serialNumber;
-  }
 }
