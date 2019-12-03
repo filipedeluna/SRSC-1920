@@ -1,5 +1,6 @@
 package server.props;
 
+import shared.utils.properties.CustomProperties;
 import shared.utils.properties.ICustomProperty;
 import shared.utils.properties.CustomPropertyType;
 
@@ -38,6 +39,7 @@ public enum ServerProperty implements ICustomProperty {
   HASH_ALG("hash_alg", CustomPropertyType.STRING),
 
   // PKI Server
+  USE_PKI("use_pki", CustomPropertyType.BOOL),
   PKI_SERVER_ADDRESS("pki_server_address", CustomPropertyType.STRING),
   PKI_SERVER_PORT("pki_server_port", CustomPropertyType.INT);
 

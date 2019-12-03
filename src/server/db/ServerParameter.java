@@ -9,7 +9,9 @@ public enum ServerParameter {
   DH_KS("dh_ks"),
   DH_P("dh_p"),
   DH_G("dh_g"),
-  DH_PARAM_SIG("dh_param_sig");
+
+  // Server signature of all parameters
+  PARAM_SIG("param_sig");
 
   /////////////////////////////////////////////////
 

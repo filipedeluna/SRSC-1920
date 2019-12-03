@@ -154,15 +154,18 @@ class Server {
   }
 
   private static SSLContext buildSSLContext(CustomProperties properties, KeyStore keyStore) throws GeneralSecurityException, IOException, PropertyException {
-    SSLContext defaultSSLContext = SSLContext.getInstance("TLS", CryptUtil.PROVIDER_TLS);
-
     // Build default context for use with custom trust manager (OCSP) Extension
     KeyManagerFactory keyManagerFactory = getKeyManagerFactory(properties, keyStore);
     TrustManagerFactory trustManagerFactory = getTrustManagerFactory(properties);
     KeyManager[] keyManagers = keyManagerFactory.getKeyManagers();
     TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
 
+    SSLContext defaultSSLContext = SSLContext.getInstance("TLS", CryptUtil.PROVIDER_TLS);
     defaultSSLContext.init(keyManagers, trustManagers, new SecureRandom());
+
+    // Check if PKI is to be used, if not.. return regular socket
+    if (!properties.getBool(ServerProperty.USE_PKI))
+      return defaultSSLContext;
 
     // Build server context with custom trust manager
     TrustManager[] extendedTrustManagers = new TrustManager[trustManagers.length + 1];

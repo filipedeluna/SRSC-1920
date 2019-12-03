@@ -38,13 +38,13 @@ public final class ServerDatabaseDriver {
     try {
       String query =
           "CREATE TABLE IF NOT EXISTS users (" +
-              "user_id   INTEGER PRIMARY KEY, " +
-              "uuid      INTEGER NOT NULL UNIQUE, " +
-              "pub_key   INTEGER NOT NULL, " +
-
+              "user_id    INTEGER PRIMARY KEY, " +
+              "uuid       INTEGER NOT NULL UNIQUE, " +
+              "pub_key    TEXT    NOT NULL, " +
               // Security data
-              "dh_value  INTEGER NOT NULL, " +
-              "signature INTEGER NOT NULL, " +
+              "dh_pub_key TEXT    NOT NULL, " +
+              // Signature of all data
+              "signature  TEXT    NOT NULL, " +
               ");";
 
       connection.createStatement().execute(query);
@@ -58,6 +58,7 @@ public final class ServerDatabaseDriver {
               "text             TEXT, " +
               "attachment_data  TEXT, " +
               "attachments      BLOB, " +
+              // Mac hash with secret client key to prevent tampering
               "mac_hash         TEXT, " +
               "FOREIGN KEY (sender_id)   REFERENCES users(user_id)," +
               "FOREIGN KEY (receiver_id) REFERENCES users(user_id)" +
@@ -68,11 +69,10 @@ public final class ServerDatabaseDriver {
       query =
           "CREATE TABLE IF NOT EXISTS receipts (" +
               "message_id INTEGER NOT NULL, " +
-              "sender_id  INTEGER NOT NULL, " +
               "date       TEXT NOT NULL, " +
+              // Reader signature of message contents with private key
               "signature  TEXT NOT NULL, " +
               "FOREIGN KEY (message_id) REFERENCES messages(message_id)," +
-              "FOREIGN KEY (sender_id) REFERENCES users(user_id)" +
               ");";
 
       connection.createStatement().execute(query);
@@ -84,7 +84,6 @@ public final class ServerDatabaseDriver {
               ");";
 
       connection.createStatement().execute(query);
-
     } catch (SQLException e) {
       throw new CriticalDatabaseException(e);
     }
@@ -298,6 +297,16 @@ public final class ServerDatabaseDriver {
       throw new CriticalDatabaseException(e);
     }
   }
+
+                "message_id INTEGER NOT NULL, " +
+                    "date       TEXT NOT NULL, " +
+                    // Reader signature of message contents with private key
+                    "signature  TEXT NOT NULL, " +
+                    "FOREIGN KEY (message_id) REFERENCES messages(message_id)," +
+
+  SELECT Orders.OrderID, Customers.CustomerName, Orders.OrderDate
+  FROM Orders
+  INNER JOIN Customers ON Orders.CustomerID=Customers.CustomerID;
 
   public ArrayList<Receipt> getReceipts(int messageId) throws CriticalDatabaseException {
     try {
