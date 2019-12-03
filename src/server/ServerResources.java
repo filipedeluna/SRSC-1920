@@ -6,7 +6,6 @@ import server.response.ParametersResponse;
 import shared.errors.IHTTPStatusException;
 import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
-import shared.errors.properties.PropertyException;
 import shared.errors.request.CustomRequestException;
 import shared.errors.request.InvalidFormatException;
 import shared.errors.request.InvalidRouteException;
@@ -16,6 +15,7 @@ import shared.response.EchoResponse;
 import shared.response.ErrorResponse;
 import shared.utils.CryptUtil;
 import shared.utils.GsonUtils;
+import shared.utils.SafeInputStreamReader;
 
 import javax.net.ssl.SSLSocket;
 import java.security.*;
@@ -38,7 +38,7 @@ class ServerResources implements Runnable {
     this.props = props;
 
     try {
-      input = new JsonReader(new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8));
+      input = new JsonReader(new SafeInputStreamReader(client.getInputStream()));
       output = client.getOutputStream();
     } catch (Exception e) {
       handleException(e);
@@ -111,7 +111,7 @@ class ServerResources implements Runnable {
   }
 
   // Create user message box
-  private synchronized void create(JsonObject requestData) throws RequestException, GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException {
+  private synchronized void create(JsonObject requestData) throws RequestException, GeneralSecurityException, IOException {
     // Get public key and certificate from user
     X509Certificate certificate = (X509Certificate) client.getSession().getPeerCertificates()[0];
     PublicKey publicKey = certificate.getPublicKey();
@@ -140,11 +140,11 @@ class ServerResources implements Runnable {
   }
 
   // Is Revoked
-  private synchronized void validate(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException {
+  private synchronized void validate(JsonObject requestData)  {
 
   }
 
-  // Revoke
+  // Get all server params
   private synchronized void params(JsonObject requestData) throws GeneralSecurityException, CriticalDatabaseException, RequestException, IOException {
     String nonce = GsonUtils.getString(requestData, "nonce");
 

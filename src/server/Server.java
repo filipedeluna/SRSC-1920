@@ -79,8 +79,7 @@ class Server {
 
       // Build DB and create shared properties class
       String databaseLocation = properties.getString(ServerProperty.DATABASE_LOC);
-      String databaseFilesLocation = properties.getString(ServerProperty.DATABASE_FILES_LOC);
-      ServerDatabaseDriver db = new ServerDatabaseDriver(databaseLocation, databaseFilesLocation);
+      ServerDatabaseDriver db = new ServerDatabaseDriver(databaseLocation);
 
       ServerProperties svParams = new ServerProperties(properties, keyStore, db);
 

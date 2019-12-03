@@ -32,9 +32,8 @@ public final class PKIDatabaseDriver {
     try {
       String query =
           "CREATE TABLE IF NOT EXISTS entries (" +
-              "cert_hash       TEXT    NOT NULL UNIQUE, " +
-              "revoked         INTEGER NOT NULL, " +
-              "PRIMARY KEY (cert_hash)" +
+              "cert_hash       TEXT PRIMARY KEY, " +
+              "revoked         INTEGER NOT NULL DEFAULT 0, " +
               ");";
 
       connection.createStatement().execute(query);
@@ -45,7 +44,7 @@ public final class PKIDatabaseDriver {
 
   public void register(String certHash) throws DatabaseException, CriticalDatabaseException {
     try {
-      String insertQuery = "INSERT INTO entries (cert_hash, revoked) VALUES (?, 0);";
+      String insertQuery = "INSERT INTO entries (cert_hash) VALUES (?);";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
       ps.setString(1, certHash);

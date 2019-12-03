@@ -1,19 +1,11 @@
 package shared;
 
 public final class Pair<K, V> {
-  private K key;
-  private V value;
+  public K A;
+  public V B;
 
-  public Pair(K key, V value) {
-    this.key = key;
-    this.value = value;
-  }
-
-  public K key() {
-    return key;
-  }
-
-  public V value() {
-    return value;
+  public Pair(K a, V b) {
+    this.A = a;
+    this.B = b;
   }
 }

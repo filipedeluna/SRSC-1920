@@ -28,6 +28,7 @@ import shared.response.ErrorResponse;
 import shared.errors.request.InvalidRouteException;
 import shared.errors.request.RequestException;
 import shared.http.HTTPStatus;
+import shared.utils.SafeInputStreamReader;
 import shared.utils.crypto.AEAHelper;
 import shared.utils.crypto.B4Helper;
 import shared.utils.crypto.HashHelper;
@@ -46,7 +47,7 @@ class PKIServerResources implements Runnable {
     this.props = props;
 
     try {
-      input = new JsonReader(new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8));
+      input = new JsonReader(new SafeInputStreamReader(client.getInputStream()));
       output = client.getOutputStream();
     } catch (Exception e) {
       handleException(e, props.DEBUG_MODE);
