@@ -2,7 +2,9 @@ package server;
 
 import com.google.gson.Gson;
 import server.db.ServerDatabaseDriver;
-import server.db.ServerParameter;
+import server.db.ServerParameterMap;
+import server.db.ServerParameterType;
+import server.errors.parameters.ParameterException;
 import server.props.ServerProperty;
 import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
@@ -18,6 +20,7 @@ import shared.utils.properties.CustomProperties;
 import javax.crypto.spec.DHParameterSpec;
 import java.io.IOException;
 import java.security.*;
+import java.util.ArrayList;
 
 class ServerProperties {
   boolean DEBUG_MODE;
@@ -37,7 +40,7 @@ class ServerProperties {
   private String pubKeyName;
   private String ksPassword;
 
-  ServerProperties(CustomProperties properties, KeyStore keyStore, ServerDatabaseDriver db) throws PropertyException, GeneralSecurityException, IOException, DatabaseException, CriticalDatabaseException {
+  ServerProperties(CustomProperties properties, KeyStore keyStore, ServerDatabaseDriver db) throws PropertyException, GeneralSecurityException, IOException, DatabaseException, CriticalDatabaseException, ParameterException {
     this.props = properties;
 
     DEBUG_MODE = properties.getBool(ServerProperty.DEBUG);
@@ -63,45 +66,41 @@ class ServerProperties {
     pubKeyName = properties.getString(ServerProperty.PUB_KEY_NAME);
     PUB_KEY = AEA.getCertFromKeystore(pubKeyName, KEYSTORE).getPublicKey();
 
-    // Initialize DH params
+    // Initialize DH params and helper
     String dhKeyAlg = properties.getString(ServerProperty.DH_KEY_ALG);
     String dhKeyHashAlg = properties.getString(ServerProperty.DH_KEY_HASH_ALG);
     int dhKeySize = properties.getInt(ServerProperty.DH_KEY_SIZE);
-
-    // Initialize dh helper with params and check if supposed to reset dh params
-    boolean dhParamsReset = properties.getBool(ServerProperty.PARAMS_RESET);
     DH = new DHHelper(dhKeyAlg, dhKeyHashAlg, dhKeySize);
 
-    if (dhParamsReset)
-      dhParamsReset();
+    // check if supposed to reset server params and reset them if so
+    if (properties.getBool(ServerProperty.PARAMS_RESET))
+      paramsReset();
   }
 
   PrivateKey privateKey() throws GeneralSecurityException {
     return (PrivateKey) KEYSTORE.getKey(pubKeyName, ksPassword.toCharArray());
   }
 
-  private void dhParamsReset() throws GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException {
-    // Generate and get DH parameters
+  private void paramsReset() throws GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException, ParameterException {
+    // Delete all params
+    DB.deleteAllParameters();
+
+    // Create parameter list
+    ServerParameterMap params = new ServerParameterMap();
+
+    // Insert AEA parameters
+    params.put(ServerParameterType.PUB_KEY_ALG, AEA.keyAlg());
+    params.put(ServerParameterType.CERT_SIG_ALG, AEA.certAlg());
+
+    // Generate DH Spec and insert DH parameters
     DHParameterSpec spec = DH.genParams();
-    String dhAlg = DH.alg();
-    String p = spec.getP().toString(); // Big int
-    String g = spec.getG().toString(); // Big int
-    String keySize = String.valueOf(DH.keySize()); // int
+    params.put(ServerParameterType.DH_ALG, DH.alg());
+    params.put(ServerParameterType.DH_P, spec.getP().toString()); // Big Int
+    params.put(ServerParameterType.DH_G, spec.getG().toString()); // Big Int
+    params.put(ServerParameterType.DH_KEYSIZE, String.valueOf(DH.keySize())); // int
+    params.put(ServerParameterType.DH_HASH_ALG, DH.hashAlg());
 
-    // Insert DH parameters
-    DB.insertParameter(ServerParameter.DH_ALG, dhAlg);
-    DB.insertParameter(ServerParameter.DH_P, p);
-    DB.insertParameter(ServerParameter.DH_G, g);
-    DB.insertParameter(ServerParameter.DH_KS, keySize);
-
-    // Join all parameters and sign them
-    byte[] dhParamsBytes = CryptUtil.joinByteArrays(
-        dhAlg.getBytes(),
-        p.getBytes(),
-        g.getBytes(),
-        keySize.getBytes()
-    );
-
-
+    // Join all parameters, sign them, encode them and insert them in DB
+    DB.insertParameter(ServerParameterType.PARAM_SIG, B64.encode(params.getAllParametersBytes()));
   }
 }

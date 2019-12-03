@@ -2,6 +2,7 @@ package server;
 
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
+import server.db.ServerParameterMap;
 import server.response.ParametersResponse;
 import shared.errors.IHTTPStatusException;
 import shared.errors.db.CriticalDatabaseException;
@@ -149,9 +150,10 @@ class ServerResources implements Runnable {
     String nonce = GsonUtils.getString(requestData, "nonce");
 
     // Get params and parse to json object
-    HashMap<String, String> params = props.DB.getAllParameters();
+    ServerParameterMap params = props.DB.getAllParameters();
     String paramsJSON = props.GSON.toJson(params);
 
+    // Sign params
     PrivateKey privateKey = props.privateKey();
     byte[] paramsJSONSigBytes = props.AEA.sign(privateKey, paramsJSON.getBytes());
     String paramsJSONSigEncoded = props.B64.encode(paramsJSONSigBytes);

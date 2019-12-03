@@ -4,6 +4,7 @@ import org.sqlite.JDBC;
 import server.db.wrapper.Message;
 import server.db.wrapper.Receipt;
 import server.db.wrapper.User;
+import server.errors.parameters.ParameterException;
 import shared.Pair;
 import shared.errors.db.*;
 
@@ -16,10 +17,12 @@ public final class ServerDatabaseDriver {
   private static final int ERR_NOT_FOUND = 12;
 
   private Connection connection;
+  private int paramCounter;
 
   public ServerDatabaseDriver(String dbPath) throws CriticalDatabaseException {
     // Connect to file
     connection = connect(dbPath);
+    paramCounter = 0; // control insertion of params so the order for hashing is known
 
     // Create tables they do not exist
     createTables();
@@ -79,6 +82,7 @@ public final class ServerDatabaseDriver {
 
       query =
           "CREATE TABLE IF NOT EXISTS server_params (" +
+              "id    TEXT NOT NULL UNIQUE, " +
               "name  TEXT NOT NULL UNIQUE, " +
               "value TEXT NOT NULL " +
               ");";
@@ -282,15 +286,14 @@ public final class ServerDatabaseDriver {
     RECEIPT BOX
   */
 
-  public void insertReceipt(Receipt rcpt) throws DatabaseException, CriticalDatabaseException {
+  public void insertReceipt(Receipt rcpt) throws CriticalDatabaseException {
     try {
-      String insertQuery = "INSERT INTO receipts (message_id, sender_id, date, receiver_signature) VALUES (?, ?, ?, ?);";
+      String insertQuery = "INSERT INTO receipts (message_id, date, receiver_signature) VALUES (?, ?, ?);";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
       ps.setInt(1, rcpt.messageId);
-      ps.setInt(2, rcpt.senderId);
-      ps.setString(3, rcpt.date);
-      ps.setString(4, rcpt.signature);
+      ps.setString(2, rcpt.date);
+      ps.setString(3, rcpt.signature);
 
       ps.executeUpdate();
     } catch (SQLException e) {
@@ -298,19 +301,11 @@ public final class ServerDatabaseDriver {
     }
   }
 
-                "message_id INTEGER NOT NULL, " +
-                    "date       TEXT NOT NULL, " +
-                    // Reader signature of message contents with private key
-                    "signature  TEXT NOT NULL, " +
-                    "FOREIGN KEY (message_id) REFERENCES messages(message_id)," +
-
-  SELECT Orders.OrderID, Customers.CustomerName, Orders.OrderDate
-  FROM Orders
-  INNER JOIN Customers ON Orders.CustomerID=Customers.CustomerID;
-
   public ArrayList<Receipt> getReceipts(int messageId) throws CriticalDatabaseException {
     try {
-      String insertQuery = "SELECT * FROM receipts WHERE message_id = ?;";
+      String insertQuery =
+          "SELECT r.message_id AS message_id, m.sender_id AS sender_id, m.date AS date, m.signature AS signature " +
+              "FROM receipts r JOIN messages m ON r.message_id = m.message_id WHERE message_id = ?;";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
       ps.setInt(1, messageId);
@@ -322,7 +317,6 @@ public final class ServerDatabaseDriver {
       while (rs.next()) {
         receipts.add(new Receipt(
                 rs.getInt("message_id"),
-                rs.getInt("sender_id"),
                 rs.getString("date"),
                 rs.getString("signature")
             )
@@ -338,32 +332,14 @@ public final class ServerDatabaseDriver {
   /*
     Server Parameters
   */
-  public void insertParameter(ServerParameter parameter, String value) throws DatabaseException, CriticalDatabaseException {
+  public void insertParameter(ServerParameterType parameter, String value) throws DatabaseException, CriticalDatabaseException {
     try {
-      String paramName = parameter.val();
-
-      // Check Parameter exists
-      String statement = "SELECT * FROM server_params WHERE name = ?;";
+      // Does not exist so we create it
+      String statement = "INSERT INTO server_params (id, name, value) VALUES (?, ?, ?);";
       PreparedStatement ps = connection.prepareStatement(statement);
-      ps.setString(1, paramName);
-
-      ResultSet rs = ps.executeQuery();
-
-      // Check exists
-      if (rs.next()) {
-        // Exists so we update it
-        statement = "UPDATE server_params SET value = ? WHERE name = ?;";
-        ps = connection.prepareStatement(statement);
-        ps.setString(1, value);
-        ps.setString(2, paramName);
-
-      } else {
-        // Does not exist so we create it
-        statement = "INSERT INTO server_params (name, value) VALUES (?, ?);";
-        ps = connection.prepareStatement(statement);
-        ps.setString(1, paramName);
-        ps.setString(2, value);
-      }
+      ps.setInt(1, paramCounter++);
+      ps.setString(2, parameter.dbName());
+      ps.setString(3, value);
 
       int updated = ps.executeUpdate();
 
@@ -374,12 +350,25 @@ public final class ServerDatabaseDriver {
     }
   }
 
-  public String getParameter(ServerParameter parameter) throws DatabaseException, CriticalDatabaseException {
+  public void deleteAllParameters() throws CriticalDatabaseException {
+    try {
+      // Check Parameter exists
+      String statement = "DELETE FROM server_params;";
+      PreparedStatement ps = connection.prepareStatement(statement);
+
+      ps.executeUpdate();
+    } catch (SQLException e) {
+      throw new CriticalDatabaseException(e);
+    }
+  }
+
+  // TODO useless?
+  public String getParameter(ServerParameterType parameter) throws DatabaseException, CriticalDatabaseException {
     try {
       String selectUser = "SELECT value FROM server_params WHERE name = ?;";
 
       PreparedStatement ps = connection.prepareStatement(selectUser);
-      ps.setString(1, parameter.val());
+      ps.setString(1, parameter.dbName());
 
       ResultSet rs = ps.executeQuery();
 
@@ -393,23 +382,29 @@ public final class ServerDatabaseDriver {
     }
   }
 
-  public HashMap<String, String> getAllParameters() throws CriticalDatabaseException {
+  public ServerParameterMap getAllParameters() throws CriticalDatabaseException {
     try {
-      String selectUser = "SELECT * FROM server_params;";
+      String selectUser = "SELECT * FROM server_params ORDER BY id;";
 
       PreparedStatement ps = connection.prepareStatement(selectUser);
 
       ResultSet rs = ps.executeQuery();
 
-      HashMap<String, String> params = new HashMap<>();
+      ServerParameterMap params = new ServerParameterMap();
 
       while (rs.next()) {
-        params.put(rs.getString("name"), rs.getString("value"));
+        params.put(
+            rs.getInt("id"),
+            rs.getString("name"),
+            rs.getString("value"));
       }
 
       return params;
-    } catch (SQLException e) {
-      throw new CriticalDatabaseException(e);
+    } catch (SQLException | ParameterException e) {
+      if (e instanceof ParameterException)
+        throw new CriticalDatabaseException((ParameterException) e);
+
+      throw new CriticalDatabaseException((SQLException) e);
     }
   }
 

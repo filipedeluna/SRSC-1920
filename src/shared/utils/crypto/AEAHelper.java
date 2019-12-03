@@ -224,4 +224,12 @@ public class AEAHelper {
 
     return new PKCS10CertificationRequest(csrBytes);
   }
+
+  public String keyAlg() {
+    return keyAlg;
+  }
+
+  public String certAlg() {
+    return certSignAlg;
+  }
 }
