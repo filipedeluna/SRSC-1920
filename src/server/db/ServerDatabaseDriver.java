@@ -298,15 +298,6 @@ public final class ServerDatabaseDriver {
     }
   }
 
-                "message_id INTEGER NOT NULL, " +
-                    "date       TEXT NOT NULL, " +
-                    // Reader signature of message contents with private key
-                    "signature  TEXT NOT NULL, " +
-                    "FOREIGN KEY (message_id) REFERENCES messages(message_id)," +
-
-  SELECT Orders.OrderID, Customers.CustomerName, Orders.OrderDate
-  FROM Orders
-  INNER JOIN Customers ON Orders.CustomerID=Customers.CustomerID;
 
   public ArrayList<Receipt> getReceipts(int messageId) throws CriticalDatabaseException {
     try {
