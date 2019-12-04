@@ -1,6 +1,6 @@
 package shared.http;
 
-public class HTTPStatusPair {
+public final class HTTPStatusPair {
   private int code;
   private String message;
 

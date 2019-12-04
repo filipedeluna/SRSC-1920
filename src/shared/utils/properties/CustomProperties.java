@@ -5,7 +5,7 @@ import shared.errors.properties.*;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-public class CustomProperties extends java.util.Properties {
+public final class CustomProperties extends java.util.Properties {
 
   public CustomProperties(String path) throws PropertyException {
     super();

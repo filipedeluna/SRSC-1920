@@ -2,7 +2,7 @@ package server.db.wrapper;
 
 import java.io.Serializable;
 
-public class Message implements Serializable {
+public final class Message implements Serializable {
   public int id;
   public int senderId;
   public int receiverId;

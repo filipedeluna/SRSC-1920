@@ -18,7 +18,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.X509Certificate;
 
-class PKIServerProperties {
+final class PKIServerProperties {
   boolean DEBUG_MODE;
 
   DHHelper DH;

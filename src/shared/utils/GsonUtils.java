@@ -9,7 +9,7 @@ import shared.errors.request.RequestException;
 
 import java.util.ArrayList;
 
-public abstract class GsonUtils {
+public final class GsonUtils {
   public static String getString(JsonObject obj, String val) throws RequestException {
     try {
       return getElement(obj, val).getAsString();

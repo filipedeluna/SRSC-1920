@@ -5,7 +5,7 @@ import server.db.wrapper.Receipt;
 
 import java.util.ArrayList;
 
-public class MessageReceiptsResponse extends OkResponseWithNonce {
+public final class MessageReceiptsResponse extends OkResponseWithNonce {
   private ArrayList<Receipt> receipts;
   private Message message;
 

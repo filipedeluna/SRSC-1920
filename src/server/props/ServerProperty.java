@@ -1,6 +1,5 @@
 package server.props;
 
-import shared.utils.properties.CustomProperties;
 import shared.utils.properties.ICustomProperty;
 import shared.utils.properties.CustomPropertyType;
 

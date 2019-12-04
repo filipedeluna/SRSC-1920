@@ -2,7 +2,7 @@ package server.db.wrapper;
 
 import java.io.Serializable;
 
-public class Receipt implements Serializable {
+public final class Receipt implements Serializable {
   public int messageId;
   public String date;
   public String signature;

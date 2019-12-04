@@ -2,7 +2,6 @@ package shared;
 
 
 public enum ServerRequest {
-  ECHO("echo"),
   CREATE("create"),
   LIST("list"),
   NEW("new"),
@@ -34,7 +33,7 @@ public enum ServerRequest {
   }
 
   public boolean needsNonce() {
-    return this != ServerRequest.RECEIPT && this != ServerRequest.ECHO;
+    return this != ServerRequest.RECEIPT;
   }
 }
 

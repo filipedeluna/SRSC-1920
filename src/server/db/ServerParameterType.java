@@ -1,6 +1,5 @@
 package server.db;
 
-
 public enum ServerParameterType {
   // Add parameters here
 

@@ -1,6 +1,6 @@
 package server.response;
 
-public class ParametersResponse extends OkResponseWithNonce {
+public final class ParametersResponse extends OkResponseWithNonce {
   private String parameters;
   private String signature;
 

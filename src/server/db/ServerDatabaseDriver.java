@@ -7,15 +7,14 @@ import server.db.wrapper.User;
 import server.errors.parameters.ParameterException;
 import shared.Pair;
 import shared.errors.db.*;
-import shared.utils.CryptUtil;
 
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 public final class ServerDatabaseDriver {
   private static final int ERR_UNIQUE_CONSTRAINT = 19;
   private static final int ERR_NOT_FOUND = 12;
+  private static final int ERR_FOREIGN_KEY_CONSTRAINT = 787;
 
   private Connection connection;
   private int paramCounter;
@@ -43,7 +42,7 @@ public final class ServerDatabaseDriver {
       String query =
           "CREATE TABLE IF NOT EXISTS users (" +
               "user_id    INTEGER PRIMARY KEY, " +
-              "uuid       INTEGER NOT NULL UNIQUE, " +
+              "uuid       TEXT    NOT NULL UNIQUE, " +
               "pub_key    TEXT    NOT NULL, " +
               // Security data
               "dh_pub_key TEXT    NOT NULL, " +
@@ -73,9 +72,9 @@ public final class ServerDatabaseDriver {
       query =
           "CREATE TABLE IF NOT EXISTS receipts (" +
               "message_id INTEGER NOT NULL, " +
-              "date       TEXT NOT NULL, " +
+              "date       TEXT    NOT NULL, " +
               // Reader signature of message contents with private key
-              "signature  TEXT NOT NULL, " +
+              "signature  TEXT    NOT NULL, " +
               "FOREIGN KEY (message_id) REFERENCES messages(message_id)," +
               ");";
 
@@ -83,9 +82,9 @@ public final class ServerDatabaseDriver {
 
       query =
           "CREATE TABLE IF NOT EXISTS server_params (" +
-              "id    TEXT NOT NULL UNIQUE, " +
-              "name  TEXT NOT NULL UNIQUE, " +
-              "value TEXT NOT NULL " +
+              "id    INTEGER NOT NULL UNIQUE, " +
+              "name  TEXT    NOT NULL UNIQUE, " +
+              "value TEXT    NOT NULL " +
               ");";
 
       connection.createStatement().execute(query);
@@ -122,7 +121,7 @@ public final class ServerDatabaseDriver {
     }
   }
 
-  public User getUser(int id) throws CriticalDatabaseException {
+  public User getUser(int id) throws CriticalDatabaseException, DatabaseException {
     try {
       String selectUser = "SELECT * FROM users WHERE user_id = ?;";
 
@@ -131,17 +130,19 @@ public final class ServerDatabaseDriver {
 
       ResultSet rs = ps.executeQuery();
 
-      if (!rs.next())
-        return null;
-      else
-        return new User(
-            rs.getString("user_id"),
-            null,
-            rs.getString("pub_key"),
-            rs.getString("dh_value"),
-            rs.getString("signature")
-        );
+      rs.next();
+
+      return new User(
+          rs.getString("user_id"),
+          null,
+          rs.getString("pub_key"),
+          rs.getString("dh_value"),
+          rs.getString("signature")
+      );
     } catch (SQLException e) {
+      if (e.getErrorCode() == ERR_NOT_FOUND)
+        throw new EntryNotFoundException();
+
       throw new CriticalDatabaseException(e);
     }
   }
@@ -237,7 +238,7 @@ public final class ServerDatabaseDriver {
     }
   }
 
-  public int insertMessage(Message msg) throws CriticalDatabaseException {
+  public int insertMessage(Message msg) throws CriticalDatabaseException, DatabaseException {
     try {
       String insertQuery = "INSERT INTO messages (sender_id, receiver_id, text, attachment_data, attachments, mac_hash) " +
           "VALUES (?, ?, ?, ?, ?, ?);";
@@ -256,6 +257,9 @@ public final class ServerDatabaseDriver {
 
       return rs.getInt("message_id");
     } catch (SQLException e) {
+      if (e.getErrorCode() == ERR_FOREIGN_KEY_CONSTRAINT)
+        throw new GenericItemNotFoundException("user");
+
       throw new CriticalDatabaseException(e);
     }
   }
@@ -269,8 +273,7 @@ public final class ServerDatabaseDriver {
 
       ResultSet rs = ps.executeQuery();
 
-      if (!rs.next())
-        throw new EntryNotFoundException();
+      rs.next();
 
       return new Message(
           rs.getInt("sender_id"),
@@ -279,6 +282,9 @@ public final class ServerDatabaseDriver {
           rs.getBytes("attachments")
       );
     } catch (SQLException e) {
+      if (e.getErrorCode() == ERR_NOT_FOUND)
+        throw new EntryNotFoundException();
+
       throw new CriticalDatabaseException(e);
     }
   }
@@ -287,8 +293,9 @@ public final class ServerDatabaseDriver {
     RECEIPT BOX
   */
 
-  public void insertReceipt(Receipt rcpt) throws CriticalDatabaseException {
+  public void insertReceipt(Receipt rcpt) throws CriticalDatabaseException, GenericItemNotFoundException {
     try {
+      // Insert receipt
       String insertQuery = "INSERT INTO receipts (message_id, date, receiver_signature) VALUES (?, ?, ?);";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
@@ -297,12 +304,23 @@ public final class ServerDatabaseDriver {
       ps.setString(3, rcpt.signature);
 
       ps.executeUpdate();
+
+      // Set message as read
+      String updateQuery = "UPDATE messages (read) VALUES (1) WHERE message_id = ?;";
+
+      connection.prepareStatement(updateQuery);
+      ps.setInt(1, rcpt.messageId);
+
+      ps.executeUpdate();
     } catch (SQLException e) {
+      if (e.getErrorCode() == ERR_FOREIGN_KEY_CONSTRAINT)
+        throw new GenericItemNotFoundException("message");
+
       throw new CriticalDatabaseException(e);
     }
   }
 
-  public ArrayList<Receipt> getReceipts(int messageId) throws CriticalDatabaseException {
+  public ArrayList<Receipt> getReceipts(int messageId) throws CriticalDatabaseException, DatabaseException {
     try {
       String insertQuery =
           "SELECT r.message_id AS message_id, m.sender_id AS sender_id, m.date AS date, m.signature AS signature " +
@@ -326,6 +344,9 @@ public final class ServerDatabaseDriver {
 
       return receipts;
     } catch (SQLException e) {
+      if (e.getErrorCode() == ERR_FOREIGN_KEY_CONSTRAINT)
+        throw new GenericItemNotFoundException("message");
+
       throw new CriticalDatabaseException(e);
     }
   }
@@ -346,6 +367,7 @@ public final class ServerDatabaseDriver {
 
       if (updated == 0)
         throw new FailedToInsertOrUpdateException();
+
     } catch (SQLException e) {
       throw new CriticalDatabaseException(e);
     }

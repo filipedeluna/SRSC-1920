@@ -2,7 +2,7 @@ package server.response;
 
 import server.db.wrapper.Message;
 
-public class ReceiveMessageResponse extends OkResponseWithNonce {
+public final class ReceiveMessageResponse extends OkResponseWithNonce {
   private Message message;
 
   public ReceiveMessageResponse(String nonce, Message message) {

@@ -2,7 +2,7 @@ package server.db.wrapper;
 
 import java.io.Serializable;
 
-public class User implements Serializable {
+public final class User implements Serializable {
   public String id;
   public String uuid;
 

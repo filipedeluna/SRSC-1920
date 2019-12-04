@@ -35,7 +35,7 @@ import java.security.cert.Certificate;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Date;
 
-public class AEAHelper {
+public final class AEAHelper {
   private static final String CERTIFICATE_FORMAT = "X.509";
 
   private static final long ONE_DAY = 24L * 60L * 60L * 1000L; // 1 year

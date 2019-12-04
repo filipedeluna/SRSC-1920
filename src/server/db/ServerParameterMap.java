@@ -10,7 +10,7 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 
-public class ServerParameterMap extends LinkedHashMap<String, Pair<Integer, String>> {
+public final class ServerParameterMap extends LinkedHashMap<String, Pair<Integer, String>> {
   public ServerParameterMap() {
     super();
   }

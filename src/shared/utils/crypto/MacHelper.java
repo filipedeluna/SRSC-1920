@@ -8,7 +8,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.*;
 
-public class MacHelper {
+public final class MacHelper {
   private static final String PROVIDER = CryptUtil.PROVIDER;
 
   private Mac mac;

@@ -9,7 +9,6 @@ import server.props.ServerProperty;
 import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
 import shared.errors.properties.PropertyException;
-import shared.utils.CryptUtil;
 import shared.utils.GsonUtils;
 import shared.utils.crypto.AEAHelper;
 import shared.utils.crypto.B4Helper;
@@ -20,9 +19,8 @@ import shared.utils.properties.CustomProperties;
 import javax.crypto.spec.DHParameterSpec;
 import java.io.IOException;
 import java.security.*;
-import java.util.ArrayList;
 
-class ServerProperties {
+final class ServerProperties {
   boolean DEBUG_MODE;
 
   DHHelper DH;
@@ -32,9 +30,10 @@ class ServerProperties {
   Gson GSON;
 
   ServerDatabaseDriver DB;
-  KeyStore KEYSTORE;
 
   PublicKey PUB_KEY;
+
+  private KeyStore keyStore;
 
   private CustomProperties props;
   private String pubKeyName;
@@ -44,7 +43,7 @@ class ServerProperties {
     this.props = properties;
 
     DEBUG_MODE = properties.getBool(ServerProperty.DEBUG);
-    KEYSTORE = keyStore;
+    this.keyStore = keyStore;
     DB = db;
 
     B64 = new B4Helper();
@@ -64,7 +63,7 @@ class ServerProperties {
 
     // Get pub key and assign it
     pubKeyName = properties.getString(ServerProperty.PUB_KEY_NAME);
-    PUB_KEY = AEA.getCertFromKeystore(pubKeyName, KEYSTORE).getPublicKey();
+    PUB_KEY = AEA.getCertFromKeystore(pubKeyName, this.keyStore).getPublicKey();
 
     // Initialize DH params and helper
     String dhKeyAlg = properties.getString(ServerProperty.DH_KEY_ALG);
@@ -78,7 +77,7 @@ class ServerProperties {
   }
 
   PrivateKey privateKey() throws GeneralSecurityException {
-    return (PrivateKey) KEYSTORE.getKey(pubKeyName, ksPassword.toCharArray());
+    return (PrivateKey) keyStore.getKey(pubKeyName, ksPassword.toCharArray());
   }
 
   private void paramsReset() throws GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException, ParameterException {

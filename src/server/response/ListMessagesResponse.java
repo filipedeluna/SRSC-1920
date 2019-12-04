@@ -2,7 +2,7 @@ package server.response;
 
 import java.util.ArrayList;
 
-public class ListMessagesResponse extends OkResponseWithNonce {
+public final class ListMessagesResponse extends OkResponseWithNonce {
   private ArrayList<String> receivedMessageIds;
   private ArrayList<Integer> sentMessageIds;
 

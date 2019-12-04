@@ -3,10 +3,9 @@ package shared.utils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
-public class SafeInputStreamReader extends InputStreamReader {
+public final class SafeInputStreamReader extends InputStreamReader {
   private static final long MAX_BYTES = 5L * 1024L * 1024L; // 5 MB
   private long bytesRead = 0;
 

@@ -1,6 +1,6 @@
 package server.response;
 
-public class SendMessageResponse extends OkResponseWithNonce {
+public final class SendMessageResponse extends OkResponseWithNonce {
   private int messageId;
 
   public SendMessageResponse(String nonce, int messageId) {

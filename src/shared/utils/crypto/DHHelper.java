@@ -3,7 +3,6 @@ package shared.utils.crypto;
 import shared.utils.CryptUtil;
 
 import javax.crypto.KeyAgreement;
-import javax.crypto.spec.DHGenParameterSpec;
 import javax.crypto.spec.DHParameterSpec;
 import java.math.BigInteger;
 import java.security.*;

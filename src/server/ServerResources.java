@@ -17,7 +17,6 @@ import shared.errors.request.InvalidRouteException;
 import shared.errors.request.MissingValueException;
 import shared.errors.request.RequestException;
 import shared.http.HTTPStatus;
-import shared.response.EchoResponse;
 import shared.response.ErrorResponse;
 import shared.utils.GsonUtils;
 import shared.utils.SafeInputStreamReader;
@@ -31,10 +30,9 @@ import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 
-class ServerResources implements Runnable {
+final class ServerResources implements Runnable {
   private SSLSocket client;
   private JsonReader input;
   private OutputStream output;
@@ -81,9 +79,6 @@ class ServerResources implements Runnable {
         nonce = GsonUtils.getString(requestData, "nonce");
 
       switch (request) {
-        case ECHO:
-          echo(requestData);
-          break;
         case CREATE:
           createUser(requestData, nonce);
           break;
@@ -97,16 +92,16 @@ class ServerResources implements Runnable {
           listMessages(requestData, nonce);
           break;
         case SEND:
-          sendMessage(requestData, nonce);
+          insertMessage(requestData, nonce);
           break;
         case RECEIVE:
-          receiveMessage(requestData, nonce);
+          getMessage(requestData, nonce);
           break;
         case RECEIPT:
-          sendMessageReceipt(requestData);
+          insertReceipt(requestData);
           break;
         case STATUS:
-          getMessageStatus(requestData, nonce);
+          getReceipts(requestData, nonce);
           break;
         case PARAMS:
           params(nonce);
@@ -115,15 +110,6 @@ class ServerResources implements Runnable {
     } catch (ClassCastException | IllegalStateException e) {
       throw new InvalidRouteException();
     }
-  }
-
-  // Echo
-  private void echo(JsonObject requestData) throws RequestException, IOException {
-    String message = GsonUtils.getString(requestData, "message");
-
-    EchoResponse response = new EchoResponse(message);
-
-    send(response.json(props.GSON));
   }
 
   // Create user message box
@@ -157,7 +143,7 @@ class ServerResources implements Runnable {
   }
 
   // List users details
-  private void listUsers(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
+  private void listUsers(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
     // Get intended user id or none if supposed to get all users
     int userId;
 
@@ -182,7 +168,7 @@ class ServerResources implements Runnable {
   }
 
   // List new messages
-  private synchronized void listNewMessages(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
+  private void listNewMessages(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
     // Get intended user id or none if supposed to get all users
     int userId = GsonUtils.getInt(requestData, "userId");
 
@@ -194,7 +180,7 @@ class ServerResources implements Runnable {
   }
 
   // List all messages
-  private synchronized void listMessages(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
+  private void listMessages(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
     // Get intended user id messages
     int userId = GsonUtils.getInt(requestData, "userId");
 
@@ -210,7 +196,7 @@ class ServerResources implements Runnable {
   }
 
   // Is Revoked
-  private synchronized void sendMessage(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
+  private synchronized void insertMessage(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
     // Get sender and receiver ids
     int senderId = GsonUtils.getInt(requestData, "source");
     int receiverId = GsonUtils.getInt(requestData, "destination");
@@ -248,7 +234,7 @@ class ServerResources implements Runnable {
     send(response.json(props.GSON));
   }
 
-  private void receiveMessage(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
+  private void getMessage(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
     // Get intended message id
     int messageId = GsonUtils.getInt(requestData, "messageId");
 
@@ -261,7 +247,7 @@ class ServerResources implements Runnable {
   }
 
 
-  private void sendMessageReceipt(JsonObject requestData) throws RequestException, CriticalDatabaseException, DatabaseException, IOException {
+  private synchronized void insertReceipt(JsonObject requestData) throws RequestException, CriticalDatabaseException, DatabaseException {
     // Get read message id
     int messageId = GsonUtils.getInt(requestData, "messageId");
 
@@ -277,7 +263,7 @@ class ServerResources implements Runnable {
     // No response
   }
 
-  private void getMessageStatus(JsonObject requestData, String nonce) throws RequestException, CriticalDatabaseException, DatabaseException, IOException {
+  private void getReceipts(JsonObject requestData, String nonce) throws RequestException, CriticalDatabaseException, DatabaseException, IOException {
     // Get intended message id
     int messageId = GsonUtils.getInt(requestData, "messageId");
 
@@ -294,7 +280,7 @@ class ServerResources implements Runnable {
 
 
   // Get all server params
-  private synchronized void params(String nonce) throws GeneralSecurityException, CriticalDatabaseException, IOException {
+  private void params(String nonce) throws GeneralSecurityException, CriticalDatabaseException, IOException {
     // Get params and parse to json object
     ServerParameterMap params = props.DB.getAllParameters();
     String paramsJSON = props.GSON.toJson(params);

@@ -4,7 +4,7 @@ import java.util.Base64;
 import java.util.Base64.Encoder;
 import java.util.Base64.Decoder;
 
-public class B4Helper {
+public final class B4Helper {
   private Encoder encoder;
   private Decoder decoder;
 
