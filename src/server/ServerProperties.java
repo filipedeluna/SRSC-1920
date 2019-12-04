@@ -39,11 +39,15 @@ final class ServerProperties {
   private String pubKeyName;
   private String ksPassword;
 
+  private int bufferSizeInMB;
+
   ServerProperties(CustomProperties properties, KeyStore keyStore, ServerDatabaseDriver db) throws PropertyException, GeneralSecurityException, IOException, DatabaseException, CriticalDatabaseException, ParameterException {
     this.props = properties;
+    this.keyStore = keyStore;
+
+    bufferSizeInMB = properties.getInt(ServerProperty.BUFFER_SIZE_MB);
 
     DEBUG_MODE = properties.getBool(ServerProperty.DEBUG);
-    this.keyStore = keyStore;
     DB = db;
 
     B64 = new B4Helper();
@@ -101,5 +105,9 @@ final class ServerProperties {
 
     // Join all parameters, sign them, encode them and insert them in DB
     DB.insertParameter(ServerParameterType.PARAM_SIG, B64.encode(params.getAllParametersBytes()));
+  }
+
+  public int getBufferSizeInMB() {
+    return bufferSizeInMB;
   }
 }

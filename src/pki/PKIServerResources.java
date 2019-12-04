@@ -40,7 +40,10 @@ final class PKIServerResources implements Runnable {
     this.props = props;
 
     try {
-      input = new JsonReader(new SafeInputStreamReader(client.getInputStream()));
+      // We should not allow large transfers in order to avoid DoS
+      int maxBufferSizeInMB = 1;
+
+      input = new JsonReader(new SafeInputStreamReader(client.getInputStream(), maxBufferSizeInMB));
       output = client.getOutputStream();
     } catch (Exception e) {
       handleException(e, props.DEBUG_MODE);

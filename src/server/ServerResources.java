@@ -44,7 +44,7 @@ final class ServerResources implements Runnable {
     this.props = props;
 
     try {
-      input = new JsonReader(new SafeInputStreamReader(client.getInputStream()));
+      input = new JsonReader(new SafeInputStreamReader(client.getInputStream(), props.getBufferSizeInMB()));
       output = client.getOutputStream();
     } catch (Exception e) {
       handleException(e);
