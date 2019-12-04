@@ -7,6 +7,7 @@ import server.db.wrapper.User;
 import server.errors.parameters.ParameterException;
 import shared.Pair;
 import shared.errors.db.*;
+import shared.utils.CryptUtil;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -236,7 +237,7 @@ public final class ServerDatabaseDriver {
     }
   }
 
-  public int insertMessage(Message msg) throws DatabaseException, CriticalDatabaseException {
+  public int insertMessage(Message msg) throws CriticalDatabaseException {
     try {
       String insertQuery = "INSERT INTO messages (sender_id, receiver_id, text, attachment_data, attachments, mac_hash) " +
           "VALUES (?, ?, ?, ?, ?, ?);";
@@ -247,7 +248,7 @@ public final class ServerDatabaseDriver {
       ps.setString(3, msg.text);
       ps.setString(4, msg.attachmentData);
       ps.setBytes(5, msg.attachments);
-      ps.setString(5, msg.macHash);
+      ps.setString(6, msg.macHash);
 
       ps.executeUpdate();
 
