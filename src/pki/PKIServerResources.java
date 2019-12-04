@@ -6,6 +6,8 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.cert.X509Certificate;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
@@ -67,6 +69,8 @@ final class PKIServerResources implements Runnable {
     try {
       String requestType = GsonUtils.getString(requestData, "type");
 
+      props.LOGGER.log(Level.FINE, "Request: " + requestType);
+
       switch (requestType) {
         case "sign":
           sign(requestData);
@@ -103,7 +107,7 @@ final class PKIServerResources implements Runnable {
 
     // Sign csr
     X509Certificate signedCert =
-        props.AEA.signCSR(certRequest, props.CERT, props.privateKey(), props.CERT_VALIDATY);
+        props.AEA.signCSR(certRequest, props.CERT, props.privateKey(), props.CERT_VALIDITY);
 
     // Get serial number and add to db
     BigInteger serialNumber = signedCert.getSerialNumber();
@@ -118,6 +122,8 @@ final class PKIServerResources implements Runnable {
     // Create payload and send response
     SignResponse response = new SignResponse(signedCertEncoded);
     send(response.json(props.GSON));
+
+    props.LOGGER.log(Level.FINE, "Certificate emitted with SN " + serialNumber);
   }
 
   // Is Revoked
@@ -151,6 +157,8 @@ final class PKIServerResources implements Runnable {
     OKResponse response = new OKResponse();
 
     send(response.json(props.GSON));
+
+    props.LOGGER.log(Level.FINE, "Certificate revoked with SN " + serialNumber);
   }
 
   /*
@@ -162,6 +170,7 @@ final class PKIServerResources implements Runnable {
     if (exception instanceof IHTTPStatusException) {
       HTTPStatus status = ((IHTTPStatusException) exception).status();
       response = status.buildErrorResponse(exception.getMessage());
+      props.LOGGER.log(Level.WARNING, exception.getMessage());
     } else {
       System.err.println("Client disconnected due to critical error: " + exception.getMessage());
 
@@ -169,6 +178,7 @@ final class PKIServerResources implements Runnable {
         exception.printStackTrace();
 
       response = HTTPStatus.INTERNAL_SERVER_ERROR.buildErrorResponse();
+      props.LOGGER.log(Level.SEVERE, exception.getMessage());
     }
 
     String responseJson = response.json(props.GSON);
@@ -177,6 +187,7 @@ final class PKIServerResources implements Runnable {
       send(responseJson);
     } catch (IOException e) {
       System.err.println("Failed to send error response to client");
+      props.LOGGER.log(Level.SEVERE, exception.getMessage());
 
       if (debugMode)
         e.printStackTrace();

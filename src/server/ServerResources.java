@@ -31,6 +31,8 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 final class ServerResources implements Runnable {
   private SSLSocket client;
@@ -56,7 +58,7 @@ final class ServerResources implements Runnable {
     try {
       JsonObject parsedRequest = parseRequest(input);
 
-      handleRequest(parsedRequest);
+      handleRequest(parsedRequest, client);
 
       client.close();
     } catch (Exception e) {
@@ -64,7 +66,7 @@ final class ServerResources implements Runnable {
     }
   }
 
-  private void handleRequest(JsonObject requestData) throws RequestException, IOException, DatabaseException, GeneralSecurityException, CriticalDatabaseException {
+  private void handleRequest(JsonObject requestData, SSLSocket client) throws RequestException, IOException, DatabaseException, GeneralSecurityException, CriticalDatabaseException {
     try {
       String requestName = GsonUtils.getString(requestData, "type");
       ServerRequest request = ServerRequest.fromString(requestName);
@@ -77,6 +79,12 @@ final class ServerResources implements Runnable {
       // Get nonce if supposed to for the requested route
       if (request.needsNonce())
         nonce = GsonUtils.getString(requestData, "nonce");
+
+      // Log client request without any specific info.
+      // Certificates emitted by CA should have unique serial numbers
+      // This way, we can identify the principal if a DOS or other similar attack occurs
+      props.LOGGER.log(Level.FINE, "Request: " + requestName + " made by " +
+          client.getSession().getPeerCertificateChain()[0].getSerialNumber() + ".");
 
       switch (request) {
         case CREATE:
@@ -313,6 +321,8 @@ final class ServerResources implements Runnable {
     if (exception instanceof IHTTPStatusException) {
       HTTPStatus status = ((IHTTPStatusException) exception).status();
       response = status.buildErrorResponse(exception.getMessage());
+
+      props.LOGGER.log(Level.WARNING, exception.getMessage());
     } else {
       System.err.println("Client disconnected due to critical error: " + exception.getMessage());
 
@@ -320,6 +330,8 @@ final class ServerResources implements Runnable {
         exception.printStackTrace();
 
       response = HTTPStatus.INTERNAL_SERVER_ERROR.buildErrorResponse();
+
+      props.LOGGER.log(Level.SEVERE, exception.getMessage());
     }
 
     String responseJson = response.json(props.GSON);
@@ -331,6 +343,8 @@ final class ServerResources implements Runnable {
 
       if (props.DEBUG_MODE)
         e.printStackTrace();
+
+      props.LOGGER.log(Level.SEVERE, exception.getMessage());
     }
   }
 

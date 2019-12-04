@@ -3,6 +3,7 @@ package pki;
 import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 import pki.db.PKIDatabaseDriver;
 import pki.props.PKIProperty;
+import server.props.ServerProperty;
 import shared.errors.properties.InvalidValueException;
 import shared.errors.properties.PropertyException;
 import shared.utils.CryptUtil;
@@ -10,10 +11,14 @@ import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.*;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.security.KeyStore;
 import java.security.Security;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.logging.FileHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 final class PKIServer {
   private static final String PROPS_PATH = "src/pki/props/pki.properties";
@@ -23,18 +28,24 @@ final class PKIServer {
     Security.addProvider(new BouncyCastleJsseProvider());
     System.setProperty("java.net.preferIPv4Stack", "true");
 
-    // Get properties from file
     CustomProperties props = null;
-    // initial props
+    Logger logger = null;
     boolean debugMode = false;
 
     try {
       props = new CustomProperties(PROPS_PATH);
 
+      // Create Logger and add a file handler to defined file
+      String logFile = props.getString(PKIProperty.LOG_LOC);
+      logger = Logger.getLogger("PKI Logger");
+      logger.addHandler(new FileHandler(logFile, true));
+
       debugMode = props.getBool(PKIProperty.DEBUG);
     } catch (PropertyException e) {
       System.err.println(e.getMessage());
       System.exit(-1);
+    } catch (IOException e) {
+      System.err.println("Failed to initiate logger: " + e.getMessage());
     }
 
     // Start main thread
@@ -78,17 +89,17 @@ final class PKIServer {
 
       // Create db and initiate properties
       PKIDatabaseDriver db = new PKIDatabaseDriver(props.getString(PKIProperty.DATABASE_LOC));
-      PKIServerProperties pkiServerProps = new PKIServerProperties(props, keyStore, db);
+      PKIServerProperties pkiServerProps = new PKIServerProperties(props, keyStore, db, logger);
 
       // Client serving loop
-      while (true) {
-        SSLSocket sslClient = (SSLSocket) serverSocket.accept();
+      SSLSocket sslClient;
 
-        PKIServerResources pkiServerResources = new PKIServerResources(sslClient, pkiServerProps);
-        executor.execute(new Thread(pkiServerResources));
+      while (true) {
+        sslClient = (SSLSocket) serverSocket.accept();
+        executor.execute(new Thread(new PKIServerResources(sslClient, pkiServerProps)));
       }
     } catch (Exception e) {
-      handleException(e, debugMode);
+      handleException(e, debugMode, logger);
     } finally {
       System.exit(-1);
     }
@@ -97,7 +108,7 @@ final class PKIServer {
   /*
     Utils
   */
-  private static void handleException(Exception e, boolean debugMode) {
+  private static void handleException(Exception e, boolean debugMode, Logger logger) {
     boolean expected = false;
 
     if (e instanceof PropertyException)
@@ -105,7 +116,9 @@ final class PKIServer {
 
     if (expected) {
       System.err.println(e.getMessage());
+      logger.log(Level.WARNING, e.getMessage());
     } else {
+      logger.log(Level.SEVERE, e.getMessage());
       System.err.println("CRITICAL ERROR.");
     }
 

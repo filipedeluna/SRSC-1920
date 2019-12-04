@@ -8,6 +8,7 @@ public enum ServerProperty implements ICustomProperty {
 
   // System
   DEBUG("debug", CustomPropertyType.BOOL),
+  LOG_LOC("log_location", CustomPropertyType.STRING),
   THREAD_POOL_SIZE("thread_pool_size", CustomPropertyType.INT),
   DATABASE_LOC("database_location", CustomPropertyType.STRING),
   PARAMS_RESET("params_reset", CustomPropertyType.BOOL),

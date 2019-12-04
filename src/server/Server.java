@@ -20,6 +20,11 @@ import java.security.SecureRandom;
 import java.security.Security;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.logging.FileHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import static com.sun.xml.internal.ws.spi.db.BindingContextFactory.LOGGER;
 
 final class Server {
   private static final String PROPS_PATH = "src/server/props/server.properties";
@@ -29,18 +34,24 @@ final class Server {
     System.setProperty("java.net.preferIPv4Stack", "true");
     Security.addProvider(new BouncyCastleJsseProvider());
 
-    // Get properties from file
     CustomProperties properties = null;
-    // initial props
+    Logger logger = null;
     boolean debugMode = false;
 
     try {
       properties = new CustomProperties(PROPS_PATH);
 
+      // Create Logger and add a file handler to defined file
+      String logFile = properties.getString(ServerProperty.LOG_LOC);
+      logger = Logger.getLogger("Server Logger");
+      logger.addHandler(new FileHandler(logFile, true));
+
       debugMode = properties.getBool(ServerProperty.DEBUG);
     } catch (PropertyException e) {
       System.err.println(e.getMessage());
       System.exit(-1);
+    } catch (IOException e) {
+      System.err.println("Failed to initiate logger: " + e.getMessage());
     }
 
     // Start main thread
@@ -81,17 +92,17 @@ final class Server {
       String databaseLocation = properties.getString(ServerProperty.DATABASE_LOC);
       ServerDatabaseDriver db = new ServerDatabaseDriver(databaseLocation);
 
-      ServerProperties svParams = new ServerProperties(properties, keyStore, db);
+      ServerProperties props = new ServerProperties(properties, keyStore, db, logger);
 
       // Client serving loop
-      while (true) {
-        SSLSocket sslClient = (SSLSocket) serverSocket.accept();
-        ServerResources serverResources = new ServerResources(sslClient, svParams);
+      SSLSocket sslClient;
 
-        executor.execute(new Thread(serverResources));
+      while (true) {
+        sslClient = (SSLSocket) serverSocket.accept();
+        executor.execute(new Thread(new ServerResources(sslClient, props)));
       }
     } catch (Exception e) {
-      handleException(e, debugMode);
+      handleException(e, debugMode, logger);
     } finally {
       System.exit(-1);
     }
@@ -100,7 +111,7 @@ final class Server {
   /*
     Utils
   */
-  private static void handleException(Exception e, boolean debugMode) {
+  private static void handleException(Exception e, boolean debugMode, Logger logger) {
     boolean expected = false;
 
     if (e instanceof PropertyException)
@@ -108,12 +119,15 @@ final class Server {
 
     if (expected) {
       System.err.println(e.getMessage());
+      logger.log(Level.WARNING, e.getMessage());
     } else {
+      logger.log(Level.SEVERE, e.getMessage());
       System.err.println("CRITICAL ERROR.");
     }
 
     if (debugMode)
       e.printStackTrace();
+
   }
 
   private static boolean validateThreadCount(int threadCount) {

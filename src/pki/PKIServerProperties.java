@@ -17,6 +17,7 @@ import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.X509Certificate;
+import java.util.logging.Logger;
 
 final class PKIServerProperties {
   boolean DEBUG_MODE;
@@ -26,26 +27,27 @@ final class PKIServerProperties {
   AEAHelper AEA;
   B4Helper B64;
   Gson GSON;
+  Logger LOGGER;
 
   PKIDatabaseDriver DB;
   KeyStore KEYSTORE;
 
   PublicKey PUB_KEY;
   X509Certificate CERT;
-  int CERT_VALIDATY;
+  int CERT_VALIDITY;
 
   private CustomProperties props;
   private String pubKeyName;
   private String ksPassword;
   private String token;
 
-  PKIServerProperties(CustomProperties props, KeyStore keyStore, PKIDatabaseDriver db) throws PropertyException, GeneralSecurityException {
+  PKIServerProperties(CustomProperties props, KeyStore keyStore, PKIDatabaseDriver db, Logger logger) throws PropertyException, GeneralSecurityException {
     this.props = props;
 
+    LOGGER = logger;
     DEBUG_MODE = props.getBool(ServerProperty.DEBUG);
     KEYSTORE = keyStore;
     DB = db;
-
     B64 = new B4Helper();
     GSON = GsonUtils.buildGsonInstance();
 
@@ -67,7 +69,7 @@ final class PKIServerProperties {
     pubKeyName = props.getString(PKIProperty.PKI_PUB_KEY);
     CERT = AEA.getCertFromKeystore(pubKeyName, KEYSTORE);
     PUB_KEY = CERT.getPublicKey();
-    CERT_VALIDATY = props.getInt(PKIProperty.CERTIFICATE_VALIDITY);
+    CERT_VALIDITY = props.getInt(PKIProperty.CERTIFICATE_VALIDITY);
   }
 
   PrivateKey privateKey() throws GeneralSecurityException {

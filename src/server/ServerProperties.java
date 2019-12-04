@@ -19,6 +19,7 @@ import shared.utils.properties.CustomProperties;
 import javax.crypto.spec.DHParameterSpec;
 import java.io.IOException;
 import java.security.*;
+import java.util.logging.Logger;
 
 final class ServerProperties {
   boolean DEBUG_MODE;
@@ -28,6 +29,7 @@ final class ServerProperties {
   AEAHelper AEA;
   B4Helper B64;
   Gson GSON;
+  Logger LOGGER;
 
   ServerDatabaseDriver DB;
 
@@ -41,17 +43,20 @@ final class ServerProperties {
 
   private int bufferSizeInMB;
 
-  ServerProperties(CustomProperties properties, KeyStore keyStore, ServerDatabaseDriver db) throws PropertyException, GeneralSecurityException, IOException, DatabaseException, CriticalDatabaseException, ParameterException {
+  ServerProperties(CustomProperties properties, KeyStore keyStore, ServerDatabaseDriver db, Logger logger) throws PropertyException, GeneralSecurityException, IOException, DatabaseException, CriticalDatabaseException, ParameterException {
     this.props = properties;
     this.keyStore = keyStore;
 
-    bufferSizeInMB = properties.getInt(ServerProperty.BUFFER_SIZE_MB);
-
+    // Set Debug mode
     DEBUG_MODE = properties.getBool(ServerProperty.DEBUG);
-    DB = db;
+
+    // Max size of socket buffer
+    bufferSizeInMB = properties.getInt(ServerProperty.BUFFER_SIZE_MB);
 
     B64 = new B4Helper();
     GSON = GsonUtils.buildGsonInstance();
+    DB = db;
+    LOGGER = logger;
 
     // Get and set password for keystore
     ksPassword = props.getString(ServerProperty.KEYSTORE_PASS);
