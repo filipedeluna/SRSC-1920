@@ -3,13 +3,8 @@ package pki;
 import com.google.gson.Gson;
 import pki.db.PKIDatabaseDriver;
 import pki.props.PKIProperty;
-import server.db.ServerDatabaseDriver;
-import server.db.ServerParameter;
 import server.props.ServerProperty;
-import shared.errors.db.CriticalDatabaseException;
-import shared.errors.db.DatabaseException;
 import shared.errors.properties.PropertyException;
-import shared.utils.CryptUtil;
 import shared.utils.GsonUtils;
 import shared.utils.crypto.AEAHelper;
 import shared.utils.crypto.B4Helper;
@@ -17,15 +12,13 @@ import shared.utils.crypto.DHHelper;
 import shared.utils.crypto.HashHelper;
 import shared.utils.properties.CustomProperties;
 
-import javax.crypto.spec.DHParameterSpec;
-import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.X509Certificate;
 
-class PKIServerProperties {
+final class PKIServerProperties {
   boolean DEBUG_MODE;
 
   DHHelper DH;

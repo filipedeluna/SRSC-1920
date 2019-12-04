@@ -15,7 +15,7 @@ import java.security.Security;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
-class PKIServer {
+final class PKIServer {
   private static final String PROPS_PATH = "src/pki/props/pki.properties";
 
   @SuppressWarnings("InfiniteLoopStatement")

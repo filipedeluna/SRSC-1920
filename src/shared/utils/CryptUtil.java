@@ -4,7 +4,7 @@ import java.io.*;
 import java.security.*;
 import java.util.Base64;
 
-public abstract class CryptUtil {
+public final class CryptUtil {
   public static final String PROVIDER = "BC";
   public static final String PROVIDER_TLS = "BCJSSE";
 

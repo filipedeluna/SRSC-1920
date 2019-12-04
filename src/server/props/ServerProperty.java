@@ -1,6 +1,5 @@
 package server.props;
 
-import shared.utils.properties.CustomProperties;
 import shared.utils.properties.ICustomProperty;
 import shared.utils.properties.CustomPropertyType;
 
@@ -15,6 +14,7 @@ public enum ServerProperty implements ICustomProperty {
 
   // Network
   PORT("port", CustomPropertyType.INT),
+  BUFFER_SIZE_MB("buffer_size_megabytes", CustomPropertyType.INT),
   TLS_MUTUAL_AUTH("tls_mutual_auth", CustomPropertyType.BOOL),
   TLS_CIPHERSUITES("tls_ciphersuites", CustomPropertyType.STRING_ARRAY),
   TLS_PROTOCOLS("tls_protocols", CustomPropertyType.STRING_ARRAY),

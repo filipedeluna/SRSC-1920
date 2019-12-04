@@ -5,8 +5,7 @@ import shared.utils.CryptUtil;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 
-
-public class HashHelper {
+public final class HashHelper {
   private static final String PROVIDER = CryptUtil.PROVIDER;
 
   private MessageDigest messageDigest;

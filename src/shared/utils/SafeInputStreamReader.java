@@ -3,16 +3,20 @@ package shared.utils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
-public class SafeInputStreamReader extends InputStreamReader {
-  private static final long MAX_BYTES = 5L * 1024L * 1024L; // 5 MB
-  private long bytesRead = 0;
+public final class SafeInputStreamReader extends InputStreamReader {
+  private static final long MEGA_BYTE = 1024L * 1024L; // 1 MB
+
+  private long bytesRead;
+  private long maxBufferSize;
 
   // This class makes it so users can't send HUGE files and DOS
-  public SafeInputStreamReader(InputStream in) {
+  public SafeInputStreamReader(InputStream in, int maxBufferSizeInMB) {
     super(in, StandardCharsets.UTF_8);
+
+    maxBufferSize = MEGA_BYTE * maxBufferSizeInMB;
+    bytesRead = 0;
   }
 
   @Override
@@ -42,7 +46,7 @@ public class SafeInputStreamReader extends InputStreamReader {
   private int readBytes(int lastRead) throws IOException {
     bytesRead += lastRead;
 
-    if (bytesRead > MAX_BYTES)
+    if (bytesRead > maxBufferSize)
       throw new IOException("Max file size passed.");
 
     return lastRead;

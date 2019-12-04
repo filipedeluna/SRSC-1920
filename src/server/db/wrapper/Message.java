@@ -1,6 +1,8 @@
 package server.db.wrapper;
 
-public class Message {
+import java.io.Serializable;
+
+public final class Message implements Serializable {
   public int id;
   public int senderId;
   public int receiverId;
@@ -8,6 +10,8 @@ public class Message {
   public String attachmentData;
   public byte[] attachments;
   public String macHash;
+
+  public Message() {}
 
   public Message(int senderId, int receiverId, String text, String attachmentData, byte[] attachments, String macHash) {
     this.senderId = senderId;

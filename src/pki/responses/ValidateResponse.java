@@ -2,7 +2,7 @@ package pki.responses;
 
 import shared.response.OKResponse;
 
-public class ValidateResponse extends OKResponse {
+public final class ValidateResponse extends OKResponse {
   private String valid;
 
   public ValidateResponse(boolean validation) {

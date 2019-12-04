@@ -4,8 +4,12 @@ import com.google.gson.Gson;
 import shared.http.HTTPStatus;
 import shared.http.HTTPStatusPair;
 
-abstract class GsonResponse {
+import java.io.Serializable;
+
+abstract class GsonResponse implements Serializable {
   private HTTPStatusPair status;
+
+  GsonResponse() {}
 
   GsonResponse(HTTPStatus status) {
     this.status = status.buildPair();

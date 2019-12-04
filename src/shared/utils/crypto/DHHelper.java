@@ -3,7 +3,6 @@ package shared.utils.crypto;
 import shared.utils.CryptUtil;
 
 import javax.crypto.KeyAgreement;
-import javax.crypto.spec.DHGenParameterSpec;
 import javax.crypto.spec.DHParameterSpec;
 import java.math.BigInteger;
 import java.security.*;
@@ -15,6 +14,7 @@ public class DHHelper {
   private AlgorithmParameterGenerator algParamsGenerator;
   private int keySize;
   private String dhAlg;
+  private String hashAlg;
 
   public DHHelper(String dhAlg, String hashAlg, int keySize) throws GeneralSecurityException {
     keyPairGenerator = KeyPairGenerator.getInstance(dhAlg, CryptUtil.PROVIDER);
@@ -24,6 +24,7 @@ public class DHHelper {
 
     algParamsGenerator.init(keySize);
 
+    this.hashAlg = hashAlg;
     this.keySize = keySize;
     this.dhAlg = dhAlg;
   }
@@ -57,5 +58,9 @@ public class DHHelper {
 
   public String alg() {
     return dhAlg;
+  }
+
+  public String hashAlg() {
+    return hashAlg;
   }
 }

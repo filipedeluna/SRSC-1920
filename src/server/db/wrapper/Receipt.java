@@ -1,14 +1,16 @@
 package server.db.wrapper;
 
-public class Receipt {
+import java.io.Serializable;
+
+public final class Receipt implements Serializable {
   public int messageId;
-  public int senderId;
   public String date;
   public String signature;
 
-  public Receipt(int messageId, int senderId, String date, String signature) {
+  public Receipt() {}
+
+  public Receipt(int messageId, String date, String signature) {
     this.messageId = messageId;
-    this.senderId = senderId;
     this.date = date;
     this.signature = signature;
   }

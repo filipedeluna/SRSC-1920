@@ -21,7 +21,7 @@ import java.security.Security;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
-class Server {
+final class Server {
   private static final String PROPS_PATH = "src/server/props/server.properties";
 
   @SuppressWarnings("InfiniteLoopStatement")
@@ -171,8 +171,10 @@ class Server {
     TrustManager[] extendedTrustManagers = new TrustManager[trustManagers.length + 1];
     System.arraycopy(trustManagers, 0, extendedTrustManagers, 0, trustManagers.length);
     Gson gson = GsonUtils.buildGsonInstance();
+
+    // Add custom trust manager to trust managers
     extendedTrustManagers[trustManagers.length] =
-        new CustomTrustManager(properties, defaultSSLContext.getSocketFactory(), new B4Helper(), gson);
+        new CustomTrustManager(properties, defaultSSLContext.getSocketFactory(), trustManagers, new B4Helper(), gson);
 
     SSLContext serverSSLContext = SSLContext.getInstance("TLS", CryptUtil.PROVIDER_TLS);
     serverSSLContext.init(keyManagers, extendedTrustManagers, new SecureRandom());

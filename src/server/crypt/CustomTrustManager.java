@@ -20,24 +20,22 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 
-public class CustomTrustManager implements X509TrustManager {
-  private ArrayList<X509Certificate> acceptedIssuers;
-
-  private B4Helper b64Helper;
+public final class CustomTrustManager implements X509TrustManager {
+  private TrustManager[] trustManagers;
   private Gson gson;
   private SSLSocket socket;
   private boolean debug;
 
-  public CustomTrustManager(CustomProperties properties, SSLSocketFactory socketFactory, B4Helper b64Helper, Gson gson) throws PropertyException, IOException {
+  public CustomTrustManager(CustomProperties properties, SSLSocketFactory socketFactory, TrustManager[] trustManagers, B4Helper b4Helper, Gson gson) throws PropertyException, IOException {
     // Create socket
     String pkiServerAddress = properties.getString(ServerProperty.PKI_SERVER_ADDRESS);
     int pkiServerPort = properties.getInt(ServerProperty.PKI_SERVER_PORT);
 
     socket = (SSLSocket) socketFactory.createSocket(pkiServerAddress, pkiServerPort);
     debug = properties.getBool(ServerProperty.DEBUG);
-    this.b64Helper = b64Helper;
+
+    this.trustManagers = trustManagers;
     this.gson = gson;
   }
 
@@ -78,11 +76,16 @@ public class CustomTrustManager implements X509TrustManager {
 
   @Override
   public void checkServerTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
-
   }
 
   @Override
   public X509Certificate[] getAcceptedIssuers() {
-    return (X509Certificate[]) acceptedIssuers.toArray();
+    // Look for default X509 trust manager and send it so it does not interfere
+    for (TrustManager trustManager : trustManagers) {
+      if (trustManager instanceof X509TrustManager)
+        return ((X509TrustManager) trustManager).getAcceptedIssuers();
+    }
+
+    return new X509Certificate[0];
   }
 }

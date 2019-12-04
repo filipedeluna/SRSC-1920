@@ -7,7 +7,7 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.*;
 
-public class SEAHelper {
+public final class SEAHelper {
   private String spec;
   private String mode;
   private Cipher cipher;

@@ -12,30 +12,23 @@ import com.google.gson.stream.JsonReader;
 import org.bouncycastle.operator.OperatorException;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.PKCSException;
-import pki.db.PKIDatabaseDriver;
-import pki.props.PKIProperty;
 import pki.responses.SignResponse;
 import pki.responses.ValidateResponse;
 import shared.errors.IHTTPStatusException;
 import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
-import shared.errors.properties.PropertyException;
 import shared.errors.request.CustomRequestException;
 import shared.response.OKResponse;
 import shared.utils.GsonUtils;
-import shared.response.EchoResponse;
 import shared.response.ErrorResponse;
 import shared.errors.request.InvalidRouteException;
 import shared.errors.request.RequestException;
 import shared.http.HTTPStatus;
 import shared.utils.SafeInputStreamReader;
-import shared.utils.crypto.AEAHelper;
-import shared.utils.crypto.B4Helper;
-import shared.utils.crypto.HashHelper;
 
 import javax.net.ssl.SSLSocket;
 
-class PKIServerResources implements Runnable {
+final class PKIServerResources implements Runnable {
   private SSLSocket client;
   private com.google.gson.stream.JsonReader input;
   private OutputStream output;
@@ -47,7 +40,10 @@ class PKIServerResources implements Runnable {
     this.props = props;
 
     try {
-      input = new JsonReader(new SafeInputStreamReader(client.getInputStream()));
+      // We should not allow large transfers in order to avoid DoS
+      int maxBufferSizeInMB = 1;
+
+      input = new JsonReader(new SafeInputStreamReader(client.getInputStream(), maxBufferSizeInMB));
       output = client.getOutputStream();
     } catch (Exception e) {
       handleException(e, props.DEBUG_MODE);
@@ -72,9 +68,6 @@ class PKIServerResources implements Runnable {
       String requestType = GsonUtils.getString(requestData, "type");
 
       switch (requestType) {
-        case "echo":
-          echo(requestData);
-          break;
         case "sign":
           sign(requestData);
           break;
@@ -90,15 +83,6 @@ class PKIServerResources implements Runnable {
     } catch (ClassCastException | IllegalStateException e) {
       throw new InvalidRouteException();
     }
-  }
-
-  // Echo
-  private void echo(JsonObject requestData) throws RequestException, IOException {
-    String message = GsonUtils.getString(requestData, "message");
-
-    EchoResponse response = new EchoResponse(message);
-
-    send(response.json(props.GSON));
   }
 
   // Register
