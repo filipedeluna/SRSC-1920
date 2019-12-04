@@ -10,6 +10,7 @@ import shared.errors.db.*;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public final class ServerDatabaseDriver {
   private static final int ERR_UNIQUE_CONSTRAINT = 19;
@@ -336,6 +337,7 @@ public final class ServerDatabaseDriver {
       while (rs.next()) {
         receipts.add(new Receipt(
                 rs.getInt("message_id"),
+                rs.getInt("sender_id"),
                 rs.getString("date"),
                 rs.getString("signature")
             )
