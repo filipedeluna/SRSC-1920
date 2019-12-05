@@ -4,6 +4,7 @@ import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
 import server.db.wrapper.Message;
 import server.db.wrapper.Receipt;
+import server.props.ServerProperty;
 import server.response.*;
 import server.db.ServerParameterMap;
 import server.db.wrapper.User;
@@ -22,8 +23,8 @@ import shared.utils.GsonUtils;
 import shared.utils.SafeInputStreamReader;
 
 import javax.net.ssl.SSLSocket;
-import java.security.*;
 import java.security.cert.X509Certificate;
+import java.security.*;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -32,7 +33,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 final class ServerResources implements Runnable {
   private SSLSocket client;
@@ -40,6 +40,7 @@ final class ServerResources implements Runnable {
   private OutputStream output;
 
   private ServerProperties props;
+  private X509Certificate clientCert;
 
   ServerResources(SSLSocket client, ServerProperties props) {
     this.client = client;
@@ -55,6 +56,16 @@ final class ServerResources implements Runnable {
 
   public void run() {
     try {
+      clientCert = props.AEA.certFromSession(client);
+
+      // Verify client certificate validity in PKI (like OCSP)
+      if (!props.PKI_ENABLED) {
+        SSLSocket pkiSocket = props.PKI_COMMS_MGR.getSocket();
+
+        // Check certificate validity in PKI
+        props.PKI_COMMS_MGR.checkClientCertificateRevoked(clientCert, pkiSocket);
+      }
+      // Serve client request
       JsonObject parsedRequest = parseRequest(input);
 
       handleRequest(parsedRequest, client);
@@ -83,8 +94,7 @@ final class ServerResources implements Runnable {
       // Log client request without any specific info.
       // Certificates emitted by CA should have unique serial numbers
       // This way, we can identify the principal if a DOS or other similar attack occurs
-      props.LOGGER.log(Level.FINE, "Request: " + requestName + " made by " +
-          client.getSession().getPeerCertificateChain()[0].getSerialNumber() + ".");
+      props.LOGGER.log(Level.FINE, "Request: " + requestName + " made by " + clientCert.getSerialNumber() + ".");
 
       switch (request) {
         case CREATE:
@@ -123,8 +133,7 @@ final class ServerResources implements Runnable {
   // Create user message box
   private synchronized void createUser(JsonObject requestData, String nonce) throws RequestException, IOException, DatabaseException, CriticalDatabaseException {
     // Get public key and certificate from user
-    X509Certificate certificate = (X509Certificate) client.getSession().getPeerCertificates()[0];
-    PublicKey publicKey = certificate.getPublicKey();
+    PublicKey publicKey = clientCert.getPublicKey();
     String publicKeyEncoded = props.B64.encode(publicKey.getEncoded());
 
     // Get user intended uuid and message verification nonce

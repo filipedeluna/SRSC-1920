@@ -23,6 +23,8 @@ import org.bouncycastle.asn1.x509.Extension;
 
 import javax.crypto.*;
 import javax.crypto.spec.DHParameterSpec;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSocket;
 import javax.security.cert.CertificateEncodingException;
 import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
@@ -179,6 +181,10 @@ public final class AEAHelper {
     }
 
     return newCerts;
+  }
+
+  public X509Certificate certFromSession(SSLSocket socket) throws SSLPeerUnverifiedException {
+    return (X509Certificate) socket.getSession().getPeerCertificates()[0];
   }
 
   public X509Certificate signCSR(PKCS10CertificationRequest csr, X509Certificate caCert, PrivateKey key, int validityDays) throws OperatorException, PKCSException, GeneralSecurityException, IOException {

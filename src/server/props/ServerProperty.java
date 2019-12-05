@@ -32,6 +32,7 @@ public enum ServerProperty implements ICustomProperty {
   PUB_KEY_SIZE("pub_key_size", CustomPropertyType.INT),
   PUB_KEY_NAME("pub_key_name", CustomPropertyType.STRING),
   CERT_SIGN_ALG("cert_sign_alg", CustomPropertyType.STRING),
+  CERT_TYPE("cert_type", CustomPropertyType.STRING),
 
   DH_KEY_ALG("dh_key_alg", CustomPropertyType.STRING),
   DH_KEY_HASH_ALG("dh_key_hash_alg", CustomPropertyType.STRING),
@@ -42,7 +43,8 @@ public enum ServerProperty implements ICustomProperty {
   // PKI Server
   USE_PKI("use_pki", CustomPropertyType.BOOL),
   PKI_SERVER_ADDRESS("pki_server_address", CustomPropertyType.STRING),
-  PKI_SERVER_PORT("pki_server_port", CustomPropertyType.INT);
+  PKI_SERVER_PORT("pki_server_port", CustomPropertyType.INT),
+  PKI_CHECK_VALIDITY("pki_check_validity", CustomPropertyType.INT);
 
   /////////////////////////////////////////////////
 

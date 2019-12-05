@@ -85,6 +85,7 @@ final class PKIServer {
       serverSocket.setEnabledCipherSuites(enabledCipherSuites);
       serverSocket.setNeedClientAuth(false); // Unilateral
 
+      logger.log(Level.INFO, "Started server on port: " + port);
       System.out.print("Started pki server on port " + port + "\n");
 
       // Create db and initiate properties
@@ -119,7 +120,7 @@ final class PKIServer {
       logger.log(Level.WARNING, e.getMessage());
     } else {
       logger.log(Level.SEVERE, e.getMessage());
-      System.err.println("CRITICAL ERROR.");
+      System.err.println("CRITICAL ERROR: " + e.getClass().getName());
     }
 
     if (debugMode)

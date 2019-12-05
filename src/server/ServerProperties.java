@@ -1,6 +1,7 @@
 package server;
 
 import com.google.gson.Gson;
+import server.crypt.PKICommunicationsManager;
 import server.db.ServerDatabaseDriver;
 import server.db.ServerParameterMap;
 import server.db.ServerParameterType;
@@ -17,6 +18,7 @@ import shared.utils.crypto.HashHelper;
 import shared.utils.properties.CustomProperties;
 
 import javax.crypto.spec.DHParameterSpec;
+import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.security.*;
 import java.util.logging.Logger;
@@ -43,7 +45,10 @@ final class ServerProperties {
 
   private int bufferSizeInMB;
 
-  ServerProperties(CustomProperties properties, KeyStore keyStore, ServerDatabaseDriver db, Logger logger) throws PropertyException, GeneralSecurityException, IOException, DatabaseException, CriticalDatabaseException, ParameterException {
+  boolean PKI_ENABLED;
+  volatile PKICommunicationsManager PKI_COMMS_MGR;
+
+  ServerProperties(CustomProperties properties, KeyStore keyStore, ServerDatabaseDriver db, Logger logger, SSLContext sslContext) throws PropertyException, GeneralSecurityException, IOException, DatabaseException, CriticalDatabaseException, ParameterException {
     this.props = properties;
     this.keyStore = keyStore;
 
@@ -57,6 +62,11 @@ final class ServerProperties {
     GSON = GsonUtils.buildGsonInstance();
     DB = db;
     LOGGER = logger;
+
+    // Configure PKI Comms manager if pki enabled
+    PKI_ENABLED = properties.getBool(ServerProperty.USE_PKI);
+    if (PKI_ENABLED)
+      PKI_COMMS_MGR = new PKICommunicationsManager(properties, sslContext, GSON, logger);
 
     // Get and set password for keystore
     ksPassword = props.getString(ServerProperty.KEYSTORE_PASS);
