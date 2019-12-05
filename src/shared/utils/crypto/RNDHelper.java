@@ -9,7 +9,7 @@ public final class RNDHelper {
   // NIST SP800-90A suggests 440 bits for SHA1 and SHA-256 seed
   // And 888 bits for SHA-384 and 512
   private static final int MAX_USES = 50; // Max uses before reseed
-  private static final int SEED_SIZE = 55; // 440bits
+  private static final int SEED_SIZE = 111; // 888bits
 
   private final Encoder stringifier;
   private SecureRandom strongRandom; // dev/random -> Blocking
@@ -28,11 +28,11 @@ public final class RNDHelper {
     stringifier = Base64.getEncoder().withoutPadding();
   }
 
-  // Random Base64 string of size
+  // Random Base64 string of size, cut because base64 adds characters
   public String getString(int size, boolean strong) {
     byte[] randomBytes = getBytes(size, strong);
 
-    return stringifier.encodeToString(randomBytes).substring(0, size -1);
+    return stringifier.encodeToString(randomBytes).substring(0, size - 1);
   }
 
   public byte[] getBytes(int size, boolean strong) {
@@ -76,7 +76,8 @@ public final class RNDHelper {
   // to the random generation algorithm
   // On linux, dev/random should seed itself and make
   // seedings virtually useless. But with a SHA instance,
-  // it can be quite useful
+  // it can be quite useful. The implementation will be left
+  // for educational and testing purposes.
   private void checkUses(boolean strong) {
     // Always generate seeds with the strong random
     if (strongUses == MAX_USES) {
