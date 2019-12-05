@@ -51,5 +51,4 @@ public final class SafeInputStreamReader extends InputStreamReader {
 
     return lastRead;
   }
-
 }

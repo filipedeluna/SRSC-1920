@@ -1,12 +1,13 @@
 import com.google.gson.Gson;
+import shared.utils.crypto.RNDHelper;
+
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 
 public class TESTER {
 
-  public static void main(String[] args) {
-    TestGson obj = new TestGson("NoRefFoundRandomError");
-    Gson gson = new Gson();
-    String json = gson.toJson(obj);
+  public static void main(String[] args) throws NoSuchAlgorithmException {
 
-    System.out.println(json);
+
   }
 }

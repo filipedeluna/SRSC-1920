@@ -31,11 +31,11 @@ public final class MacHelper {
     return mac.doFinal(data);
   }
 
-  public int macSize() {
+  public int getMacSize() {
     return mac.getMacLength();
   }
 
-  public SecretKey keyFromBytes(byte[] keyBytes) {
+  public SecretKey getKeyFromBytes(byte[] keyBytes) {
     return new SecretKeySpec(keyBytes, 0, mac.getMacLength(), mac.getAlgorithm());
   }
 

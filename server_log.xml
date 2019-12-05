@@ -77,3 +77,44 @@
 <!DOCTYPE log SYSTEM "logger.dtd">
 <log>
 </log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T23:00:49</date>
+  <millis>1575586849044</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+<record>
+  <date>2019-12-05T23:00:49</date>
+  <millis>1575586849103</millis>
+  <sequence>3</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>BC SecureRandom not available</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T23:01:48</date>
+  <millis>1575586908554</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>

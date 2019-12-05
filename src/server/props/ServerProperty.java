@@ -43,8 +43,9 @@ public enum ServerProperty implements ICustomProperty {
   // PKI Server
   USE_PKI("use_pki", CustomPropertyType.BOOL),
   PKI_SERVER_ADDRESS("pki_server_address", CustomPropertyType.STRING),
+  PKI_CHECK_VALIDITY("pki_check_validity", CustomPropertyType.INT),
   PKI_SERVER_PORT("pki_server_port", CustomPropertyType.INT),
-  PKI_CHECK_VALIDITY("pki_check_validity", CustomPropertyType.INT);
+  PKI_TIMEOUT("pki_timeout", CustomPropertyType.INT);
 
   /////////////////////////////////////////////////
 

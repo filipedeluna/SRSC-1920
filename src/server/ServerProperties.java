@@ -1,7 +1,7 @@
 package server;
 
 import com.google.gson.Gson;
-import server.crypt.PKICommunicationsManager;
+import server.crypt.PKICommsManager;
 import server.db.ServerDatabaseDriver;
 import server.db.ServerParameterMap;
 import server.db.ServerParameterType;
@@ -11,10 +11,7 @@ import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
 import shared.errors.properties.PropertyException;
 import shared.utils.GsonUtils;
-import shared.utils.crypto.AEAHelper;
-import shared.utils.crypto.B4Helper;
-import shared.utils.crypto.DHHelper;
-import shared.utils.crypto.HashHelper;
+import shared.utils.crypto.*;
 import shared.utils.properties.CustomProperties;
 
 import javax.crypto.spec.DHParameterSpec;
@@ -26,10 +23,11 @@ import java.util.logging.Logger;
 final class ServerProperties {
   boolean DEBUG_MODE;
 
+  RNDHelper RANDOM;
   DHHelper DH;
   HashHelper HASH;
   AEAHelper AEA;
-  B4Helper B64;
+  B64Helper B64;
   Gson GSON;
   Logger LOGGER;
 
@@ -46,7 +44,7 @@ final class ServerProperties {
   private int bufferSizeInMB;
 
   boolean PKI_ENABLED;
-  volatile PKICommunicationsManager PKI_COMMS_MGR;
+  volatile PKICommsManager PKI_COMMS_MGR;
 
   ServerProperties(CustomProperties properties, KeyStore keyStore, ServerDatabaseDriver db, Logger logger, SSLContext sslContext) throws PropertyException, GeneralSecurityException, IOException, DatabaseException, CriticalDatabaseException, ParameterException {
     this.props = properties;
@@ -58,7 +56,8 @@ final class ServerProperties {
     // Max size of socket buffer
     bufferSizeInMB = properties.getInt(ServerProperty.BUFFER_SIZE_MB);
 
-    B64 = new B4Helper();
+    RANDOM = new RNDHelper();
+    B64 = new B64Helper();
     GSON = GsonUtils.buildGsonInstance();
     DB = db;
     LOGGER = logger;
@@ -66,19 +65,20 @@ final class ServerProperties {
     // Configure PKI Comms manager if pki enabled
     PKI_ENABLED = properties.getBool(ServerProperty.USE_PKI);
     if (PKI_ENABLED)
-      PKI_COMMS_MGR = new PKICommunicationsManager(properties, sslContext, GSON, logger);
+      PKI_COMMS_MGR = new PKICommsManager(properties, sslContext, GSON, logger);
 
     // Get and set password for keystore
     ksPassword = props.getString(ServerProperty.KEYSTORE_PASS);
 
     // Initialize hash helper
-    HASH = new HashHelper(properties.getString(ServerProperty.HASH_ALG));
+    HASH = new HashHelper(properties.getString(ServerProperty.HASH_ALG), B64);
 
     // Initialize AEA params
     String pubKeyAlg = properties.getString(ServerProperty.PUB_KEY_ALG);
     String certSignAlg = properties.getString(ServerProperty.CERT_SIGN_ALG);
     int pubKeySize = properties.getInt(ServerProperty.PUB_KEY_SIZE);
-    AEA = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize);
+    String certType = properties.getString(ServerProperty.CERT_TYPE);
+    AEA = new AEAHelper(pubKeyAlg, certSignAlg, certType, pubKeySize, RANDOM);
 
     // Get pub key and assign it
     pubKeyName = properties.getString(ServerProperty.PUB_KEY_NAME);
@@ -92,14 +92,14 @@ final class ServerProperties {
 
     // check if supposed to reset server params and reset them if so
     if (properties.getBool(ServerProperty.PARAMS_RESET))
-      paramsReset();
+      resetParams();
   }
 
   PrivateKey privateKey() throws GeneralSecurityException {
     return (PrivateKey) keyStore.getKey(pubKeyName, ksPassword.toCharArray());
   }
 
-  private void paramsReset() throws GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException, ParameterException {
+  private void resetParams() throws GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException, ParameterException {
     // Delete all params
     DB.deleteAllParameters();
 
@@ -112,11 +112,11 @@ final class ServerProperties {
 
     // Generate DH Spec and insert DH parameters
     DHParameterSpec spec = DH.genParams();
-    params.put(ServerParameterType.DH_ALG, DH.alg());
+    params.put(ServerParameterType.DH_ALG, DH.getAlgorithm());
     params.put(ServerParameterType.DH_P, spec.getP().toString()); // Big Int
     params.put(ServerParameterType.DH_G, spec.getG().toString()); // Big Int
-    params.put(ServerParameterType.DH_KEYSIZE, String.valueOf(DH.keySize())); // int
-    params.put(ServerParameterType.DH_HASH_ALG, DH.hashAlg());
+    params.put(ServerParameterType.DH_KEYSIZE, String.valueOf(DH.getKeySize())); // int
+    params.put(ServerParameterType.DH_HASH_ALG, DH.getHashAlgorithm());
 
     // Join all parameters, sign them, encode them and insert them in DB
     DB.insertParameter(ServerParameterType.PARAM_SIG, B64.encode(params.getAllParametersBytes()));

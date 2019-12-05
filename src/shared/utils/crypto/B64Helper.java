@@ -4,11 +4,11 @@ import java.util.Base64;
 import java.util.Base64.Encoder;
 import java.util.Base64.Decoder;
 
-public final class B4Helper {
+public final class B64Helper {
   private Encoder encoder;
   private Decoder decoder;
 
-  public B4Helper() {
+  public B64Helper() {
     this.decoder = Base64.getDecoder();
     this.encoder = Base64.getEncoder();
   }

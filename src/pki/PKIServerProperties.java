@@ -6,10 +6,7 @@ import pki.props.PKIProperty;
 import server.props.ServerProperty;
 import shared.errors.properties.PropertyException;
 import shared.utils.GsonUtils;
-import shared.utils.crypto.AEAHelper;
-import shared.utils.crypto.B4Helper;
-import shared.utils.crypto.DHHelper;
-import shared.utils.crypto.HashHelper;
+import shared.utils.crypto.*;
 import shared.utils.properties.CustomProperties;
 
 import java.security.GeneralSecurityException;
@@ -24,8 +21,9 @@ final class PKIServerProperties {
 
   DHHelper DH;
   HashHelper HASH;
+  RNDHelper RND;
   AEAHelper AEA;
-  B4Helper B64;
+  B64Helper B64;
   Gson GSON;
   Logger LOGGER;
 
@@ -48,8 +46,9 @@ final class PKIServerProperties {
     DEBUG_MODE = props.getBool(ServerProperty.DEBUG);
     KEYSTORE = keyStore;
     DB = db;
-    B64 = new B4Helper();
+    B64 = new B64Helper();
     GSON = GsonUtils.buildGsonInstance();
+    RND = new RNDHelper();
 
     token = props.getString(PKIProperty.TOKEN_VALUE);
 
@@ -57,13 +56,14 @@ final class PKIServerProperties {
     ksPassword = props.getString(PKIProperty.KEYSTORE_PASS);
 
     // Initialize hash helper
-    HASH = new HashHelper(props.getString(PKIProperty.HASH_ALG));
+    HASH = new HashHelper(props.getString(PKIProperty.HASH_ALG), B64);
 
     // Initialize AEA params
     String pubKeyAlg = props.getString(PKIProperty.PUB_KEY_ALG);
     String certSignAlg = props.getString(PKIProperty.CERT_SIGN_ALG);
+    String certFormat = props.getString(PKIProperty.CERT_FORMAT);
     int pubKeySize = props.getInt(PKIProperty.PUB_KEY_SIZE);
-    AEA = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize);
+    AEA = new AEAHelper(pubKeyAlg, certSignAlg, certFormat, pubKeySize, RND);
 
     // Get pub key and assign it
     pubKeyName = props.getString(PKIProperty.PKI_PUB_KEY);
@@ -76,7 +76,7 @@ final class PKIServerProperties {
     return (PrivateKey) KEYSTORE.getKey(pubKeyName, ksPassword.toCharArray());
   }
 
-  boolean validToken(String token) {
+  boolean isTokenValid(String token) {
     return this.token.equals(token);
   }
 }

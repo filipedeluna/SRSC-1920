@@ -10,7 +10,6 @@ import shared.errors.db.*;
 
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 public final class ServerDatabaseDriver {
   private static final int ERR_UNIQUE_CONSTRAINT = 19;
@@ -431,8 +430,4 @@ public final class ServerDatabaseDriver {
       throw new CriticalDatabaseException((SQLException) e);
     }
   }
-
-  /*
-    UTILS
-  */
 }

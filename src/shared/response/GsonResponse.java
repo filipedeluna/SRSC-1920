@@ -18,8 +18,4 @@ abstract class GsonResponse implements Serializable {
   public String json(Gson gson) {
     return gson.toJson(this);
   }
-
-  public HTTPStatusPair getStatus() {
-    return status;
-  }
 }

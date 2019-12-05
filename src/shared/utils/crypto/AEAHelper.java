@@ -22,7 +22,6 @@ import sun.security.x509.X509CertInfo;
 import org.bouncycastle.asn1.x509.Extension;
 
 import javax.crypto.*;
-import javax.crypto.spec.DHParameterSpec;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSocket;
 import javax.security.cert.CertificateEncodingException;
@@ -38,8 +37,6 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Date;
 
 public final class AEAHelper {
-  private static final String CERTIFICATE_FORMAT = "X.509";
-
   private static final long ONE_DAY = 24L * 60L * 60L * 1000L; // 1 year
 
   private Cipher cipher;
@@ -55,18 +52,21 @@ public final class AEAHelper {
 
   private int keySize;
 
+  private RNDHelper random;
+
   // Public Keys ----------------------------------------------------------------------------------------
-  public AEAHelper(String keyAlg, String certSignAlg, int keySize) throws GeneralSecurityException {
+  public AEAHelper(String keyAlg, String certSignAlg, String certFormat, int keySize, RNDHelper random) throws GeneralSecurityException {
     cipher = Cipher.getInstance(keyAlg, CryptUtil.PROVIDER);
     keyFactory = KeyFactory.getInstance(keyAlg, CryptUtil.PROVIDER);
     keyPairGenerator = KeyPairGenerator.getInstance(keyAlg, CryptUtil.PROVIDER);
 
-    certFactory = CertificateFactory.getInstance(CERTIFICATE_FORMAT, CryptUtil.PROVIDER);
+    certFactory = CertificateFactory.getInstance(certFormat, CryptUtil.PROVIDER);
     signature = Signature.getInstance(certSignAlg, CryptUtil.PROVIDER);
 
     jcaCertConverter = new JcaX509CertificateConverter().setProvider(CryptUtil.PROVIDER);
     jcaContentSignBuilder = new JcaContentSignerBuilder(certSignAlg).setProvider(CryptUtil.PROVIDER);
 
+    this.random = random;
     this.certSignAlg = certSignAlg;
     this.keyAlg = keyAlg;
     this.keySize = keySize;
@@ -125,7 +125,7 @@ public final class AEAHelper {
 
   // Certificates --------------------------------------------------------------------------
 
-  public X509Certificate certFromBytes(byte[] certBytes) throws GeneralSecurityException {
+  public X509Certificate getCertFromBytes(byte[] certBytes) throws GeneralSecurityException {
     return (X509Certificate) certFactory.generateCertificate(new ByteArrayInputStream(certBytes));
   }
 
@@ -183,7 +183,7 @@ public final class AEAHelper {
     return newCerts;
   }
 
-  public X509Certificate certFromSession(SSLSocket socket) throws SSLPeerUnverifiedException {
+  public X509Certificate getCertFromSession(SSLSocket socket) throws SSLPeerUnverifiedException {
     return (X509Certificate) socket.getSession().getPeerCertificates()[0];
   }
 
@@ -202,7 +202,7 @@ public final class AEAHelper {
     // Build new cert
     X509v3CertificateBuilder certificateBuilder = new JcaX509v3CertificateBuilder(
         caCert,
-        BigInteger.valueOf(CryptUtil.randomLong()),
+        BigInteger.valueOf(random.getLong(true)),
         new Date(now),
         new Date(now + ONE_DAY * validityDays),
         csr.getSubject(),
@@ -219,7 +219,7 @@ public final class AEAHelper {
     return jcaCertConverter.getCertificate(certificateBuilder.build(contentSigner));
   }
 
-  public PKCS10CertificationRequest createCSR(String name, KeyPair keyPair) throws IOException, GeneralSecurityException {
+  public PKCS10CertificationRequest generateCSR(String name, KeyPair keyPair) throws IOException, GeneralSecurityException {
     X500Name x500Name = new X500Name("CN=" + name);
 
     signature.initSign(keyPair.getPrivate());

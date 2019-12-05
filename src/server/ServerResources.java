@@ -4,7 +4,6 @@ import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
 import server.db.wrapper.Message;
 import server.db.wrapper.Receipt;
-import server.props.ServerProperty;
 import server.response.*;
 import server.db.ServerParameterMap;
 import server.db.wrapper.User;
@@ -56,15 +55,16 @@ final class ServerResources implements Runnable {
 
   public void run() {
     try {
-      clientCert = props.AEA.certFromSession(client);
+      clientCert = props.AEA.getCertFromSession(client);
 
       // Verify client certificate validity in PKI (like OCSP)
-      if (!props.PKI_ENABLED) {
+      if (props.PKI_ENABLED) {
         SSLSocket pkiSocket = props.PKI_COMMS_MGR.getSocket();
 
         // Check certificate validity in PKI
         props.PKI_COMMS_MGR.checkClientCertificateRevoked(clientCert, pkiSocket);
       }
+
       // Serve client request
       JsonObject parsedRequest = parseRequest(input);
 
@@ -272,7 +272,7 @@ final class ServerResources implements Runnable {
     String signature = GsonUtils.getString(requestData, "receipt");
 
     // Get current time
-    String date = getDate();
+    String date = getCurrentDate();
 
     // Insert message receipt
     props.DB.insertReceipt(new Receipt(messageId, date, signature));
@@ -361,7 +361,7 @@ final class ServerResources implements Runnable {
     output.write(message.getBytes(StandardCharsets.UTF_8));
   }
 
-  private String getDate() {
+  private String getCurrentDate() {
     DateFormat df = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 
     return df.format(new Date());

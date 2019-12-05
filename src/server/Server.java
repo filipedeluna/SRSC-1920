@@ -1,17 +1,12 @@
 package server;
 
-import com.google.gson.Gson;
 import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
-import server.crypt.PKICommunicationsManager;
 import server.db.ServerDatabaseDriver;
 import server.props.ServerProperty;
 import shared.errors.properties.InvalidValueException;
 import shared.errors.properties.PropertyException;
 import shared.utils.CryptUtil;
-import shared.utils.GsonUtils;
-import shared.utils.crypto.B4Helper;
 import shared.utils.properties.CustomProperties;
-import shared.utils.properties.CustomPropertyType;
 
 import javax.net.ssl.*;
 import java.io.IOException;
@@ -58,7 +53,7 @@ final class Server {
       // Create thread pool for clients
       int threadPoolSize = properties.getInt(ServerProperty.THREAD_POOL_SIZE);
 
-      if (!validateThreadCount(threadPoolSize))
+      if (!isThreadCountValid(threadPoolSize))
         throw new InvalidValueException(ServerProperty.THREAD_POOL_SIZE.val());
 
       Executor executor = Executors.newFixedThreadPool(threadPoolSize);
@@ -129,7 +124,7 @@ final class Server {
       e.printStackTrace();
   }
 
-  private static boolean validateThreadCount(int threadCount) {
+  private static boolean isThreadCountValid(int threadCount) {
     int totalThreads = Runtime.getRuntime().availableProcessors();
 
     // Keep threads between 0 < threads < CPUTOTAL

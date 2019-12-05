@@ -52,15 +52,15 @@ public class DHHelper {
     return algParams.getParameterSpec(DHParameterSpec.class);
   }
 
-  public int keySize() {
+  public int getKeySize() {
     return keySize;
   }
 
-  public String alg() {
+  public String getAlgorithm() {
     return dhAlg;
   }
 
-  public String hashAlg() {
+  public String getHashAlgorithm() {
     return hashAlg;
   }
 }

@@ -13,15 +13,18 @@ public final class SEAHelper {
   private Cipher cipher;
   private KeyGenerator keyGen;
 
-  public SEAHelper(String algorithm, String mode, String padding) throws GeneralSecurityException {
+  private RNDHelper random;
+
+  public SEAHelper(String algorithm, String mode, String padding, RNDHelper random) throws GeneralSecurityException {
     this.mode = mode;
+    this.random = random;
 
     spec = algorithm + "/" + mode + "/" + padding;
     cipher = Cipher.getInstance(spec, CryptUtil.PROVIDER);
     keyGen = KeyGenerator.getInstance(cipher.getAlgorithm(), CryptUtil.PROVIDER);
   }
 
-  public byte[] decryptSymmetric(byte[] buff, Key key, byte[] iv) throws GeneralSecurityException {
+  public byte[] decrypt(byte[] buff, Key key, byte[] iv) throws GeneralSecurityException {
     IvParameterSpec ivSpec = new IvParameterSpec(iv);
 
     cipher.init(Cipher.DECRYPT_MODE, key, ivSpec);
@@ -29,13 +32,13 @@ public final class SEAHelper {
     return cipher.doFinal(buff);
   }
 
-  public byte[] decryptSymmetric(byte[] buff, Key key) throws GeneralSecurityException {
+  public byte[] decrypt(byte[] buff, Key key) throws GeneralSecurityException {
     cipher.init(Cipher.DECRYPT_MODE, key);
 
     return cipher.doFinal(buff);
   }
 
-  public byte[] encryptSymmetric(byte[] buff, Key key, byte[] iv) throws GeneralSecurityException {
+  public byte[] encrypt(byte[] buff, Key key, byte[] iv) throws GeneralSecurityException {
     IvParameterSpec ivSpec = new IvParameterSpec(iv);
 
     cipher.init(Cipher.ENCRYPT_MODE, key, ivSpec);
@@ -43,7 +46,7 @@ public final class SEAHelper {
     return cipher.doFinal(buff);
   }
 
-  public byte[] encryptSymmetric(byte[] buff, Key key) throws GeneralSecurityException {
+  public byte[] encrypt(byte[] buff, Key key) throws GeneralSecurityException {
     cipher.init(Cipher.ENCRYPT_MODE, key);
 
     return cipher.doFinal(buff);
@@ -58,7 +61,7 @@ public final class SEAHelper {
   }
 
   public byte[] generateIV() {
-    return CryptUtil.randomBytes(cipher.getBlockSize());
+    return random.getBytes(cipher.getBlockSize(), true);
   }
 
   public SecretKey generateKey() {
@@ -67,7 +70,7 @@ public final class SEAHelper {
     return keyGen.generateKey();
   }
 
-  public String spec() {
+  public String getSpec() {
     return spec;
   }
 }

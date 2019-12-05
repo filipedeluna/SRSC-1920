@@ -2,7 +2,6 @@ package shared.utils;
 
 import java.io.*;
 import java.security.*;
-import java.util.Base64;
 
 public final class CryptUtil {
   public static final String PROVIDER = "BC";
@@ -27,31 +26,5 @@ public final class CryptUtil {
     }
 
     return outputStream.toByteArray();
-  }
-
-  public static String randomString(int size) {
-    byte[] randomBytes = randomBytes(size);
-
-    return Base64.getEncoder().encodeToString(randomBytes);
-  }
-
-  public static byte[] randomBytes(int size) {
-    byte[] randomBytes = new byte[size];
-
-    RANDOM.nextBytes(randomBytes);
-
-    return randomBytes;
-  }
-
-  public static int randomInt() {
-    return RANDOM.nextInt();
-  }
-
-  public static long randomLong() {
-    return RANDOM.nextLong();
-  }
-
-  public static float randomFloat() {
-    return RANDOM.nextFloat();
   }
 }

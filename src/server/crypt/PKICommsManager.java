@@ -25,8 +25,9 @@ import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public final class PKICommunicationsManager {
-  private static final int ONE_MINUTE = 60 * 1000;
+public final class PKICommsManager {
+  private static final int ONE_SECOND = 1000;
+  private static final int ONE_MINUTE = 60 * ONE_SECOND;
 
   private Logger logger;
   private boolean debug;
@@ -39,12 +40,13 @@ public final class PKICommunicationsManager {
 
   private String pkiServerAddress;
   private int pkiServerPort;
+  private int pkiTimeout;
 
-  private int pkiCheckValidityMinutes;
+  private int pkiCheckValidity;
 
   private HashMap<String, Long> checkedClients = new HashMap<>();
 
-  public PKICommunicationsManager(CustomProperties properties, SSLContext sslContext, Gson gson, Logger logger) throws PropertyException {
+  public PKICommsManager(CustomProperties properties, SSLContext sslContext, Gson gson, Logger logger) throws PropertyException {
     debug = properties.getBool(ServerProperty.DEBUG);
     this.logger = logger;
 
@@ -58,7 +60,8 @@ public final class PKICommunicationsManager {
     // Get PKI parameters
     pkiServerAddress = properties.getString(ServerProperty.PKI_SERVER_ADDRESS);
     pkiServerPort = properties.getInt(ServerProperty.PKI_SERVER_PORT);
-    pkiCheckValidityMinutes = properties.getInt(ServerProperty.PKI_CHECK_VALIDITY) * ONE_MINUTE;
+    pkiCheckValidity = properties.getInt(ServerProperty.PKI_CHECK_VALIDITY) * ONE_MINUTE;
+    pkiTimeout = properties.getInt(ServerProperty.PKI_TIMEOUT) * ONE_SECOND;
   }
 
   public SSLSocket getSocket() throws IOException {
@@ -67,13 +70,14 @@ public final class PKICommunicationsManager {
 
     sslSocket.setEnabledProtocols(enabledProtocols);
     sslSocket.setEnabledCipherSuites(enabledCipherSuites);
+    sslSocket.setSoTimeout(pkiTimeout);
 
     return sslSocket;
   }
 
   public void checkClientCertificateRevoked(X509Certificate clientCert, SSLSocket socket) throws CertificateException {
     // No need to check if in cache and valid
-    if (isCertInCache(clientCert))
+    if (certInCache(clientCert))
       return;
 
     // Get cert sn, build and send request
@@ -81,7 +85,6 @@ public final class PKICommunicationsManager {
     ValidateCertificateRequest request = new ValidateCertificateRequest(certSN);
 
     try {
-      socket.startHandshake();
       OutputStream output = socket.getOutputStream();
       JsonReader input = new JsonReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
 
@@ -121,7 +124,7 @@ public final class PKICommunicationsManager {
     logger.log(Level.FINE, "Validated certificate: " + certSN);
   }
 
-  private synchronized boolean isCertInCache(X509Certificate certificate) {
+  private synchronized boolean certInCache(X509Certificate certificate) {
     // Get SN
     String certSN = certificate.getSerialNumber().toString();
 
@@ -132,7 +135,7 @@ public final class PKICommunicationsManager {
     long now = System.currentTimeMillis();
 
     // Check if still valid
-    if (checkedClients.get(certSN) + pkiCheckValidityMinutes < now) {
+    if (checkedClients.get(certSN) + pkiCheckValidity < now) {
       // Remove old validity first
       checkedClients.remove(certSN);
       return false;

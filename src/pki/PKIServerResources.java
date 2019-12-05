@@ -7,7 +7,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.cert.X509Certificate;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
@@ -96,7 +95,7 @@ final class PKIServerResources implements Runnable {
     String token = GsonUtils.getString(requestData, "token");
 
     // We will use a predefined token value for test purposes
-    if (!props.validToken(token))
+    if (!props.isTokenValid(token))
       throw new CustomRequestException("Invalid token", HTTPStatus.UNAUTHORIZED);
 
     // Get csr encoded from request and decode it
@@ -146,7 +145,7 @@ final class PKIServerResources implements Runnable {
     String token = GsonUtils.getString(requestData, "token");
 
     // We will use a predefined token value for test purposes
-    if (!props.validToken(token))
+    if (!props.isTokenValid(token))
       throw new CustomRequestException("Invalid token", HTTPStatus.UNAUTHORIZED);
 
     // Get certificate and public key
