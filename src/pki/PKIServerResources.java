@@ -49,7 +49,6 @@ final class PKIServerResources implements Runnable {
       output = client.getOutputStream();
     } catch (Exception e) {
       handleException(e, props.DEBUG_MODE);
-      Thread.currentThread().interrupt();
     }
   }
 
@@ -62,6 +61,7 @@ final class PKIServerResources implements Runnable {
       client.close();
     } catch (Exception e) {
       handleException(e, props.DEBUG_MODE);
+      Thread.currentThread().interrupt();
     }
   }
 

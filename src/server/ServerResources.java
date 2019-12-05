@@ -50,7 +50,6 @@ final class ServerResources implements Runnable {
       output = client.getOutputStream();
     } catch (Exception e) {
       handleException(e);
-      Thread.currentThread().interrupt();
     }
   }
 
@@ -63,6 +62,7 @@ final class ServerResources implements Runnable {
       client.close();
     } catch (Exception e) {
       handleException(e);
+      Thread.currentThread().interrupt();
     }
   }
 
