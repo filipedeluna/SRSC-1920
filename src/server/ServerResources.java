@@ -219,8 +219,8 @@ final class ServerResources implements Runnable {
   // Is Revoked
   private synchronized void insertMessage(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
     // Get sender and receiver ids
-    int senderId = GsonUtils.getInt(requestData, "source");
-    int receiverId = GsonUtils.getInt(requestData, "destination");
+    int senderId = GsonUtils.getInt(requestData, "senderId");
+    int receiverId = GsonUtils.getInt(requestData, "receiverId");
 
     // Get message (encrypted and encoded) parts and respective mac hash of them
     String text = GsonUtils.getString(requestData, "text");
