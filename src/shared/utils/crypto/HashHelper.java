@@ -11,7 +11,8 @@ public final class HashHelper {
   private MessageDigest messageDigest;
   private B64Helper b64Helper;
 
-  public HashHelper(String algorithm, B64Helper b64Helper) throws GeneralSecurityException {
+  public HashHelper(String algorithm) throws GeneralSecurityException {
+    b64Helper = new B64Helper();
     this.messageDigest = MessageDigest.getInstance(algorithm, PROVIDER);
   }
 

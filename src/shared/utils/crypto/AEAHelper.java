@@ -40,6 +40,8 @@ import java.util.Date;
 public final class AEAHelper {
   private static final long ONE_DAY = 24L * 60L * 60L * 1000L; // 1 year
 
+  private RNDHelper random;
+
   private Cipher cipher;
   private KeyPairGenerator keyPairGenerator;
   private KeyFactory keyFactory;
@@ -53,10 +55,9 @@ public final class AEAHelper {
 
   private int keySize;
 
-  private RNDHelper random;
-
   // Public Keys ----------------------------------------------------------------------------------------
-  public AEAHelper(String keyAlg, String certSignAlg, String certFormat, int keySize, RNDHelper random) throws GeneralSecurityException {
+  public AEAHelper(String keyAlg, String certSignAlg, String certFormat, int keySize) throws GeneralSecurityException {
+    random = new RNDHelper();
     cipher = Cipher.getInstance(keyAlg, CryptUtil.PROVIDER);
     keyFactory = KeyFactory.getInstance(keyAlg, CryptUtil.PROVIDER);
     keyPairGenerator = KeyPairGenerator.getInstance(keyAlg, CryptUtil.PROVIDER);
@@ -67,7 +68,6 @@ public final class AEAHelper {
     jcaCertConverter = new JcaX509CertificateConverter().setProvider(CryptUtil.PROVIDER);
     jcaContentSignBuilder = new JcaContentSignerBuilder(certSignAlg).setProvider(CryptUtil.PROVIDER);
 
-    this.random = random;
     this.certSignAlg = certSignAlg;
     this.keyAlg = keyAlg;
     this.keySize = keySize;

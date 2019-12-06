@@ -10,9 +10,7 @@ import server.db.wrapper.User;
 import shared.Pair;
 import shared.ServerRequest;
 import shared.errors.IHTTPStatusException;
-import shared.errors.db.CriticalDatabaseException;
-import shared.errors.db.DatabaseException;
-import shared.errors.db.GenericItemNotFoundException;
+import shared.errors.db.*;
 import shared.errors.request.*;
 import shared.http.HTTPStatus;
 import shared.response.ErrorResponse;
@@ -76,7 +74,7 @@ final class ServerResources implements Runnable {
     }
   }
 
-  private void handleRequest(JsonObject requestData) throws RequestException, IOException, DatabaseException, GeneralSecurityException, CriticalDatabaseException {
+  private void handleRequest(JsonObject requestData) throws RequestException, IOException, GeneralSecurityException, CriticalDatabaseException {
     try {
       String requestName = GsonUtils.getString(requestData, "type");
       ServerRequest request = ServerRequest.fromString(requestName);
@@ -97,7 +95,7 @@ final class ServerResources implements Runnable {
 
       switch (request) {
         case CREATE:
-          createUser(requestData, nonce);
+          insertUser(requestData, nonce);
           break;
         case LIST:
           listUsers(requestData, nonce);
@@ -130,7 +128,7 @@ final class ServerResources implements Runnable {
   }
 
   // Create user message box
-  private synchronized void createUser(JsonObject requestData, String nonce) throws RequestException, IOException, DatabaseException, CriticalDatabaseException {
+  private synchronized void insertUser(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
     // Get public key and certificate from user
     PublicKey publicKey = clientCert.getPublicKey();
     String publicKeyEncoded = props.B64.encode(publicKey.getEncoded());
@@ -140,6 +138,7 @@ final class ServerResources implements Runnable {
 
     // Get extra fields
     String dhValue = GsonUtils.getString(requestData, "dhValue");
+    String seaSpec = GsonUtils.getString(requestData, "seaSpec");
 
     // Get extra fields signature
     String secDataSignature = GsonUtils.getString(requestData, "secDataSignature");
@@ -148,17 +147,22 @@ final class ServerResources implements Runnable {
         uuid,
         publicKeyEncoded,
         dhValue,
+        seaSpec,
         secDataSignature
     );
 
     // Insert user and send response
-    int userId = props.DB.insertUser(user);
+    try {
+      int userId = props.DB.insertUser(user);
 
-    send(new CreateUserResponse(nonce, userId));
+      send(new CreateUserResponse(nonce, userId));
+    } catch (DuplicateEntryException e) {
+      throw new CustomRequestException("User ID already registered.", HTTPStatus.BAD_REQUEST);
+    }
   }
 
   // List users details
-  private void listUsers(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
+  private void listUsers(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
     // Get intended user id or none if supposed to get all users
     int userId;
 
@@ -171,11 +175,16 @@ final class ServerResources implements Runnable {
 
     ArrayList<User> users = new ArrayList<>();
 
+
     // Detect if supposed to get 1 or multiple users
-    if (userId > 0)
-      users.add(props.DB.getUser(userId));
-    else
-      users = props.DB.getAllUsers();
+    try {
+      if (userId > 0)
+        users.add(props.DB.getUser(userId));
+      else
+        users = props.DB.getAllUsers();
+    } catch (EntryNotFoundException e) {
+      throw new CustomRequestException("User id not found", HTTPStatus.NOT_FOUND);
+    }
 
     // Parse user list to json and send
     String usersJSON = props.GSON.toJson(users);
@@ -227,7 +236,15 @@ final class ServerResources implements Runnable {
       // Message has no attachments
     }
 
-    String macHash = GsonUtils.getString(requestData, "macHash");
+    String cipherIV = "";
+    //Security part
+    try {
+      cipherIV = GsonUtils.getString(requestData, "cipherIV");
+    } catch (MissingValueException e) {
+      // Message cipher does not use IV
+    }
+
+    String senderSignature = GsonUtils.getString(requestData, "senderSignature");
 
     // Create and insert message
     Message message = new Message(
@@ -236,7 +253,8 @@ final class ServerResources implements Runnable {
         text,
         attachmentData,
         attachments,
-        macHash
+        cipherIV,
+        senderSignature
     );
 
     // Try to insert message in db
@@ -256,7 +274,7 @@ final class ServerResources implements Runnable {
     try {
       Message message = props.DB.getMessage(messageId);
       send(new ReceiveMessageResponse(nonce, message));
-    } catch (DatabaseException e) {
+    } catch (EntryNotFoundException e) {
       throw new CustomRequestException("Message id not found", HTTPStatus.NOT_FOUND);
     }
   }
@@ -266,18 +284,22 @@ final class ServerResources implements Runnable {
     // Get read message id
     int messageId = GsonUtils.getInt(requestData, "messageId");
 
-    // Get receipt -> message content signature
-    String signature = GsonUtils.getString(requestData, "receipt");
+    // Get receiver signature -> message contents signature
+    String receiverSignature = GsonUtils.getString(requestData, "receiverSignature");
 
     // Get current time
     String date = getCurrentDate();
 
     // Insert message receipt
     try {
-      props.DB.insertReceipt(new Receipt(messageId, date, signature));
-    } catch (GenericItemNotFoundException e) {
+      props.DB.insertReceipt(new Receipt(messageId, date, receiverSignature));
+
+      // Set message as read
+      props.DB.setMessageAsRead(messageId);
+    } catch (FailedToInsertException | EntryNotFoundException e) {
       throw new CustomRequestException("Message id not found", HTTPStatus.NOT_FOUND);
     }
+
   }
 
   private void getReceipts(JsonObject requestData, String nonce) throws RequestException, CriticalDatabaseException, IOException {
@@ -292,24 +314,18 @@ final class ServerResources implements Runnable {
 
       // Create response and send
       send(new MessageReceiptsResponse(nonce, message, receipts));
-    } catch (DatabaseException e) {
+    } catch (EntryNotFoundException e) {
       throw new CustomRequestException("Message id not found", HTTPStatus.NOT_FOUND);
     }
   }
 
-
   // Get all server params
-  private void params(String nonce) throws GeneralSecurityException, CriticalDatabaseException, IOException {
+  private void params(String nonce) throws CriticalDatabaseException, IOException {
     // Get params and parse to json object
     ServerParameterMap params = props.DB.getAllParameters();
     String paramsJSON = props.GSON.toJson(params);
 
-    // Sign params
-    PrivateKey privateKey = props.privateKey();
-    byte[] paramsJSONSigBytes = props.AEA.sign(privateKey, paramsJSON.getBytes());
-    String paramsJSONSigEncoded = props.B64.encode(paramsJSONSigBytes);
-
-    send(new ParametersResponse(nonce, paramsJSON, paramsJSONSigEncoded));
+    send(new ParametersResponse(nonce, paramsJSON, paramsJSON));
   }
 
   /*

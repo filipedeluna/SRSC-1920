@@ -9,25 +9,29 @@ public final class Message implements Serializable {
   private String text;
   private String attachmentData;
   private byte[] attachments;
-  private String macHash;
+  private String cipherIV;
+  private String senderSignature;
 
   public Message() {
   }
 
-  public Message(int senderId, int receiverId, String text, String attachmentData, byte[] attachments, String macHash) {
+  public Message(int senderId, int receiverId, String text, String attachmentData, byte[] attachments, String cipherIV, String senderSignature) {
     this.senderId = senderId;
     this.receiverId = receiverId;
     this.text = text;
     this.attachmentData = attachmentData;
     this.attachments = attachments;
-    this.macHash = macHash;
+    this.cipherIV = cipherIV;
+    this.senderSignature = senderSignature;
   }
 
-  public Message(int senderId, String text, String attachmentData, byte[] attachments) {
+  public Message(int senderId, String text, String attachmentData, byte[] attachments, String cipherIV, String senderSignature) {
     this.senderId = senderId;
     this.text = text;
     this.attachmentData = attachmentData;
     this.attachments = attachments;
+    this.cipherIV = cipherIV;
+    this.senderSignature = senderSignature;
   }
 
   public int getId() {
@@ -54,8 +58,12 @@ public final class Message implements Serializable {
     return attachments;
   }
 
-  public String getMacHash() {
-    return macHash;
+  public String getIV() {
+    return cipherIV;
+  }
+
+  public String getSenderSignature() {
+    return senderSignature;
   }
 }
 

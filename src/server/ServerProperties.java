@@ -62,14 +62,14 @@ final class ServerProperties {
     ksPassword = properties.getString(ServerProperty.KEYSTORE_PASS);
 
     // Initialize hash helper
-    hashHelper = new HashHelper(properties.getString(ServerProperty.HASH_ALG), B64);
+    hashHelper = new HashHelper(properties.getString(ServerProperty.HASH_ALG));
 
     // Initialize AEA params
     String pubKeyAlg = properties.getString(ServerProperty.PUB_KEY_ALG);
     String certSignAlg = properties.getString(ServerProperty.CERT_SIGN_ALG);
     int pubKeySize = properties.getInt(ServerProperty.PUB_KEY_SIZE);
     String certType = properties.getString(ServerProperty.CERT_TYPE);
-    AEA = new AEAHelper(pubKeyAlg, certSignAlg, certType, pubKeySize, random);
+    AEA = new AEAHelper(pubKeyAlg, certSignAlg, certType, pubKeySize);
 
     // Get pub key and assign it
     pubKeyName = properties.getString(ServerProperty.PUB_KEY_NAME);
@@ -115,7 +115,10 @@ final class ServerProperties {
     params.put(ServerParameterType.DH_HASH_ALG, dhHelper.getHashAlgorithm());
 
     // Join all parameters, sign them, encode them and insert them in DB
-    DB.insertParameter(ServerParameterType.PARAM_SIG, B64.encode(params.getAllParametersBytes()));
+    byte[] paramBytes = params.getAllParametersBytes();
+    byte[] paramSigBytes = AEA.sign(privateKey(), paramBytes);
+
+    DB.insertParameter(ServerParameterType.PARAM_SIG, B64.encode(paramSigBytes));
   }
 
   public int getBufferSizeInMB() {

@@ -46,8 +46,8 @@ public final class ServerDatabaseDriver {
               "pub_key    TEXT    NOT NULL, " +
               // Security data
               "dh_pub_key TEXT    NOT NULL, " +
-              // Signature of all data
-              "signature  TEXT    NOT NULL " +
+              "sea_spec   TEXT    NOT NULL, " + // User chosen sea spec
+              "sec_data_signature TEXT    NOT NULL " + // Signature of all security data
               ");";
 
       connection.createStatement().execute(query);
@@ -57,12 +57,12 @@ public final class ServerDatabaseDriver {
               "message_id       INTEGER PRIMARY KEY AUTOINCREMENT, " +
               "sender_id        INTEGER NOT NULL, " +
               "receiver_id      INTEGER NOT NULL, " +
-              "read             INTEGER NOT NULL DEFAULT 0, " +
+              "read             INTEGER NOT NULL DEFAULT 0, " + // Boolean - 0 of not read, 1 if read
               "text             TEXT, " +
               "attachment_data  TEXT, " +
               "attachments      BLOB, " +
-              // Mac hash with secret client key to prevent tampering
-              "mac_hash         TEXT, " +
+              "cipher_iv        TEXT, " + // Sea IV for cipher used in encryption or null if none used
+              "sender_signature TEXT, " + // Signed with sender public key
               "FOREIGN KEY (sender_id)   REFERENCES users(user_id)," +
               "FOREIGN KEY (receiver_id) REFERENCES users(user_id)" +
               ");";
@@ -71,10 +71,9 @@ public final class ServerDatabaseDriver {
 
       query =
           "CREATE TABLE IF NOT EXISTS receipts (" +
-              "message_id INTEGER NOT NULL, " +
-              "date       TEXT    NOT NULL, " +
-              // Reader signature of message contents with private key
-              "signature  TEXT    NOT NULL, " +
+              "message_id         INTEGER NOT NULL, " +
+              "date               TEXT    NOT NULL, " +
+              "receiver_signature TEXT NOT NULL, " + // Reader signature of message contents with private key
               "FOREIGN KEY (message_id) REFERENCES messages(message_id)" +
               ");";
 
@@ -96,17 +95,18 @@ public final class ServerDatabaseDriver {
   /*
     USERS
   */
-  public int insertUser(User user) throws DatabaseException, CriticalDatabaseException {
+  public int insertUser(User user) throws CriticalDatabaseException, DuplicateEntryException {
     try {
       // Insert user
-      String insertQuery = "INSERT INTO users (uuid, pub_key, dh_value, signature) VALUES (?, ?, ?, ?);";
+      String insertQuery = "INSERT INTO users (uuid, pub_key, dh_value, sea_spec, sec_data_signature) VALUES (?, ?, ?, ?, ?);";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
       ps.setString(1, user.getUuid());
       ps.setString(2, user.getPubKey());
       // Security data
       ps.setString(3, user.getDhValue());
-      ps.setString(4, user.getSecDataSignature());
+      ps.setString(4, user.getSeaSpec());
+      ps.setString(5, user.getSecDataSignature());
 
       ps.executeUpdate();
 
@@ -121,7 +121,7 @@ public final class ServerDatabaseDriver {
     }
   }
 
-  public User getUser(int id) throws CriticalDatabaseException, DatabaseException {
+  public User getUser(int id) throws CriticalDatabaseException, EntryNotFoundException {
     try {
       String selectUser = "SELECT * FROM users WHERE user_id = ?;";
 
@@ -134,10 +134,10 @@ public final class ServerDatabaseDriver {
 
       return new User(
           rs.getString("user_id"),
-          null,
           rs.getString("pub_key"),
           rs.getString("dh_value"),
-          rs.getString("signature")
+          rs.getString("sea_spec"),
+          rs.getString("sec_data_signature")
       );
     } catch (SQLException e) {
       if (e.getErrorCode() == ERR_NOT_FOUND)
@@ -160,10 +160,10 @@ public final class ServerDatabaseDriver {
       while (rs.next()) {
         users.add(new User(
             rs.getString("user_id"),
-            null,
             rs.getString("pub_key"),
             rs.getString("dh_value"),
-            rs.getString("signature")
+            rs.getString("sea_spec"),
+            rs.getString("sec_data_signature")
         ));
       }
 
@@ -238,10 +238,10 @@ public final class ServerDatabaseDriver {
     }
   }
 
-  public int insertMessage(Message msg) throws CriticalDatabaseException, DatabaseException {
+  public int insertMessage(Message msg) throws CriticalDatabaseException, FailedToInsertException {
     try {
-      String insertQuery = "INSERT INTO messages (sender_id, receiver_id, text, attachment_data, attachments, mac_hash) " +
-          "VALUES (?, ?, ?, ?, ?, ?);";
+      String insertQuery = "INSERT INTO messages (sender_id, receiver_id, text, attachment_data, attachments, cipher_iv, sender_signature) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?);";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
       ps.setInt(1, msg.getSenderId());
@@ -249,7 +249,8 @@ public final class ServerDatabaseDriver {
       ps.setString(3, msg.getText());
       ps.setString(4, msg.getAttachmentData());
       ps.setBytes(5, msg.getAttachments());
-      ps.setString(6, msg.getMacHash());
+      ps.setString(6, msg.getIV());
+      ps.setString(7, msg.getSenderSignature());
 
       ps.executeUpdate();
 
@@ -258,13 +259,13 @@ public final class ServerDatabaseDriver {
       return rs.getInt("message_id");
     } catch (SQLException e) {
       if (e.getErrorCode() == ERR_FOREIGN_KEY_CONSTRAINT)
-        throw new GenericItemNotFoundException("user");
+        throw new FailedToInsertException();
 
       throw new CriticalDatabaseException(e);
     }
   }
 
-  public Message getMessage(int messageId) throws CriticalDatabaseException, DatabaseException {
+  public Message getMessage(int messageId) throws CriticalDatabaseException, EntryNotFoundException {
     try {
       String insertQuery = "SELECT * FROM messages WHERE message_id = ?;";
 
@@ -279,7 +280,9 @@ public final class ServerDatabaseDriver {
           rs.getInt("sender_id"),
           rs.getString("text"),
           rs.getString("attachment_data"),
-          rs.getBytes("attachments")
+          rs.getBytes("attachments"),
+          rs.getString("cipher_iv"),
+          rs.getString("sender_signature")
       );
     } catch (SQLException e) {
       if (e.getErrorCode() == ERR_NOT_FOUND)
@@ -289,11 +292,28 @@ public final class ServerDatabaseDriver {
     }
   }
 
+  public void setMessageAsRead(int message_id) throws CriticalDatabaseException, EntryNotFoundException {
+    try {
+      String selectUser = "UPDATE messages SET read = 1 WHERE message_id = ?;";
+
+      PreparedStatement ps = connection.prepareStatement(selectUser);
+      ps.setInt(1, message_id);
+
+      int updated = ps.executeUpdate();
+
+      if (updated == 0)
+        throw new EntryNotFoundException();
+
+    } catch (SQLException e) {
+      throw new CriticalDatabaseException(e);
+    }
+  }
+
   /*
     RECEIPT BOX
   */
 
-  public void insertReceipt(Receipt rcpt) throws CriticalDatabaseException, GenericItemNotFoundException {
+  public void insertReceipt(Receipt rcpt) throws CriticalDatabaseException, FailedToInsertException {
     try {
       // Insert receipt
       String insertQuery = "INSERT INTO receipts (message_id, date, receiver_signature) VALUES (?, ?, ?);";
@@ -301,7 +321,7 @@ public final class ServerDatabaseDriver {
       PreparedStatement ps = connection.prepareStatement(insertQuery);
       ps.setInt(1, rcpt.getMessageId());
       ps.setString(2, rcpt.getDate());
-      ps.setString(3, rcpt.getSignature());
+      ps.setString(3, rcpt.getReceiverSignature());
 
       ps.executeUpdate();
 
@@ -314,16 +334,16 @@ public final class ServerDatabaseDriver {
       ps.executeUpdate();
     } catch (SQLException e) {
       if (e.getErrorCode() == ERR_FOREIGN_KEY_CONSTRAINT)
-        throw new GenericItemNotFoundException("message");
+        throw new FailedToInsertException();
 
       throw new CriticalDatabaseException(e);
     }
   }
 
-  public ArrayList<Receipt> getReceipts(int messageId) throws CriticalDatabaseException, DatabaseException {
+  public ArrayList<Receipt> getReceipts(int messageId) throws CriticalDatabaseException {
     try {
       String insertQuery =
-          "SELECT r.message_id AS message_id, m.sender_id AS sender_id, m.date AS date, m.signature AS signature " +
+          "SELECT r.message_id AS message_id, m.sender_id AS sender_id, r.date AS date, r.receiver_signature AS receiver_signature " +
               "FROM receipts r JOIN messages m ON r.message_id = m.message_id WHERE message_id = ?;";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
@@ -337,16 +357,13 @@ public final class ServerDatabaseDriver {
         receipts.add(new Receipt(
                 rs.getInt("message_id"),
                 rs.getString("date"),
-                rs.getString("signature")
+                rs.getString("receiver_signature")
             )
         );
       }
 
       return receipts;
     } catch (SQLException e) {
-      if (e.getErrorCode() == ERR_FOREIGN_KEY_CONSTRAINT)
-        throw new GenericItemNotFoundException("message");
-
       throw new CriticalDatabaseException(e);
     }
   }
@@ -354,7 +371,7 @@ public final class ServerDatabaseDriver {
   /*
     Server Parameters
   */
-  public void insertParameter(ServerParameterType parameter, String value) throws DatabaseException, CriticalDatabaseException {
+  public void insertParameter(ServerParameterType parameter, String value) throws CriticalDatabaseException, FailedToInsertException {
     try {
       // Does not exist so we create it
       String statement = "INSERT INTO server_params (id, name, value) VALUES (?, ?, ?);";
@@ -366,7 +383,7 @@ public final class ServerDatabaseDriver {
       int updated = ps.executeUpdate();
 
       if (updated == 0)
-        throw new FailedToInsertOrUpdateException();
+        throw new FailedToInsertException();
 
     } catch (SQLException e) {
       throw new CriticalDatabaseException(e);
@@ -386,7 +403,7 @@ public final class ServerDatabaseDriver {
   }
 
   // TODO useless?
-  public String getParameter(ServerParameterType parameter) throws DatabaseException, CriticalDatabaseException {
+  public String getParameter(ServerParameterType parameter) throws CriticalDatabaseException, EntryNotFoundException {
     try {
       String selectUser = "SELECT value FROM server_params WHERE name = ?;";
 

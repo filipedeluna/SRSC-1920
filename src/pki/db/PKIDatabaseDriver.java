@@ -88,9 +88,6 @@ public final class PKIDatabaseDriver {
         throw new EntryNotFoundException();
 
     } catch (SQLException e) {
-      if (e.getErrorCode() == ERR_NOT_FOUND)
-        throw new EntryNotFoundException();
-
       throw new CriticalDatabaseException(e);
     }
   }

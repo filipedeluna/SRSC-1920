@@ -49,14 +49,14 @@ final class PKIServerProperties {
     ksPassword = props.getString(PKIProperty.KEYSTORE_PASS);
 
     // Initialize hash helper
-    HASH = new HashHelper(props.getString(PKIProperty.HASH_ALG), B64);
+    HASH = new HashHelper(props.getString(PKIProperty.HASH_ALG));
 
     // Initialize AEA params
     String pubKeyAlg = props.getString(PKIProperty.PUB_KEY_ALG);
     String certSignAlg = props.getString(PKIProperty.CERT_SIGN_ALG);
     String certFormat = props.getString(PKIProperty.CERT_FORMAT);
     int pubKeySize = props.getInt(PKIProperty.PUB_KEY_SIZE);
-    AEA = new AEAHelper(pubKeyAlg, certSignAlg, certFormat, pubKeySize, random);
+    AEA = new AEAHelper(pubKeyAlg, certSignAlg, certFormat, pubKeySize);
 
     // Get pub key and assign it
     pubKeyName = props.getString(PKIProperty.PKI_PUB_KEY);

@@ -5,14 +5,14 @@ import java.io.Serializable;
 public final class Receipt implements Serializable {
   private int messageId;
   private String date;
-  private String signature;
+  private String receiverSignature;
 
   public Receipt() {}
 
-  public Receipt(int messageId, String date, String signature) {
+  public Receipt(int messageId, String date, String receiverSignature) {
     this.messageId = messageId;
     this.date = date;
-    this.signature = signature;
+    this.receiverSignature = receiverSignature;
   }
 
   public int getMessageId() {
@@ -23,7 +23,7 @@ public final class Receipt implements Serializable {
     return date;
   }
 
-  public String getSignature() {
-    return signature;
+  public String getReceiverSignature() {
+    return receiverSignature;
   }
 }

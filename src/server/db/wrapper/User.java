@@ -5,26 +5,30 @@ import java.io.Serializable;
 public final class User implements Serializable {
   private String id;
   private String uuid;
-
-  public User() {}
+  public String pubKey;
 
   // Security Params
   public String dhValue;
+  public String seaSpec;
   public String secDataSignature;
-  public String pubKey;
 
-  public User(String id, String uuid, String pubKey, String dhValue, String secDataSignature) {
+  public User() {
+  }
+
+  public User(String id, String uuid, String pubKey, String dhValue, String seaSpec, String secDataSignature) {
     this.id = id;
     this.uuid = uuid;
     this.pubKey = pubKey;
     this.dhValue = dhValue;
+    this.seaSpec = seaSpec;
     this.secDataSignature = secDataSignature;
   }
 
-  public User(String uuid, String pubKey, String dhValue, String secDataSignature) {
-    this.uuid = uuid;
+  public User(String id, String pubKey, String dhValue, String seaSpec, String secDataSignature) {
+    this.id = id;
     this.pubKey = pubKey;
     this.dhValue = dhValue;
+    this.seaSpec = seaSpec;
     this.secDataSignature = secDataSignature;
   }
 
@@ -38,6 +42,10 @@ public final class User implements Serializable {
 
   public String getDhValue() {
     return dhValue;
+  }
+
+  public String getSeaSpec() {
+    return seaSpec;
   }
 
   public String getSecDataSignature() {

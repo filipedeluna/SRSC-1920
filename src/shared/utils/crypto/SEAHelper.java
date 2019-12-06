@@ -6,6 +6,7 @@ import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.*;
+import java.util.Arrays;
 
 public final class SEAHelper {
   private final String spec;
@@ -15,9 +16,9 @@ public final class SEAHelper {
 
   private final RNDHelper random;
 
-  public SEAHelper(String algorithm, String mode, String padding, RNDHelper random) throws GeneralSecurityException {
+  public SEAHelper(String algorithm, String mode, String padding) throws GeneralSecurityException {
+    this.random = new RNDHelper();
     this.mode = mode;
-    this.random = random;
 
     spec = algorithm + "/" + mode + "/" + padding;
     cipher = Cipher.getInstance(spec, CryptUtil.PROVIDER);
@@ -68,6 +69,10 @@ public final class SEAHelper {
     keyGen.init(cipher.getBlockSize(), new SecureRandom());
 
     return keyGen.generateKey();
+  }
+
+  public byte[] trimKeyToAlg(byte[] key) {
+    return Arrays.copyOfRange(key, 0, cipher.getBlockSize());
   }
 
   public String getSpec() {
