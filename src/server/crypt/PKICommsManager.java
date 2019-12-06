@@ -51,10 +51,11 @@ public final class PKICommsManager {
 
   private final HashMap<String, Long> checkedClients;
 
-  public PKICommsManager(CustomProperties properties, SSLContext sslContext, Gson gson, AEAHelper aeaHelper, B64Helper b64Helper, Logger logger) throws PropertyException {
+  public PKICommsManager(CustomProperties properties, SSLContext sslContext, AEAHelper aeaHelper, Logger logger) throws PropertyException {
     this.logger = logger;
-    this.b64Helper = b64Helper;
-    this.gson = gson;
+    this.b64Helper = new B64Helper();
+    this.gson = GsonUtils.buildGsonInstance();
+    this.aeaHelper = aeaHelper;
 
     checkedClients = new HashMap<>();
     debug = properties.getBool(ServerProperty.DEBUG);

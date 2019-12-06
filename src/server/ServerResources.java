@@ -299,7 +299,6 @@ final class ServerResources implements Runnable {
     } catch (FailedToInsertException | EntryNotFoundException e) {
       throw new CustomRequestException("Message id not found", HTTPStatus.NOT_FOUND);
     }
-
   }
 
   private void getReceipts(JsonObject requestData, String nonce) throws RequestException, CriticalDatabaseException, IOException {

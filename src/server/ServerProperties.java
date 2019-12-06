@@ -36,6 +36,9 @@ final class ServerProperties {
   private String pubKeyName;
   private String ksPassword;
 
+  private String provider;
+  private String providerTLS;
+
   private int bufferSizeInMB;
 
   boolean PKI_ENABLED;
@@ -58,12 +61,16 @@ final class ServerProperties {
     // Get and set password for keystore
     ksPassword = properties.getString(ServerProperty.KEYSTORE_PASS);
 
+    // Get providers
+    provider = properties.getString(ServerProperty.PROVIDER);
+    providerTLS = properties.getString(ServerProperty.PROVIDER_TLS);
+
     // Initialize AEA params
     String pubKeyAlg = properties.getString(ServerProperty.PUB_KEY_ALG);
     String certSignAlg = properties.getString(ServerProperty.CERT_SIGN_ALG);
     int pubKeySize = properties.getInt(ServerProperty.PUB_KEY_SIZE);
-    String certType = properties.getString(ServerProperty.CERT_TYPE);
-    AEA = new AEAHelper(pubKeyAlg, certSignAlg, certType, pubKeySize);
+    String certType = properties.getString(ServerProperty.CERT_FORMAT);
+    AEA = new AEAHelper(pubKeyAlg, certSignAlg, certType, pubKeySize, provider);
 
     // Get pub key and assign it
     pubKeyName = properties.getString(ServerProperty.PUB_KEY_NAME);
@@ -72,7 +79,7 @@ final class ServerProperties {
     String dhKeyAlg = properties.getString(ServerProperty.DH_KEY_ALG);
     String dhKeyHashAlg = properties.getString(ServerProperty.DH_KEY_HASH_ALG);
     int dhKeySize = properties.getInt(ServerProperty.DH_KEY_SIZE);
-    dhHelper = new DHHelper(dhKeyAlg, dhKeyHashAlg, dhKeySize);
+    dhHelper = new DHHelper(dhKeyAlg, dhKeyHashAlg, dhKeySize, provider);
 
     // check if supposed to reset server params and reset them if so
     if (properties.getBool(ServerProperty.PARAMS_RESET))
@@ -81,7 +88,7 @@ final class ServerProperties {
     // Configure PKI Comms manager if pki enabled
     PKI_ENABLED = properties.getBool(ServerProperty.USE_PKI);
     if (PKI_ENABLED)
-      PKI_COMMS_MGR = new PKICommsManager(properties, sslContext, GSON, AEA, B64, logger);
+      PKI_COMMS_MGR = new PKICommsManager(properties, sslContext, AEA, logger);
 
   }
 
@@ -95,6 +102,10 @@ final class ServerProperties {
 
     // Create parameter list
     ServerParameterMap params = new ServerParameterMap();
+
+    // Insert Provider params
+    params.put(ServerParameterType.PROVIDER, provider);
+    params.put(ServerParameterType.PROVIDER_TLS, providerTLS);
 
     // Insert AEA parameters
     params.put(ServerParameterType.PUB_KEY_ALG, AEA.keyAlg());

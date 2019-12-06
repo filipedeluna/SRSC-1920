@@ -9,14 +9,12 @@ import javax.crypto.spec.SecretKeySpec;
 import java.security.*;
 
 public final class MacHelper {
-  private static final String PROVIDER = CryptUtil.PROVIDER;
-
   private Mac mac;
   private KeyGenerator keyGen;
 
-  public MacHelper(String algorithm) throws GeneralSecurityException {
-    mac = Mac.getInstance(algorithm, PROVIDER);
-    keyGen = KeyGenerator.getInstance(algorithm, PROVIDER);
+  public MacHelper(String algorithm, String provider) throws GeneralSecurityException {
+    mac = Mac.getInstance(algorithm, provider);
+    keyGen = KeyGenerator.getInstance(algorithm, provider);
   }
 
   public boolean verifyMacHash(byte[] data, byte[] hash, Key key) throws InvalidKeyException {

@@ -28,7 +28,6 @@ final class PKIServerProperties {
   int CERT_VALIDITY;
 
   private KeyStore keyStore;
-  private RNDHelper random;
 
   private String pubKeyName;
   private String ksPassword;
@@ -41,22 +40,24 @@ final class PKIServerProperties {
     DB = db;
     B64 = new B64Helper();
     GSON = GsonUtils.buildGsonInstance();
-    random = new RNDHelper();
 
     token = props.getString(PKIProperty.TOKEN_VALUE);
+
+    // Get providers
+    String provider = props.getString(PKIProperty.PROVIDER);
 
     // Get and set password for keystore
     ksPassword = props.getString(PKIProperty.KEYSTORE_PASS);
 
     // Initialize hash helper
-    HASH = new HashHelper(props.getString(PKIProperty.HASH_ALG));
+    HASH = new HashHelper(props.getString(PKIProperty.HASH_ALG), provider);
 
     // Initialize AEA params
     String pubKeyAlg = props.getString(PKIProperty.PUB_KEY_ALG);
     String certSignAlg = props.getString(PKIProperty.CERT_SIGN_ALG);
     String certFormat = props.getString(PKIProperty.CERT_FORMAT);
     int pubKeySize = props.getInt(PKIProperty.PUB_KEY_SIZE);
-    AEA = new AEAHelper(pubKeyAlg, certSignAlg, certFormat, pubKeySize);
+    AEA = new AEAHelper(pubKeyAlg, certSignAlg, certFormat, pubKeySize, provider);
 
     // Get pub key and assign it
     pubKeyName = props.getString(PKIProperty.PKI_PUB_KEY);

@@ -16,13 +16,13 @@ public final class SEAHelper {
 
   private final RNDHelper random;
 
-  public SEAHelper(String algorithm, String mode, String padding) throws GeneralSecurityException {
+  public SEAHelper(String algorithm, String mode, String padding, String provider) throws GeneralSecurityException {
     this.random = new RNDHelper();
     this.mode = mode;
 
     spec = algorithm + "/" + mode + "/" + padding;
-    cipher = Cipher.getInstance(spec, CryptUtil.PROVIDER);
-    keyGen = KeyGenerator.getInstance(cipher.getAlgorithm(), CryptUtil.PROVIDER);
+    cipher = Cipher.getInstance(spec, provider);
+    keyGen = KeyGenerator.getInstance(cipher.getAlgorithm(), provider);
   }
 
   public byte[] decrypt(byte[] buff, Key key, byte[] iv) throws BadPaddingException, IllegalBlockSizeException, InvalidAlgorithmParameterException, InvalidKeyException {

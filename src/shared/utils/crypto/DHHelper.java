@@ -17,11 +17,11 @@ public class DHHelper {
   private String dhAlg;
   private String hashAlg;
 
-  public DHHelper(String dhAlg, String hashAlg, int keySize) throws GeneralSecurityException {
-    keyPairGenerator = KeyPairGenerator.getInstance(dhAlg, CryptUtil.PROVIDER);
-    keyAgreement = KeyAgreement.getInstance(dhAlg, CryptUtil.PROVIDER);
-    hash = MessageDigest.getInstance(hashAlg, CryptUtil.PROVIDER);
-    algParamsGenerator = AlgorithmParameterGenerator.getInstance(dhAlg, CryptUtil.PROVIDER);
+  public DHHelper(String dhAlg, String hashAlg, int keySize, String provider) throws GeneralSecurityException {
+    keyPairGenerator = KeyPairGenerator.getInstance(dhAlg, provider);
+    keyAgreement = KeyAgreement.getInstance(dhAlg, provider);
+    hash = MessageDigest.getInstance(hashAlg, provider);
+    algParamsGenerator = AlgorithmParameterGenerator.getInstance(dhAlg, provider);
 
     algParamsGenerator.init(keySize);
 

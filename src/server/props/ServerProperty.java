@@ -21,6 +21,8 @@ public enum ServerProperty implements ICustomProperty {
   TLS_PROTOCOLS("tls_protocols", CustomPropertyType.STRING_ARRAY),
 
   // Crypt,
+  PROVIDER("provider", CustomPropertyType.STRING),
+  PROVIDER_TLS("provider_tls", CustomPropertyType.STRING),
   KEYSTORE_LOC("keystore_location", CustomPropertyType.STRING),
   KEYSTORE_TYPE("keystore_type", CustomPropertyType.STRING),
   KEYSTORE_PASS("keystore_pass", CustomPropertyType.STRING),
@@ -32,7 +34,7 @@ public enum ServerProperty implements ICustomProperty {
   PUB_KEY_SIZE("pub_key_size", CustomPropertyType.INT),
   PUB_KEY_NAME("pub_key_name", CustomPropertyType.STRING),
   CERT_SIGN_ALG("cert_sign_alg", CustomPropertyType.STRING),
-  CERT_TYPE("cert_type", CustomPropertyType.STRING),
+  CERT_FORMAT("cert_format", CustomPropertyType.STRING),
 
   DH_KEY_ALG("dh_key_alg", CustomPropertyType.STRING),
   DH_KEY_HASH_ALG("dh_key_hash_alg", CustomPropertyType.STRING),

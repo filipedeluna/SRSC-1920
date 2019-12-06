@@ -3,6 +3,11 @@ package server.db;
 public enum ServerParameterType {
   // Add parameters here
 
+  // Providers
+  PROVIDER("provider"),
+  PROVIDER_TLS("provider_tls"),
+
+
   // AEA
   PUB_KEY_ALG("pub_key_alg"),
   CERT_SIG_ALG("cert_sign_alg"),

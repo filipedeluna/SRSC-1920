@@ -58,13 +58,14 @@ final class Server {
 
       Executor executor = Executors.newFixedThreadPool(threadPoolSize);
 
-      // Get Keystore
+      // Get Keystore and providers
       KeyStore keyStore = getKeyStore(properties);
+      String providerTLS = properties.getString(ServerProperty.PROVIDER_TLS);
 
       // Create SSL Socket
       int port = properties.getInt(ServerProperty.PORT);
 
-      SSLContext sslContext = buildSSLContext(properties, keyStore);
+      SSLContext sslContext = buildSSLContext(properties, keyStore, providerTLS);
 
       SSLServerSocketFactory ssf = sslContext.getServerSocketFactory();
       SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port);
@@ -131,23 +132,23 @@ final class Server {
     return totalThreads > threadCount && threadCount > 0;
   }
 
-  private static KeyManagerFactory getKeyManagerFactory(CustomProperties properties, KeyStore keyStore, String certificateType) throws PropertyException, GeneralSecurityException {
+  private static KeyManagerFactory getKeyManagerFactory(CustomProperties properties, KeyStore keyStore, String certificateType, String providerTLS) throws PropertyException, GeneralSecurityException {
     String keyStorePass = properties.getString(ServerProperty.KEYSTORE_PASS);
 
-    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(certificateType, CryptUtil.PROVIDER_TLS);
+    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(certificateType, providerTLS);
     keyManagerFactory.init(keyStore, keyStorePass.toCharArray());
 
     return keyManagerFactory;
   }
 
-  private static TrustManagerFactory getTrustManagerFactory(CustomProperties properties, String certificateType) throws PropertyException, GeneralSecurityException, IOException {
+  private static TrustManagerFactory getTrustManagerFactory(CustomProperties properties, String certificateType, String providerTLS) throws PropertyException, GeneralSecurityException, IOException {
     String trustStoreLoc = properties.getString(ServerProperty.TRUSTSTORE_LOC);
     String trustStorePass = properties.getString(ServerProperty.TRUSTSTORE_PASS);
     String trustStoreType = properties.getString(ServerProperty.TRUSTSTORE_TYPE);
 
     KeyStore trustStore = CryptUtil.loadKeystore(trustStoreLoc, trustStoreType, trustStorePass.toCharArray());
 
-    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(certificateType, CryptUtil.PROVIDER_TLS);
+    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(certificateType, providerTLS);
     trustManagerFactory.init(trustStore);
 
     return trustManagerFactory;
@@ -161,15 +162,15 @@ final class Server {
     return CryptUtil.loadKeystore(keyStoreLoc, keyStoreType, keyStorePass.toCharArray());
   }
 
-  private static SSLContext buildSSLContext(CustomProperties properties, KeyStore keyStore) throws GeneralSecurityException, IOException, PropertyException {
-    String certificateType = properties.getString(ServerProperty.CERT_TYPE);
+  private static SSLContext buildSSLContext(CustomProperties properties, KeyStore keyStore, String providerTLS) throws GeneralSecurityException, IOException, PropertyException {
+    String certificateType = properties.getString(ServerProperty.CERT_FORMAT);
 
-    KeyManagerFactory keyManagerFactory = getKeyManagerFactory(properties, keyStore, certificateType);
-    TrustManagerFactory trustManagerFactory = getTrustManagerFactory(properties, certificateType);
+    KeyManagerFactory keyManagerFactory = getKeyManagerFactory(properties, keyStore, certificateType, providerTLS);
+    TrustManagerFactory trustManagerFactory = getTrustManagerFactory(properties, certificateType, providerTLS);
     KeyManager[] keyManagers = keyManagerFactory.getKeyManagers();
     TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
 
-    SSLContext sslContext = SSLContext.getInstance("TLS", CryptUtil.PROVIDER_TLS);
+    SSLContext sslContext = SSLContext.getInstance("TLS", providerTLS);
     sslContext.init(keyManagers, trustManagers, new SecureRandom());
 
     return sslContext;

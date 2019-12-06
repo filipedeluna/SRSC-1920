@@ -50,24 +50,26 @@ public final class AEAHelper {
   private CertificateFactory certFactory;
   private JcaX509CertificateConverter jcaCertConverter;
   private JcaContentSignerBuilder jcaContentSignBuilder;
-  private String certSignAlg;
-  private Signature signature;
 
+  private String certSignAlg;
+  private String provider;
+  private Signature signature;
   private int keySize;
 
   // Public Keys ----------------------------------------------------------------------------------------
-  public AEAHelper(String keyAlg, String certSignAlg, String certFormat, int keySize) throws GeneralSecurityException {
+  public AEAHelper(String keyAlg, String certSignAlg, String certFormat, int keySize, String provider) throws GeneralSecurityException {
     random = new RNDHelper();
-    cipher = Cipher.getInstance(keyAlg, CryptUtil.PROVIDER);
-    keyFactory = KeyFactory.getInstance(keyAlg, CryptUtil.PROVIDER);
-    keyPairGenerator = KeyPairGenerator.getInstance(keyAlg, CryptUtil.PROVIDER);
+    cipher = Cipher.getInstance(keyAlg, provider);
+    keyFactory = KeyFactory.getInstance(keyAlg, provider);
+    keyPairGenerator = KeyPairGenerator.getInstance(keyAlg, provider);
 
-    certFactory = CertificateFactory.getInstance(certFormat, CryptUtil.PROVIDER);
-    signature = Signature.getInstance(certSignAlg, CryptUtil.PROVIDER);
+    certFactory = CertificateFactory.getInstance(certFormat, provider);
+    signature = Signature.getInstance(certSignAlg, provider);
 
-    jcaCertConverter = new JcaX509CertificateConverter().setProvider(CryptUtil.PROVIDER);
-    jcaContentSignBuilder = new JcaContentSignerBuilder(certSignAlg).setProvider(CryptUtil.PROVIDER);
+    jcaCertConverter = new JcaX509CertificateConverter().setProvider(provider);
+    jcaContentSignBuilder = new JcaContentSignerBuilder(certSignAlg).setProvider(provider);
 
+    this.provider = provider;
     this.certSignAlg = certSignAlg;
     this.keyAlg = keyAlg;
     this.keySize = keySize;
@@ -171,7 +173,7 @@ public final class AEAHelper {
 
   public boolean validate(PublicKey publicKey, X509Certificate certificate) throws CertificateException, NoSuchAlgorithmException, NoSuchProviderException {
     try {
-      certificate.verify(publicKey, CryptUtil.PROVIDER);
+      certificate.verify(publicKey, provider);
       return true;
     } catch (InvalidKeyException | SignatureException e) {
       return false;

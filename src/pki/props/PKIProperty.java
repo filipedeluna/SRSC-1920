@@ -17,8 +17,9 @@ public enum PKIProperty implements ICustomProperty {
   TLS_CIPHERSUITES("tls_ciphersuites", CustomPropertyType.STRING_ARRAY),
   TLS_PROTOCOLS("tls_protocols", CustomPropertyType.STRING_ARRAY),
 
-
   // Crypt
+  PROVIDER("provider", CustomPropertyType.STRING),
+  PROVIDER_TLS("provider_tls", CustomPropertyType.STRING),
   KEYSTORE_LOC("keystore_location", CustomPropertyType.STRING),
   KEYSTORE_TYPE("keystore_type", CustomPropertyType.STRING),
   KEYSTORE_PASS("keystore_pass", CustomPropertyType.STRING),

@@ -6,14 +6,12 @@ import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 
 public final class HashHelper {
-  private static final String PROVIDER = CryptUtil.PROVIDER;
-
   private MessageDigest messageDigest;
   private final B64Helper b64Helper;
 
-  public HashHelper(String algorithm) throws GeneralSecurityException {
+  public HashHelper(String algorithm, String provider) throws GeneralSecurityException {
     b64Helper = new B64Helper();
-    this.messageDigest = MessageDigest.getInstance(algorithm, PROVIDER);
+    this.messageDigest = MessageDigest.getInstance(algorithm, provider);
   }
 
   public byte[] hash(byte[] data) {
