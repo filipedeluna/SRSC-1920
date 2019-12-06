@@ -19,7 +19,6 @@ import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@SuppressWarnings("DuplicatedCode")
 final class PKIServer {
   private static final String PROPS_PATH = "src/pki/props/pki.properties";
 

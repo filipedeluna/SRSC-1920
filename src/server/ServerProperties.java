@@ -32,7 +32,6 @@ final class ServerProperties {
 
   private final KeyStore keyStore;
   private DHHelper dhHelper;
-  private HashHelper hashHelper;
 
   private String pubKeyName;
   private String ksPassword;
@@ -51,18 +50,13 @@ final class ServerProperties {
     // Max size of socket buffer
     bufferSizeInMB = properties.getInt(ServerProperty.BUFFER_SIZE_MB);
 
-    RNDHelper random = new RNDHelper();
     B64 = new B64Helper();
     GSON = GsonUtils.buildGsonInstance();
     DB = db;
     LOGGER = logger;
 
-
     // Get and set password for keystore
     ksPassword = properties.getString(ServerProperty.KEYSTORE_PASS);
-
-    // Initialize hash helper
-    hashHelper = new HashHelper(properties.getString(ServerProperty.HASH_ALG));
 
     // Initialize AEA params
     String pubKeyAlg = properties.getString(ServerProperty.PUB_KEY_ALG);
@@ -91,7 +85,7 @@ final class ServerProperties {
 
   }
 
-  PrivateKey privateKey() throws GeneralSecurityException {
+  private PrivateKey privateKey() throws GeneralSecurityException {
     return (PrivateKey) keyStore.getKey(pubKeyName, ksPassword.toCharArray());
   }
 

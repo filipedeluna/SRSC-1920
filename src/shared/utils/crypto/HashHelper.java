@@ -9,7 +9,7 @@ public final class HashHelper {
   private static final String PROVIDER = CryptUtil.PROVIDER;
 
   private MessageDigest messageDigest;
-  private B64Helper b64Helper;
+  private final B64Helper b64Helper;
 
   public HashHelper(String algorithm) throws GeneralSecurityException {
     b64Helper = new B64Helper();

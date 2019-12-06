@@ -74,7 +74,7 @@ final class ServerResources implements Runnable {
     }
   }
 
-  private void handleRequest(JsonObject requestData) throws RequestException, IOException, GeneralSecurityException, CriticalDatabaseException {
+  private void handleRequest(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException {
     try {
       String requestName = GsonUtils.getString(requestData, "type");
       ServerRequest request = ServerRequest.fromString(requestName);
