@@ -12,7 +12,7 @@ public enum ServerRequest {
   STATUS("status"),
   PARAMS("params");
 
-  private String val;
+  private final String val;
 
   ServerRequest(String val) {
     this.val = val;

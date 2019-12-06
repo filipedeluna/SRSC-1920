@@ -3,8 +3,8 @@ package server.db.wrapper;
 import java.io.Serializable;
 
 public final class User implements Serializable {
-  public String id;
-  public String uuid;
+  private String id;
+  private String uuid;
 
   public User() {}
 
@@ -26,5 +26,25 @@ public final class User implements Serializable {
     this.pubKey = pubKey;
     this.dhValue = dhValue;
     this.secDataSignature = secDataSignature;
+  }
+
+  public String getId() {
+    return id;
+  }
+
+  public String getUuid() {
+    return uuid;
+  }
+
+  public String getDhValue() {
+    return dhValue;
+  }
+
+  public String getSecDataSignature() {
+    return secDataSignature;
+  }
+
+  public String getPubKey() {
+    return pubKey;
   }
 }

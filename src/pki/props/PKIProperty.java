@@ -38,8 +38,8 @@ public enum PKIProperty implements ICustomProperty {
   CERTIFICATE_VALIDITY("certificate_validity", CustomPropertyType.INT);
 
   /////////////////////////////////////////////////
-  private String val;
-  private CustomPropertyType type;
+  private final String val;
+  private final CustomPropertyType type;
 
   PKIProperty(String val, CustomPropertyType type) {
     this.val = val;

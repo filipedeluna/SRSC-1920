@@ -3,15 +3,16 @@ package server.db.wrapper;
 import java.io.Serializable;
 
 public final class Message implements Serializable {
-  public int id;
-  public int senderId;
-  public int receiverId;
-  public String text;
-  public String attachmentData;
-  public byte[] attachments;
-  public String macHash;
+  private int id;
+  private int senderId;
+  private int receiverId;
+  private String text;
+  private String attachmentData;
+  private byte[] attachments;
+  private String macHash;
 
-  public Message() {}
+  public Message() {
+  }
 
   public Message(int senderId, int receiverId, String text, String attachmentData, byte[] attachments, String macHash) {
     this.senderId = senderId;
@@ -27,6 +28,34 @@ public final class Message implements Serializable {
     this.text = text;
     this.attachmentData = attachmentData;
     this.attachments = attachments;
+  }
+
+  public int getId() {
+    return id;
+  }
+
+  public int getSenderId() {
+    return senderId;
+  }
+
+  public int getReceiverId() {
+    return receiverId;
+  }
+
+  public String getText() {
+    return text;
+  }
+
+  public String getAttachmentData() {
+    return attachmentData;
+  }
+
+  public byte[] getAttachments() {
+    return attachments;
+  }
+
+  public String getMacHash() {
+    return macHash;
   }
 }
 

@@ -5,8 +5,8 @@ import java.util.Base64.Encoder;
 import java.util.Base64.Decoder;
 
 public final class B64Helper {
-  private Encoder encoder;
-  private Decoder decoder;
+  private final Encoder encoder;
+  private final Decoder decoder;
 
   public B64Helper() {
     this.decoder = Base64.getDecoder();

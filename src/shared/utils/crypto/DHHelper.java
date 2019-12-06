@@ -6,6 +6,7 @@ import javax.crypto.KeyAgreement;
 import javax.crypto.spec.DHParameterSpec;
 import java.math.BigInteger;
 import java.security.*;
+import java.security.spec.InvalidParameterSpecException;
 
 public class DHHelper {
   private MessageDigest hash;
@@ -29,13 +30,13 @@ public class DHHelper {
     this.dhAlg = dhAlg;
   }
 
-  public KeyPair genKeyPair(DHParameterSpec spec) throws GeneralSecurityException {
+  public KeyPair genKeyPair(DHParameterSpec spec) throws InvalidAlgorithmParameterException {
     keyPairGenerator.initialize(spec);
 
     return keyPairGenerator.generateKeyPair();
   }
 
-  public byte[] genSharedKey(PrivateKey aKey, PublicKey bKey) throws GeneralSecurityException {
+  public byte[] genSharedKey(PrivateKey aKey, PublicKey bKey) throws InvalidKeyException {
     keyAgreement.init(aKey);
     keyAgreement.doPhase(bKey, true); // true - last phase
 
@@ -46,7 +47,7 @@ public class DHHelper {
     return BigInteger.probablePrime(size, new SecureRandom());
   }
 
-  public DHParameterSpec genParams() throws GeneralSecurityException {
+  public DHParameterSpec genParams() throws InvalidParameterSpecException {
     AlgorithmParameters algParams = algParamsGenerator.generateParameters();
 
     return algParams.getParameterSpec(DHParameterSpec.class);

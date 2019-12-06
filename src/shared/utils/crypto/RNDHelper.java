@@ -20,7 +20,7 @@ public final class RNDHelper {
 
   // Use the stronger implementation by default.
   // Although slower, in a small setting, it should
-  // be a better option as the overhead shouldnt matter much
+  // be a better option as the overhead shouldn't matter much
   public RNDHelper() throws NoSuchAlgorithmException {
     strongRandom = SecureRandom.getInstanceStrong();
     weakRandom = new SecureRandom();
@@ -72,7 +72,7 @@ public final class RNDHelper {
   }
 
   // Check number of seeds used to reseed
-  // periodically, avoiding cryptoanalysis attacks
+  // periodically, avoiding cryptanalysis attacks
   // to the random generation algorithm
   // On linux, dev/random should seed itself and make
   // seedings virtually useless. But with a SHA instance,

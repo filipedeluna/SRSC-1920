@@ -6,7 +6,7 @@ import shared.http.HTTPStatusPair;
 
 import java.io.Serializable;
 
-abstract class GsonResponse implements Serializable {
+public abstract class GsonResponse implements Serializable {
   private HTTPStatusPair status;
 
   GsonResponse() {}

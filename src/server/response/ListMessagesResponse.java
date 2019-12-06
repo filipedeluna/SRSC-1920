@@ -3,8 +3,8 @@ package server.response;
 import java.util.ArrayList;
 
 public final class ListMessagesResponse extends OkResponseWithNonce {
-  private ArrayList<String> receivedMessageIds;
-  private ArrayList<Integer> sentMessageIds;
+  private final ArrayList<String> receivedMessageIds;
+  private final ArrayList<Integer> sentMessageIds;
 
   public ListMessagesResponse(String nonce, ArrayList<String> receivedMessageIds, ArrayList<Integer> sentMessageIds) {
     super(nonce);

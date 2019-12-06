@@ -19,7 +19,7 @@ public enum ServerParameterType {
 
   /////////////////////////////////////////////////
 
-  private String val;
+  private final String val;
 
   ServerParameterType(String val) {
     this.val = val;

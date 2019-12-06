@@ -10,6 +10,8 @@ import shared.errors.properties.PropertyException;
 import shared.errors.request.InvalidFormatException;
 import shared.errors.request.RequestException;
 import shared.utils.GsonUtils;
+import shared.utils.crypto.AEAHelper;
+import shared.utils.crypto.B64Helper;
 import shared.utils.properties.CustomProperties;
 
 import javax.net.SocketFactory;
@@ -19,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
@@ -29,10 +32,12 @@ public final class PKICommsManager {
   private static final int ONE_SECOND = 1000;
   private static final int ONE_MINUTE = 60 * ONE_SECOND;
 
-  private Logger logger;
+  private final Logger logger;
   private boolean debug;
 
-  private Gson gson;
+  private final Gson gson;
+  private final B64Helper b64Helper;
+  private AEAHelper aeaHelper;
 
   private String[] enabledProtocols;
   private String[] enabledCipherSuites;
@@ -44,13 +49,15 @@ public final class PKICommsManager {
 
   private int pkiCheckValidity;
 
-  private HashMap<String, Long> checkedClients = new HashMap<>();
+  private final HashMap<String, Long> checkedClients;
 
-  public PKICommsManager(CustomProperties properties, SSLContext sslContext, Gson gson, Logger logger) throws PropertyException {
-    debug = properties.getBool(ServerProperty.DEBUG);
+  public PKICommsManager(CustomProperties properties, SSLContext sslContext, Gson gson, AEAHelper aeaHelper, B64Helper b64Helper, Logger logger) throws PropertyException {
     this.logger = logger;
-
+    this.b64Helper = b64Helper;
     this.gson = gson;
+
+    checkedClients = new HashMap<>();
+    debug = properties.getBool(ServerProperty.DEBUG);
 
     // Get socket config
     socketFactory = sslContext.getSocketFactory();
@@ -75,14 +82,17 @@ public final class PKICommsManager {
     return sslSocket;
   }
 
-  public void checkClientCertificateRevoked(X509Certificate clientCert, SSLSocket socket) throws CertificateException {
+  public void checkClientCertificateRevoked(X509Certificate clientCert, SSLSocket socket) throws GeneralSecurityException {
     // No need to check if in cache and valid
     if (certInCache(clientCert))
       return;
 
-    // Get cert sn, build and send request
+    // Get cert encode and send request
+    byte[] certBytes = aeaHelper.getCertBytes(clientCert);
+    String certEncoded = b64Helper.encode(certBytes);
     String certSN = clientCert.getSerialNumber().toString();
-    ValidateCertificateRequest request = new ValidateCertificateRequest(certSN);
+
+    ValidateCertificateRequest request = new ValidateCertificateRequest(certEncoded);
 
     try {
       OutputStream output = socket.getOutputStream();

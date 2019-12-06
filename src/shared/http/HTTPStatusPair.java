@@ -1,8 +1,8 @@
 package shared.http;
 
 public final class HTTPStatusPair {
-  private int code;
-  private String message;
+  private final int code;
+  private final String message;
 
   HTTPStatusPair(int code, String message) {
     this.code = code;

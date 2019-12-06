@@ -3,7 +3,6 @@ package pki;
 import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 import pki.db.PKIDatabaseDriver;
 import pki.props.PKIProperty;
-import server.props.ServerProperty;
 import shared.errors.properties.InvalidValueException;
 import shared.errors.properties.PropertyException;
 import shared.utils.CryptUtil;
@@ -20,6 +19,7 @@ import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+@SuppressWarnings("DuplicatedCode")
 final class PKIServer {
   private static final String PROPS_PATH = "src/pki/props/pki.properties";
 

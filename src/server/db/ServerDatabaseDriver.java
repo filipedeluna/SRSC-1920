@@ -102,11 +102,11 @@ public final class ServerDatabaseDriver {
       String insertQuery = "INSERT INTO users (uuid, pub_key, dh_value, signature) VALUES (?, ?, ?, ?);";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
-      ps.setString(1, user.uuid);
-      ps.setString(2, user.pubKey);
+      ps.setString(1, user.getUuid());
+      ps.setString(2, user.getPubKey());
       // Security data
-      ps.setString(3, user.dhValue);
-      ps.setString(4, user.secDataSignature);
+      ps.setString(3, user.getDhValue());
+      ps.setString(4, user.getSecDataSignature());
 
       ps.executeUpdate();
 
@@ -244,12 +244,12 @@ public final class ServerDatabaseDriver {
           "VALUES (?, ?, ?, ?, ?, ?);";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
-      ps.setInt(1, msg.senderId);
-      ps.setInt(2, msg.receiverId);
-      ps.setString(3, msg.text);
-      ps.setString(4, msg.attachmentData);
-      ps.setBytes(5, msg.attachments);
-      ps.setString(6, msg.macHash);
+      ps.setInt(1, msg.getSenderId());
+      ps.setInt(2, msg.getReceiverId());
+      ps.setString(3, msg.getText());
+      ps.setString(4, msg.getAttachmentData());
+      ps.setBytes(5, msg.getAttachments());
+      ps.setString(6, msg.getMacHash());
 
       ps.executeUpdate();
 
@@ -299,9 +299,9 @@ public final class ServerDatabaseDriver {
       String insertQuery = "INSERT INTO receipts (message_id, date, receiver_signature) VALUES (?, ?, ?);";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
-      ps.setInt(1, rcpt.messageId);
-      ps.setString(2, rcpt.date);
-      ps.setString(3, rcpt.signature);
+      ps.setInt(1, rcpt.getMessageId());
+      ps.setString(2, rcpt.getDate());
+      ps.setString(3, rcpt.getSignature());
 
       ps.executeUpdate();
 
@@ -309,7 +309,7 @@ public final class ServerDatabaseDriver {
       String updateQuery = "UPDATE messages (read) VALUES (1) WHERE message_id = ?;";
 
       connection.prepareStatement(updateQuery);
-      ps.setInt(1, rcpt.messageId);
+      ps.setInt(1, rcpt.getMessageId());
 
       ps.executeUpdate();
     } catch (SQLException e) {

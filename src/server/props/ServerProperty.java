@@ -49,8 +49,8 @@ public enum ServerProperty implements ICustomProperty {
 
   /////////////////////////////////////////////////
 
-  private String val;
-  private CustomPropertyType type;
+  private final String val;
+  private final CustomPropertyType type;
 
   ServerProperty(String val, CustomPropertyType type) {
     this.val = val;

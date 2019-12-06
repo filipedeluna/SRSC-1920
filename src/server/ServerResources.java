@@ -12,12 +12,11 @@ import shared.ServerRequest;
 import shared.errors.IHTTPStatusException;
 import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
-import shared.errors.request.InvalidFormatException;
-import shared.errors.request.InvalidRouteException;
-import shared.errors.request.MissingValueException;
-import shared.errors.request.RequestException;
+import shared.errors.db.GenericItemNotFoundException;
+import shared.errors.request.*;
 import shared.http.HTTPStatus;
 import shared.response.ErrorResponse;
+import shared.response.GsonResponse;
 import shared.utils.GsonUtils;
 import shared.utils.SafeInputStreamReader;
 
@@ -34,11 +33,11 @@ import java.util.Date;
 import java.util.logging.Level;
 
 final class ServerResources implements Runnable {
-  private SSLSocket client;
+  private final SSLSocket client;
   private JsonReader input;
   private OutputStream output;
 
-  private ServerProperties props;
+  private final ServerProperties props;
   private X509Certificate clientCert;
 
   ServerResources(SSLSocket client, ServerProperties props) {
@@ -68,7 +67,7 @@ final class ServerResources implements Runnable {
       // Serve client request
       JsonObject parsedRequest = parseRequest(input);
 
-      handleRequest(parsedRequest, client);
+      handleRequest(parsedRequest);
 
       client.close();
     } catch (Exception e) {
@@ -77,7 +76,7 @@ final class ServerResources implements Runnable {
     }
   }
 
-  private void handleRequest(JsonObject requestData, SSLSocket client) throws RequestException, IOException, DatabaseException, GeneralSecurityException, CriticalDatabaseException {
+  private void handleRequest(JsonObject requestData) throws RequestException, IOException, DatabaseException, GeneralSecurityException, CriticalDatabaseException {
     try {
       String requestName = GsonUtils.getString(requestData, "type");
       ServerRequest request = ServerRequest.fromString(requestName);
@@ -152,11 +151,10 @@ final class ServerResources implements Runnable {
         secDataSignature
     );
 
+    // Insert user and send response
     int userId = props.DB.insertUser(user);
 
-    CreateUserResponse response = new CreateUserResponse(nonce, userId);
-
-    send(response.json(props.GSON));
+    send(new CreateUserResponse(nonce, userId));
   }
 
   // List users details
@@ -164,6 +162,7 @@ final class ServerResources implements Runnable {
     // Get intended user id or none if supposed to get all users
     int userId;
 
+    // User ID will be null if supposed to get all users
     try {
       userId = GsonUtils.getInt(requestData, "userId");
     } catch (MissingValueException e) {
@@ -172,16 +171,16 @@ final class ServerResources implements Runnable {
 
     ArrayList<User> users = new ArrayList<>();
 
-    if (userId < 0)
+    // Detect if supposed to get 1 or multiple users
+    if (userId > 0)
       users.add(props.DB.getUser(userId));
     else
       users = props.DB.getAllUsers();
 
+    // Parse user list to json and send
     String usersJSON = props.GSON.toJson(users);
 
-    ListUsersResponse response = new ListUsersResponse(nonce, usersJSON);
-
-    send(response.json(props.GSON));
+    send(new ListUsersResponse(nonce, usersJSON));
   }
 
   // List new messages
@@ -189,11 +188,9 @@ final class ServerResources implements Runnable {
     // Get intended user id or none if supposed to get all users
     int userId = GsonUtils.getInt(requestData, "userId");
 
-    // Get unread messages and crete response object
+    // Get unread messages and create response object
     ArrayList<Integer> newMessageIds = props.DB.getUnreadMessages(userId);
-    ListNewMessagesResponse response = new ListNewMessagesResponse(nonce, newMessageIds);
-
-    send(response.json(props.GSON));
+    send(new ListNewMessagesResponse(nonce, newMessageIds));
   }
 
   // List all messages
@@ -204,16 +201,14 @@ final class ServerResources implements Runnable {
     // Get all messages, split between received/sent and create response object
     Pair<ArrayList<String>, ArrayList<Integer>> messages = props.DB.getAllMessages(userId);
 
-    ArrayList<String> receivedMessageIds = messages.A;
-    ArrayList<Integer> sentMessagesIds = messages.B;
+    ArrayList<String> receivedMessageIds = messages.getA();
+    ArrayList<Integer> sentMessagesIds = messages.getB();
 
-    ListMessagesResponse response = new ListMessagesResponse(nonce, receivedMessageIds, sentMessagesIds);
-
-    send(response.json(props.GSON));
+    send(new ListMessagesResponse(nonce, receivedMessageIds, sentMessagesIds));
   }
 
   // Is Revoked
-  private synchronized void insertMessage(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
+  private synchronized void insertMessage(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
     // Get sender and receiver ids
     int senderId = GsonUtils.getInt(requestData, "source");
     int receiverId = GsonUtils.getInt(requestData, "destination");
@@ -244,27 +239,30 @@ final class ServerResources implements Runnable {
         macHash
     );
 
-    int insertedMessageId = props.DB.insertMessage(message);
-
-    SendMessageResponse response = new SendMessageResponse(nonce, insertedMessageId);
-
-    send(response.json(props.GSON));
+    // Try to insert message in db
+    try {
+      int insertedMessageId = props.DB.insertMessage(message);
+      send(new SendMessageResponse(nonce, insertedMessageId));
+    } catch (DatabaseException e) {
+      throw new CustomRequestException("User id not found", HTTPStatus.NOT_FOUND);
+    }
   }
 
-  private void getMessage(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
+  private void getMessage(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
     // Get intended message id
     int messageId = GsonUtils.getInt(requestData, "messageId");
 
-    // Get all messages, split between received/sent and create response object
-    Message message = props.DB.getMessage(messageId);
-
-    ReceiveMessageResponse response = new ReceiveMessageResponse(nonce, message);
-
-    send(response.json(props.GSON));
+    // Get specific message and create response object
+    try {
+      Message message = props.DB.getMessage(messageId);
+      send(new ReceiveMessageResponse(nonce, message));
+    } catch (DatabaseException e) {
+      throw new CustomRequestException("Message id not found", HTTPStatus.NOT_FOUND);
+    }
   }
 
 
-  private synchronized void insertReceipt(JsonObject requestData) throws RequestException, CriticalDatabaseException, DatabaseException {
+  private synchronized void insertReceipt(JsonObject requestData) throws RequestException, CriticalDatabaseException {
     // Get read message id
     int messageId = GsonUtils.getInt(requestData, "messageId");
 
@@ -275,24 +273,28 @@ final class ServerResources implements Runnable {
     String date = getCurrentDate();
 
     // Insert message receipt
-    props.DB.insertReceipt(new Receipt(messageId, date, signature));
-
-    // No response
+    try {
+      props.DB.insertReceipt(new Receipt(messageId, date, signature));
+    } catch (GenericItemNotFoundException e) {
+      throw new CustomRequestException("Message id not found", HTTPStatus.NOT_FOUND);
+    }
   }
 
-  private void getReceipts(JsonObject requestData, String nonce) throws RequestException, CriticalDatabaseException, DatabaseException, IOException {
+  private void getReceipts(JsonObject requestData, String nonce) throws RequestException, CriticalDatabaseException, IOException {
     // Get intended message id
     int messageId = GsonUtils.getInt(requestData, "messageId");
 
     // TODO Why send the message here? We have a dedicated route....
-    // Get the message and its respective receipts
-    ArrayList<Receipt> receipts = props.DB.getReceipts(messageId);
-    Message message = props.DB.getMessage(messageId);
+    try {
+      // Get the message and its respective receipts
+      ArrayList<Receipt> receipts = props.DB.getReceipts(messageId);
+      Message message = props.DB.getMessage(messageId);
 
-    // Create response and send
-    MessageReceiptsResponse response = new MessageReceiptsResponse(nonce, message, receipts);
-
-    send(response.json(props.GSON));
+      // Create response and send
+      send(new MessageReceiptsResponse(nonce, message, receipts));
+    } catch (DatabaseException e) {
+      throw new CustomRequestException("Message id not found", HTTPStatus.NOT_FOUND);
+    }
   }
 
 
@@ -307,9 +309,7 @@ final class ServerResources implements Runnable {
     byte[] paramsJSONSigBytes = props.AEA.sign(privateKey, paramsJSON.getBytes());
     String paramsJSONSigEncoded = props.B64.encode(paramsJSONSigBytes);
 
-    ParametersResponse response = new ParametersResponse(nonce, paramsJSON, paramsJSONSigEncoded);
-
-    send(response.json(props.GSON));
+    send(new ParametersResponse(nonce, paramsJSON, paramsJSONSigEncoded));
   }
 
   /*
@@ -339,14 +339,11 @@ final class ServerResources implements Runnable {
         exception.printStackTrace();
 
       response = HTTPStatus.INTERNAL_SERVER_ERROR.buildErrorResponse();
-
       props.LOGGER.log(Level.SEVERE, exception.getMessage());
     }
 
-    String responseJson = response.json(props.GSON);
-
     try {
-      send(responseJson);
+      send(response);
     } catch (IOException e) {
       System.err.println("Failed to send error response to client");
 
@@ -357,8 +354,8 @@ final class ServerResources implements Runnable {
     }
   }
 
-  private void send(String message) throws IOException {
-    output.write(message.getBytes(StandardCharsets.UTF_8));
+  private void send(GsonResponse response) throws IOException {
+    output.write(response.json(props.GSON).getBytes(StandardCharsets.UTF_8));
   }
 
   private String getCurrentDate() {

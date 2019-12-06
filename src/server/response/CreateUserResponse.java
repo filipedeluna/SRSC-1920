@@ -1,7 +1,7 @@
 package server.response;
 
 public final class CreateUserResponse extends OkResponseWithNonce {
-  private int userId;
+  private final int userId;
 
   public CreateUserResponse(String nonce, int userId) {
     super(nonce);

@@ -3,8 +3,8 @@ import shared.http.HTTPStatusPair;
 
 public class TestGson {
 
-  private HTTPStatusPair status;
-  private String error;
+  private final HTTPStatusPair status;
+  private final String error;
 
   public TestGson(String error) {
     this.status = HTTPStatus.FORBIDDEN.buildPair();
