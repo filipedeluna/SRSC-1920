@@ -49,7 +49,7 @@ final class ServerResources implements Runnable {
 
   public void run() {
     try {
-      clientCert = props.AEA.getCertFromSession(client);
+      clientCert = props.aeaHelper.getCertFromSession(client);
 
       // Verify client certificate validity in PKI (like OCSP)
       if (props.PKI_ENABLED) {
@@ -88,7 +88,7 @@ final class ServerResources implements Runnable {
       // Log client request without any specific info.
       // Certificates emitted by CA should have unique serial numbers
       // This way, we can identify the principal if a DOS or other similar attack occurs
-      props.LOGGER.log(Level.FINE, "Request: " + requestName + " made by " + clientCert.getSerialNumber() + ".");
+      props.logger.log(Level.FINE, "Request: " + requestName + " made by " + clientCert.getSerialNumber() + ".");
 
       switch (request) {
         case CREATE:
@@ -129,7 +129,7 @@ final class ServerResources implements Runnable {
   private synchronized void insertUser(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
     // Get public key and certificate from user
     PublicKey publicKey = clientCert.getPublicKey();
-    String publicKeyEncoded = props.B64.encode(publicKey.getEncoded());
+    String publicKeyEncoded = props.b64Helper.encode(publicKey.getEncoded());
 
     // Get user intended uuid and message verification nonce
     String uuid = GsonUtils.getString(requestData, "uuid");
@@ -237,7 +237,7 @@ final class ServerResources implements Runnable {
     // Check if attachment was sent
     try {
       attachmentData = GsonUtils.getString(requestData, "attachmentData");
-      attachments = props.B64.decode(GsonUtils.getString(requestData, "attachments"));
+      attachments = props.b64Helper.decode(GsonUtils.getString(requestData, "attachments"));
     } catch (MissingValueException e) {
       // Message has no attachments
     }
@@ -351,7 +351,7 @@ final class ServerResources implements Runnable {
       HTTPStatus status = ((IHTTPStatusException) exception).status();
       response = status.buildErrorResponse(exception.getMessage());
 
-      props.LOGGER.log(Level.WARNING, exception.getMessage());
+      props.logger.log(Level.WARNING, exception.getMessage());
     } else {
       System.err.println("Client disconnected due to critical error: " + exception.getMessage());
 
@@ -360,7 +360,7 @@ final class ServerResources implements Runnable {
 
       response = HTTPStatus.INTERNAL_SERVER_ERROR.buildErrorResponse();
 
-      props.LOGGER.log(Level.SEVERE, exception.getMessage());
+      props.logger.log(Level.SEVERE, exception.getMessage());
     }
 
     try {
@@ -371,7 +371,7 @@ final class ServerResources implements Runnable {
       if (props.DEBUG_MODE)
         e.printStackTrace();
 
-      props.LOGGER.log(Level.SEVERE, exception.getMessage());
+      props.logger.log(Level.SEVERE, exception.getMessage());
     }
   }
 

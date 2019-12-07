@@ -23,14 +23,14 @@ import java.util.logging.Logger;
 final class ServerProperties {
   boolean DEBUG_MODE;
 
-  AEAHelper AEA;
-  B64Helper B64;
+  AEAHelper aeaHelper;
+  B64Helper b64Helper;
   Gson GSON;
-  Logger LOGGER;
+  Logger logger;
+  KSHelper ksHelper;
 
   ServerDatabaseDriver DB;
 
-  private final KeyStore keyStore;
   private DHHelper dhHelper;
 
   private String pubKeyName;
@@ -41,8 +41,8 @@ final class ServerProperties {
   boolean PKI_ENABLED;
   volatile PKICommsManager PKI_COMMS_MGR;
 
-  ServerProperties(CustomProperties properties, KeyStore keyStore, ServerDatabaseDriver db, Logger logger, SSLContext sslContext) throws PropertyException, GeneralSecurityException, IOException, DatabaseException, CriticalDatabaseException, ParameterException {
-    this.keyStore = keyStore;
+  ServerProperties(CustomProperties properties, KSHelper ksHelper, ServerDatabaseDriver db, Logger logger, SSLContext sslContext) throws PropertyException, GeneralSecurityException, IOException, DatabaseException, CriticalDatabaseException, ParameterException {
+    this.ksHelper = ksHelper;
 
     // Set Debug mode
     DEBUG_MODE = properties.getBool(ServerProperty.DEBUG);
@@ -50,22 +50,19 @@ final class ServerProperties {
     // Max size of socket buffer
     bufferSizeInMB = properties.getInt(ServerProperty.BUFFER_SIZE_MB);
 
-    B64 = new B64Helper();
+    b64Helper = new B64Helper();
     GSON = GsonUtils.buildGsonInstance();
     DB = db;
-    LOGGER = logger;
+    this.logger = logger;
 
     // Get and set password for keystore
     ksPassword = properties.getString(ServerProperty.KEYSTORE_PASS);
-
-    // Get provider
-    String provider = properties.getString(ServerProperty.PROVIDER);
 
     // Initialize AEA params
     String pubKeyAlg = properties.getString(ServerProperty.PUB_KEY_ALG);
     String certSignAlg = properties.getString(ServerProperty.CERT_SIGN_ALG);
     int pubKeySize = properties.getInt(ServerProperty.PUB_KEY_SIZE);
-    AEA = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize, provider);
+    aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize);
 
     // Get pub key and assign it
     pubKeyName = properties.getString(ServerProperty.PUB_KEY_NAME);
@@ -74,7 +71,7 @@ final class ServerProperties {
     String dhKeyAlg = properties.getString(ServerProperty.DH_KEY_ALG);
     String dhKeyHashAlg = properties.getString(ServerProperty.DH_KEY_HASH_ALG);
     int dhKeySize = properties.getInt(ServerProperty.DH_KEY_SIZE);
-    dhHelper = new DHHelper(dhKeyAlg, dhKeyHashAlg, dhKeySize, provider);
+    dhHelper = new DHHelper(dhKeyAlg, dhKeyHashAlg, dhKeySize);
 
     // check if supposed to reset server params and reset them if so
     if (properties.getBool(ServerProperty.PARAMS_RESET))
@@ -83,12 +80,12 @@ final class ServerProperties {
     // Configure PKI Comms manager if pki enabled
     PKI_ENABLED = properties.getBool(ServerProperty.USE_PKI);
     if (PKI_ENABLED)
-      PKI_COMMS_MGR = new PKICommsManager(properties, sslContext, AEA, logger);
+      PKI_COMMS_MGR = new PKICommsManager(properties, sslContext, aeaHelper, logger);
 
   }
 
   private PrivateKey privateKey() throws GeneralSecurityException {
-    return (PrivateKey) keyStore.getKey(pubKeyName, ksPassword.toCharArray());
+    return (PrivateKey) ksHelper.getKey(pubKeyName);
   }
 
   private void resetParams() throws GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException, ParameterException {
@@ -99,8 +96,8 @@ final class ServerProperties {
     ServerParameterMap params = new ServerParameterMap();
 
     // Insert AEA parameters
-    params.put(ServerParameterType.PUB_KEY_ALG, AEA.getKeyAlg());
-    params.put(ServerParameterType.CERT_SIG_ALG, AEA.getCertAlg());
+    params.put(ServerParameterType.PUB_KEY_ALG, aeaHelper.getKeyAlg());
+    params.put(ServerParameterType.CERT_SIG_ALG, aeaHelper.getCertAlg());
 
     // Generate DH Spec and insert DH parameters
     DHParameterSpec spec = dhHelper.genParams();
@@ -112,9 +109,9 @@ final class ServerProperties {
 
     // Join all parameters, sign them, encode them and insert them in DB
     byte[] paramBytes = params.getAllParametersBytes();
-    byte[] paramSigBytes = AEA.sign(privateKey(), paramBytes);
+    byte[] paramSigBytes = aeaHelper.sign(privateKey(), paramBytes);
 
-    DB.insertParameter(ServerParameterType.PARAM_SIG, B64.encode(paramSigBytes));
+    DB.insertParameter(ServerParameterType.PARAM_SIG, b64Helper.encode(paramSigBytes));
   }
 
   public int getBufferSizeInMB() {

@@ -1,5 +1,6 @@
 package shared.utils;
 
+import javax.crypto.SecretKey;
 import java.io.*;
 import java.security.*;
 

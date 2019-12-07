@@ -1,7 +1,5 @@
 package shared.utils.crypto;
 
-import shared.utils.CryptUtil;
-
 import javax.crypto.KeyAgreement;
 import javax.crypto.spec.DHParameterSpec;
 import java.math.BigInteger;
@@ -9,6 +7,8 @@ import java.security.*;
 import java.security.spec.InvalidParameterSpecException;
 
 public class DHHelper {
+  private static final String PROVIDER = "BC";
+
   private MessageDigest hash;
   private KeyPairGenerator keyPairGenerator;
   private KeyAgreement keyAgreement;
@@ -17,11 +17,11 @@ public class DHHelper {
   private String dhAlg;
   private String hashAlg;
 
-  public DHHelper(String dhAlg, String hashAlg, int keySize, String provider) throws GeneralSecurityException {
-    keyPairGenerator = KeyPairGenerator.getInstance(dhAlg, provider);
-    keyAgreement = KeyAgreement.getInstance(dhAlg, provider);
-    hash = MessageDigest.getInstance(hashAlg, provider);
-    algParamsGenerator = AlgorithmParameterGenerator.getInstance(dhAlg, provider);
+  public DHHelper(String dhAlg, String hashAlg, int keySize) throws GeneralSecurityException {
+    keyPairGenerator = KeyPairGenerator.getInstance(dhAlg, PROVIDER);
+    keyAgreement = KeyAgreement.getInstance(dhAlg, PROVIDER);
+    hash = MessageDigest.getInstance(hashAlg, PROVIDER);
+    algParamsGenerator = AlgorithmParameterGenerator.getInstance(dhAlg, PROVIDER);
 
     algParamsGenerator.init(keySize);
 

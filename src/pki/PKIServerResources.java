@@ -102,12 +102,12 @@ final class PKIServerResources implements Runnable {
 
     // Get csr encoded from request and decode it
     String certRequestEncoded = GsonUtils.getString(requestData, "certificationRequest");
-    byte[] certRequestBytes = props.B64.decode(certRequestEncoded);
+    byte[] certRequestBytes = props.b64Helper.decode(certRequestEncoded);
 
     // Get CSR from bytes
     PKCS10CertificationRequest certRequest;
     try {
-      certRequest = props.AEA.csrFromBytes(certRequestBytes);
+      certRequest = props.aeaHelper.csrFromBytes(certRequestBytes);
     } catch (IOException e) {
       throw new CustomRequestException("CSR is corrupted", HTTPStatus.BAD_REQUEST);
     }
@@ -115,15 +115,15 @@ final class PKIServerResources implements Runnable {
     // Attempt to create signed CSR
     X509Certificate signedCert;
     try {
-      signedCert = props.AEA.signCSR(certRequest, props.CERT, props.privateKey(), props.CERT_VALIDITY);
+      signedCert = props.aeaHelper.signCSR(certRequest, props.CERT, props.privateKey(), props.CERT_VALIDITY);
     } catch (PKCSException e) {
       throw new CustomRequestException("CSR signature is invalid", HTTPStatus.BAD_REQUEST);
     }
 
     // Get cert SN and hash
-    byte[] certBytes = props.AEA.getCertBytes(signedCert);
-    String certHashEncoded = props.HASH.hashAndEncode(certBytes);
-    String certSN = props.AEA.getCertSN(signedCert);
+    byte[] certBytes = props.aeaHelper.getCertBytes(signedCert);
+    String certHashEncoded = props.hashHelper.hashAndEncode(certBytes);
+    String certSN = props.aeaHelper.getCertSN(signedCert);
 
     // Attempt to register CSR
     try {
@@ -133,31 +133,31 @@ final class PKIServerResources implements Runnable {
     }
 
     // encode signed certificate
-    byte[] signedCertBytes = props.AEA.getCertBytes(signedCert);
-    String signedCertEncoded = props.B64.encode(signedCertBytes);
+    byte[] signedCertBytes = props.aeaHelper.getCertBytes(signedCert);
+    String signedCertEncoded = props.b64Helper.encode(signedCertBytes);
 
     // Create payload and send response
     send(new SignResponse(signedCertEncoded));
 
-    props.LOGGER.log(Level.FINE, "Certificate emitted with SN " + serialNumber);
+    props.logger.log(Level.FINE, "Certificate emitted with SN " + serialNumber);
   }
 
   // Is Revoked
   private void validate(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException, InvalidKeyException, NoSuchProviderException, NoSuchAlgorithmException {
     // Get certificate and decode it
     String certEncoded = GsonUtils.getString(requestData, "certificate");
-    byte[] certDecoded = props.B64.decode(certEncoded);
+    byte[] certDecoded = props.b64Helper.decode(certEncoded);
 
     // Build certificate and get serial number and build hash
     X509Certificate certificate;
     try {
-      certificate = props.AEA.getCertFromBytes(certDecoded);
+      certificate = props.aeaHelper.getCertFromBytes(certDecoded);
     } catch (CertificateException e) {
       throw new CustomRequestException("Certificate is corrupted.", HTTPStatus.BAD_REQUEST);
     }
 
-    String certSN = props.AEA.getCertSN(certificate);
-    String certHash = props.HASH.hashAndEncode(certDecoded);
+    String certSN = props.aeaHelper.getCertSN(certificate);
+    String certHash = props.hashHelper.hashAndEncode(certDecoded);
 
     // Check cert belongs to public key
     try {
@@ -168,11 +168,11 @@ final class PKIServerResources implements Runnable {
 
       send(new ValidateResponse(valid));
 
-      props.LOGGER.log(Level.FINE, "Certificate " + certSN + " validated");
+      props.logger.log(Level.FINE, "Certificate " + certSN + " validated");
     } catch (CertificateException | SignatureException e) {
       // Cert does not belong to CA
       send(new ValidateResponse(false));
-      props.LOGGER.log(Level.FINE, "Certificate " + certSN + " not validated");
+      props.logger.log(Level.FINE, "Certificate " + certSN + " not validated");
     }
   }
 
@@ -197,7 +197,7 @@ final class PKIServerResources implements Runnable {
 
     send(new OKResponse());
 
-    props.LOGGER.log(Level.FINE, "Certificate revoked with SN " + serialNumber);
+    props.logger.log(Level.FINE, "Certificate revoked with SN " + serialNumber);
   }
 
   /*
@@ -210,7 +210,7 @@ final class PKIServerResources implements Runnable {
       HTTPStatus status = ((IHTTPStatusException) exception).status();
       response = status.buildErrorResponse(exception.getMessage());
 
-      props.LOGGER.log(Level.WARNING, exception.getMessage());
+      props.logger.log(Level.WARNING, exception.getMessage());
     } else {
       System.err.println("Client disconnected due to critical error: " + exception.getMessage());
 
@@ -218,14 +218,14 @@ final class PKIServerResources implements Runnable {
         exception.printStackTrace();
 
       response = HTTPStatus.INTERNAL_SERVER_ERROR.buildErrorResponse();
-      props.LOGGER.log(Level.SEVERE, exception.getMessage());
+      props.logger.log(Level.SEVERE, exception.getMessage());
     }
 
     try {
       send(response);
     } catch (IOException e) {
       System.err.println("Failed to send error response to client");
-      props.LOGGER.log(Level.SEVERE, exception.getMessage());
+      props.logger.log(Level.SEVERE, exception.getMessage());
 
       if (props.DEBUG_MODE)
         e.printStackTrace();

@@ -15,11 +15,12 @@ import java.util.logging.Logger;
 final class PKIServerProperties {
   boolean DEBUG_MODE;
 
-  HashHelper HASH;
-  AEAHelper AEA;
-  B64Helper B64;
+  HashHelper hashHelper;
+  AEAHelper aeaHelper;
+  B64Helper b64Helper;
   Gson GSON;
-  final Logger LOGGER;
+  KSHelper ksHelper;
+  final Logger logger;
 
   PKIDatabaseDriver DB;
 
@@ -27,18 +28,16 @@ final class PKIServerProperties {
   X509Certificate CERT;
   int CERT_VALIDITY;
 
-  private KeyStore keyStore;
-
   private String pubKeyName;
   private String ksPassword;
   private String token;
 
-  PKIServerProperties(CustomProperties props, KeyStore keyStore, PKIDatabaseDriver db, Logger logger) throws PropertyException, GeneralSecurityException {
-    LOGGER = logger;
+  PKIServerProperties(CustomProperties props, PKIDatabaseDriver db, Logger logger, KSHelper ksHelper) throws PropertyException, GeneralSecurityException {
+    this.ksHelper = ksHelper;
+    this.logger = logger;
     DEBUG_MODE = props.getBool(PKIProperty.DEBUG);
-    this.keyStore = keyStore;
     DB = db;
-    B64 = new B64Helper();
+    b64Helper = new B64Helper();
     GSON = GsonUtils.buildGsonInstance();
 
     token = props.getString(PKIProperty.TOKEN_VALUE);
@@ -50,23 +49,23 @@ final class PKIServerProperties {
     ksPassword = props.getString(PKIProperty.KEYSTORE_PASS);
 
     // Initialize hash helper
-    HASH = new HashHelper(props.getString(PKIProperty.HASH_ALG), provider);
+    hashHelper = new HashHelper(props.getString(PKIProperty.HASH_ALG));
 
     // Initialize AEA params
     String pubKeyAlg = props.getString(PKIProperty.PUB_KEY_ALG);
     String certSignAlg = props.getString(PKIProperty.CERT_SIGN_ALG);
     int pubKeySize = props.getInt(PKIProperty.PUB_KEY_SIZE);
-    AEA = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize, provider);
+    aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize);
 
     // Get pub key and assign it
     pubKeyName = props.getString(PKIProperty.PKI_PUB_KEY);
-    CERT = AEA.getCertFromKeystore(pubKeyName, keyStore);
+    CERT = ksHelper.getCertificate(pubKeyName);
     PUB_KEY = CERT.getPublicKey();
     CERT_VALIDITY = props.getInt(PKIProperty.CERTIFICATE_VALIDITY);
   }
 
   PrivateKey privateKey() throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
-    return (PrivateKey) keyStore.getKey(pubKeyName, ksPassword.toCharArray());
+    return (PrivateKey) ksHelper.getKey(pubKeyName);
   }
 
   boolean isTokenValid(String token) {

@@ -11,9 +11,7 @@ import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.PKCSException;
 import shared.errors.crypto.InvalidCertificateInfoException;
-import shared.errors.crypto.InvalidPublicKeyException;
 import shared.errors.crypto.InvalidSignatureException;
-import shared.utils.CryptUtil;
 import sun.security.pkcs10.PKCS10;
 import sun.security.x509.CertificateValidity;
 import sun.security.x509.X500Name;
@@ -32,13 +30,13 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.*;
 import java.security.cert.*;
-import java.security.cert.Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Date;
 
 public final class AEAHelper {
   private static final long ONE_DAY = 24L * 60L * 60L * 1000L; // 1 year
+  private static final String PROVIDER = "BC";
 
   private RNDHelper random;
 
@@ -52,24 +50,22 @@ public final class AEAHelper {
   private JcaContentSignerBuilder jcaContentSignBuilder;
 
   private String certSignAlg;
-  private String provider;
   private Signature signature;
   private int keySize;
 
   // Public Keys ----------------------------------------------------------------------------------------
-  public AEAHelper(String keyAlg, String certSignAlg, int keySize, String provider) throws GeneralSecurityException {
+  public AEAHelper(String keyAlg, String certSignAlg, int keySize) throws GeneralSecurityException {
     random = new RNDHelper();
-    cipher = Cipher.getInstance(keyAlg, provider);
-    keyFactory = KeyFactory.getInstance(keyAlg, provider);
-    keyPairGenerator = KeyPairGenerator.getInstance(keyAlg, provider);
+    cipher = Cipher.getInstance(keyAlg, PROVIDER);
+    keyFactory = KeyFactory.getInstance(keyAlg, PROVIDER);
+    keyPairGenerator = KeyPairGenerator.getInstance(keyAlg, PROVIDER);
 
-    certFactory = CertificateFactory.getInstance("X509", provider);
-    signature = Signature.getInstance(certSignAlg, provider);
+    certFactory = CertificateFactory.getInstance("X509", PROVIDER);
+    signature = Signature.getInstance(certSignAlg, PROVIDER);
 
-    jcaCertConverter = new JcaX509CertificateConverter().setProvider(provider);
-    jcaContentSignBuilder = new JcaContentSignerBuilder(certSignAlg).setProvider(provider);
+    jcaCertConverter = new JcaX509CertificateConverter().setProvider(PROVIDER);
+    jcaContentSignBuilder = new JcaContentSignerBuilder(certSignAlg).setProvider(PROVIDER);
 
-    this.provider = provider;
     this.certSignAlg = certSignAlg;
     this.keyAlg = keyAlg;
     this.keySize = keySize;
@@ -79,10 +75,11 @@ public final class AEAHelper {
     return keyFactory.generatePublic(new X509EncodedKeySpec(keyBytes));
   }
 
-  public byte[] sign(PrivateKey key, byte[] data) throws InvalidKeyException, SignatureException {
+  public byte[] sign(PrivateKey key, byte[]... data) throws InvalidKeyException, SignatureException {
     signature.initSign(key, new SecureRandom());
 
-    signature.update(data);
+    for (byte[] dataPart : data)
+      signature.update(dataPart);
 
     return signature.sign();
   }
@@ -107,19 +104,6 @@ public final class AEAHelper {
     return cipher.doFinal(data);
   }
 
-  public static KeyPair getKeyPair(KeyStore ks, char[] pass, String keyAlias) throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException, InvalidPublicKeyException {
-    Key privateKey = ks.getKey(keyAlias, pass);
-
-    Certificate cert = ks.getCertificate(keyAlias);
-
-    PublicKey publicKey = cert.getPublicKey();
-
-    if (!(privateKey instanceof PrivateKey))
-      throw new InvalidPublicKeyException();
-
-    return new KeyPair(publicKey, (PrivateKey) privateKey);
-  }
-
   public KeyPair genKeyPair() {
     keyPairGenerator.initialize(keySize);
 
@@ -142,10 +126,6 @@ public final class AEAHelper {
 
   public X509Certificate getCertFromFile(String file) throws FileNotFoundException, CertificateException {
     return (X509Certificate) certFactory.generateCertificate(new FileInputStream(file));
-  }
-
-  public X509Certificate getCertFromKeystore(String alias, KeyStore keyStore) throws KeyStoreException {
-    return (X509Certificate) keyStore.getCertificate(alias);
   }
 
   public X509Certificate signCert(X509Certificate cert, X509Certificate issuerCert, PrivateKey issuerPrivateKey, int validityDays) throws CertificateException, InvalidCertificateInfoException, NoSuchProviderException, NoSuchAlgorithmException, InvalidKeyException, SignatureException {
@@ -173,7 +153,7 @@ public final class AEAHelper {
 
   public boolean validate(PublicKey publicKey, X509Certificate certificate) throws CertificateException, NoSuchAlgorithmException, NoSuchProviderException {
     try {
-      certificate.verify(publicKey, provider);
+      certificate.verify(publicKey, PROVIDER);
       return true;
     } catch (InvalidKeyException | SignatureException e) {
       return false;

@@ -6,6 +6,7 @@ import server.props.ServerProperty;
 import shared.errors.properties.InvalidValueException;
 import shared.errors.properties.PropertyException;
 import shared.utils.CryptUtil;
+import shared.utils.crypto.KSHelper;
 import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.*;
@@ -59,13 +60,13 @@ final class Server {
       Executor executor = Executors.newFixedThreadPool(threadPoolSize);
 
       // Get Keystore and providers
-      KeyStore keyStore = getKeyStore(properties);
-      String providerTLS = properties.getString(ServerProperty.PROVIDER_TLS);
+      KSHelper ksHelper = getKeyStore(properties);
+      KSHelper tsHelper = getTrustStore(properties);
 
       // Create SSL Socket
       int port = properties.getInt(ServerProperty.PORT);
 
-      SSLContext sslContext = buildSSLContext(properties, keyStore, providerTLS);
+      SSLContext sslContext = buildSSLContext(ksHelper, tsHelper);
 
       SSLServerSocketFactory ssf = sslContext.getServerSocketFactory();
       SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port);
@@ -88,7 +89,7 @@ final class Server {
       String databaseLocation = properties.getString(ServerProperty.DATABASE_LOC);
       ServerDatabaseDriver db = new ServerDatabaseDriver(databaseLocation);
 
-      ServerProperties props = new ServerProperties(properties, keyStore, db, logger, sslContext);
+      ServerProperties props = new ServerProperties(properties, ksHelper, db, logger, sslContext);
 
       // Client serving loop
       SSLSocket sslClient;
@@ -154,21 +155,29 @@ final class Server {
     return trustManagerFactory;
   }
 
-  private static KeyStore getKeyStore(CustomProperties properties) throws PropertyException, GeneralSecurityException, IOException {
+  private static KSHelper getKeyStore(CustomProperties properties) throws PropertyException, GeneralSecurityException, IOException {
     String keyStoreLoc = properties.getString(ServerProperty.KEYSTORE_LOC);
-    String keyStorePass = properties.getString(ServerProperty.KEYSTORE_PASS);
     String keyStoreType = properties.getString(ServerProperty.KEYSTORE_TYPE);
+    String keyStorePass = properties.getString(ServerProperty.KEYSTORE_PASS);
 
-    return CryptUtil.loadKeystore(keyStoreLoc, keyStoreType, keyStorePass.toCharArray());
+    return new KSHelper(keyStoreLoc, keyStoreType, keyStorePass.toCharArray(), false);
   }
 
-  private static SSLContext buildSSLContext(CustomProperties properties, KeyStore keyStore, String providerTLS) throws GeneralSecurityException, IOException, PropertyException {
-    KeyManagerFactory keyManagerFactory = getKeyManagerFactory(properties, keyStore, providerTLS);
-    TrustManagerFactory trustManagerFactory = getTrustManagerFactory(properties, providerTLS);
+  private static KSHelper getTrustStore(CustomProperties properties) throws PropertyException, GeneralSecurityException, IOException {
+    String trustStoreLoc = properties.getString(ServerProperty.TRUSTSTORE_LOC);
+    String trustStoreType = properties.getString(ServerProperty.TRUSTSTORE_TYPE);
+    String trustStorePass = properties.getString(ServerProperty.TRUSTSTORE_PASS);
+
+    return new KSHelper(trustStoreLoc, trustStoreType, trustStorePass.toCharArray(), true);
+  }
+
+  private static SSLContext buildSSLContext(KSHelper ksHelper, KSHelper tsHelper) throws GeneralSecurityException {
+    KeyManagerFactory keyManagerFactory = ksHelper.getKeyManagerFactory();
+    TrustManagerFactory trustManagerFactory = tsHelper.getTrustManagerFactory();
     KeyManager[] keyManagers = keyManagerFactory.getKeyManagers();
     TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
 
-    SSLContext sslContext = SSLContext.getInstance("TLS", providerTLS);
+    SSLContext sslContext = SSLContext.getInstance("TLS", "BCJSSE");
     sslContext.init(keyManagers, trustManagers, new SecureRandom());
 
     return sslContext;

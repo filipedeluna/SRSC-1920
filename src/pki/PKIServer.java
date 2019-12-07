@@ -5,6 +5,7 @@ import pki.db.PKIDatabaseDriver;
 import pki.props.PKIProperty;
 import shared.errors.properties.InvalidValueException;
 import shared.errors.properties.PropertyException;
+import shared.utils.crypto.KSHelper;
 import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.*;
@@ -57,17 +58,18 @@ final class PKIServer {
       Executor executor = Executors.newFixedThreadPool(threadPoolSize);
 
       // Load Keystore
-      String keyStorePass = props.getString(PKIProperty.KEYSTORE_PASS);
-      String keyStoreType = props.getString(PKIProperty.KEYSTORE_TYPE);
-      KeyStore keyStore = KeyStore.getInstance(keyStoreType);
-      keyStore.load(new FileInputStream(props.getString(PKIProperty.KEYSTORE_LOC)), keyStorePass.toCharArray());
+      KSHelper ksHelper = new KSHelper(
+          props.getString(PKIProperty.KEYSTORE_LOC),
+          props.getString(PKIProperty.KEYSTORE_TYPE),
+          props.getString(PKIProperty.KEYSTORE_PASS).toCharArray(),
+          false
+      );
 
       // Get TLS Provider and cert format
       String providerTLS = props.getString(PKIProperty.PROVIDER_TLS);
 
       // Initiate KMF
-      KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509", providerTLS);
-      keyManagerFactory.init(keyStore, keyStorePass.toCharArray());
+      KeyManagerFactory keyManagerFactory = ksHelper.getKeyManagerFactory();
 
       // Create SSL Socket and initialize server
       int port = props.getInt(PKIProperty.PORT);
@@ -91,7 +93,7 @@ final class PKIServer {
 
       // Create db and initiate properties
       PKIDatabaseDriver db = new PKIDatabaseDriver(props.getString(PKIProperty.DATABASE_LOC));
-      PKIServerProperties pkiServerProps = new PKIServerProperties(props, keyStore, db, logger);
+      PKIServerProperties pkiServerProps = new PKIServerProperties(props, db, logger, ksHelper);
 
       // Client serving loop
       SSLSocket sslClient;

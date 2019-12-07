@@ -5,13 +5,9 @@ import shared.utils.properties.ICustomProperty;
 
 public enum ClientProperty implements ICustomProperty {
   // Add properties here
-  PUB_KEY_ALG("pub_key_alg", CustomPropertyType.STRING),
-  PUB_KEY_SIZE("pub_key_size", CustomPropertyType.INT),
   PUB_KEY_NAME("pub_key_name", CustomPropertyType.STRING),
-  CERT_SIGN_ALG("cert_sign_alg", CustomPropertyType.STRING),
-  CERT_FORMAT("cert_format", CustomPropertyType.STRING),
-  PROVIDER("provider", CustomPropertyType.STRING),
-  SEASPEC("seaspec", CustomPropertyType.STRING),
+  SEA_SPEC("sea_spec", CustomPropertyType.STRING),
+  MAC_SPEC("mac_spec", CustomPropertyType.STRING),
 
   // System
   OUTPUT_FOLDER("output_folder", CustomPropertyType.STRING),

@@ -1,7 +1,5 @@
 package shared.utils.crypto;
 
-import shared.utils.CryptUtil;
-
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -9,6 +7,8 @@ import java.security.*;
 import java.util.Arrays;
 
 public final class SEAHelper {
+  private static final String PROVIDER = "BC";
+
   private final String spec;
   private final String mode;
   private Cipher cipher;
@@ -16,13 +16,13 @@ public final class SEAHelper {
 
   private final RNDHelper random;
 
-  public SEAHelper(String algorithm, String mode, String padding, String provider) throws GeneralSecurityException {
+  public SEAHelper(String algorithm, String mode, String padding) throws GeneralSecurityException {
     this.random = new RNDHelper();
     this.mode = mode;
 
     spec = algorithm + "/" + mode + "/" + padding;
-    cipher = Cipher.getInstance(spec, provider);
-    keyGen = KeyGenerator.getInstance(cipher.getAlgorithm(), provider);
+    cipher = Cipher.getInstance(spec, PROVIDER);
+    keyGen = KeyGenerator.getInstance(cipher.getAlgorithm(), PROVIDER);
   }
 
   public byte[] decrypt(byte[] buff, Key key, byte[] iv) throws BadPaddingException, IllegalBlockSizeException, InvalidAlgorithmParameterException, InvalidKeyException {

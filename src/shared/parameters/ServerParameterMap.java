@@ -26,7 +26,7 @@ public final class ServerParameterMap extends LinkedHashMap<String, Pair<Integer
     put(name, new Pair<>(id, value));
   }
 
-  public String getParameter(ServerParameterType type) {
+  public String getParameterValue(ServerParameterType type) {
     return get(type.dbName()).getB();
   }
 
