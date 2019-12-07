@@ -9,7 +9,9 @@ public enum ClientProperty implements ICustomProperty {
   PUB_KEY_SIZE("pub_key_size", CustomPropertyType.INT),
   PUB_KEY_NAME("pub_key_name", CustomPropertyType.STRING),
   CERT_SIGN_ALG("cert_sign_alg", CustomPropertyType.STRING),
-
+  CERT_FORMAT("cert_format", CustomPropertyType.STRING),
+  PROVIDER("provider", CustomPropertyType.STRING),
+  SEASPEC("seaspec", CustomPropertyType.STRING),
 
   // System
   OUTPUT_FOLDER("output_folder", CustomPropertyType.STRING),

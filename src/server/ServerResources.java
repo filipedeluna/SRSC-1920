@@ -124,7 +124,7 @@ final class ServerResources implements Runnable {
           params(nonce);
           break;
       }
-    } catch (ClassCastException | IllegalStateException e) {
+    } catch (ClassCastException | IllegalStateException | EntryNotFoundException e) {
       throw new InvalidRouteException();
     }
   }
@@ -165,7 +165,7 @@ final class ServerResources implements Runnable {
   }
 
   // List users details
-  private void listUsers(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
+  private void listUsers(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException, EntryNotFoundException {
     // Get intended user id or none if supposed to get all users
     int userId;
 
