@@ -137,8 +137,10 @@ final class ServerResources implements Runnable {
     String uuid = GsonUtils.getString(requestData, "uuid");
 
     // Get extra fields
-    String dhValue = GsonUtils.getString(requestData, "dhValue");
+    String dhSeaPubKey = GsonUtils.getString(requestData, "dhSeaPubKey");
+    String dhMacPubKey = GsonUtils.getString(requestData, "dhMacPubKey");
     String seaSpec = GsonUtils.getString(requestData, "seaSpec");
+    String macSpec = GsonUtils.getString(requestData, "macSpec");
 
     // Get extra fields signature
     String secDataSignature = GsonUtils.getString(requestData, "secDataSignature");
@@ -146,8 +148,10 @@ final class ServerResources implements Runnable {
     User user = new User(
         uuid,
         publicKeyEncoded,
-        dhValue,
+        dhSeaPubKey,
+        dhMacPubKey,
         seaSpec,
+        macSpec,
         secDataSignature
     );
 
@@ -287,8 +291,8 @@ final class ServerResources implements Runnable {
     // Get receiver signature -> message contents signature
     String receiverSignature = GsonUtils.getString(requestData, "receiverSignature");
 
-    // Get current time
-    String date = getCurrentDate();
+    // Get signature date
+    String date = GsonUtils.getString(requestData, "date");
 
     // Insert message receipt
     try {

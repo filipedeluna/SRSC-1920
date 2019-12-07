@@ -41,12 +41,14 @@ public final class ServerDatabaseDriver {
     try {
       String query =
           "CREATE TABLE IF NOT EXISTS users (" +
-              "user_id    INTEGER PRIMARY KEY, " +
-              "uuid       TEXT    NOT NULL UNIQUE, " +
-              "pub_key    TEXT    NOT NULL, " +
+              "user_id            INTEGER PRIMARY KEY, " +
+              "uuid               TEXT    NOT NULL UNIQUE, " +
+              "pub_key            TEXT    NOT NULL, " +
               // Security data
-              "dh_pub_key TEXT    NOT NULL, " +
-              "sea_spec   TEXT    NOT NULL, " + // User chosen sea spec
+              "dh_sea_pub_key     TEXT    NOT NULL, " +
+              "dh_mac_pub_key     TEXT    NOT NULL, " +
+              "sea_spec           TEXT    NOT NULL, " + // User chosen sea spec
+              "mac_spec           TEXT    NOT NULL, " + // User chosen mac spec
               "sec_data_signature TEXT    NOT NULL " + // Signature of all security data
               ");";
 
@@ -98,15 +100,17 @@ public final class ServerDatabaseDriver {
   public int insertUser(User user) throws CriticalDatabaseException, DuplicateEntryException {
     try {
       // Insert user
-      String insertQuery = "INSERT INTO users (uuid, pub_key, dh_value, sea_spec, sec_data_signature) VALUES (?, ?, ?, ?, ?);";
+      String insertQuery = "INSERT INTO users (uuid, pub_key, dh_sea_pub_key, dh_mac_pub_key, sea_spec, mac_spec, sec_data_signature) VALUES (?, ?, ?, ?, ?);";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
       ps.setString(1, user.getUuid());
       ps.setString(2, user.getPubKey());
       // Security data
-      ps.setString(3, user.getDhValue());
-      ps.setString(4, user.getSeaSpec());
-      ps.setString(5, user.getSecDataSignature());
+      ps.setString(3, user.getDhSeaPubKey());
+      ps.setString(4, user.getDhMacPubKey());
+      ps.setString(5, user.getSeaSpec());
+      ps.setString(6, user.getMacSpec());
+      ps.setString(7, user.getSecDataSignature());
 
       ps.executeUpdate();
 
@@ -133,10 +137,11 @@ public final class ServerDatabaseDriver {
       rs.next();
 
       return new User(
-          rs.getString("user_id"),
           rs.getString("pub_key"),
-          rs.getString("dh_value"),
+          rs.getString("dh_sea_pub_key"),
+          rs.getString("dh_mac_pub_key"),
           rs.getString("sea_spec"),
+          rs.getString("mac_spec"),
           rs.getString("sec_data_signature")
       );
     } catch (SQLException e) {
@@ -159,10 +164,11 @@ public final class ServerDatabaseDriver {
 
       while (rs.next()) {
         users.add(new User(
-            rs.getString("user_id"),
             rs.getString("pub_key"),
-            rs.getString("dh_value"),
+            rs.getString("dh_sea_pub_key"),
+            rs.getString("dh_mac_pub_key"),
             rs.getString("sea_spec"),
+            rs.getString("mac_spec"),
             rs.getString("sec_data_signature")
         ));
       }

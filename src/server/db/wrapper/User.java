@@ -5,30 +5,34 @@ import java.io.Serializable;
 public final class User implements Serializable {
   private String id;
   private String uuid;
-  public String pubKey;
+  private String pubKey;
 
   // Security Params
-  public String dhValue;
-  public String seaSpec;
-  public String secDataSignature;
+  private String dhSeaPubKey;
+  private String dhMacPubKey;
+  private String seaSpec;
+  private String macSpec;
+  private String secDataSignature;
 
   public User() {
   }
 
-  public User(String id, String uuid, String pubKey, String dhValue, String seaSpec, String secDataSignature) {
-    this.id = id;
+  public User(String uuid, String pubKey, String dhSeaPubKey, String dhMacPubKey, String seaSpec, String macSpec, String secDataSignature) {
     this.uuid = uuid;
     this.pubKey = pubKey;
-    this.dhValue = dhValue;
+    this.dhSeaPubKey = dhSeaPubKey;
+    this.dhMacPubKey = dhMacPubKey;
     this.seaSpec = seaSpec;
+    this.macSpec = macSpec;
     this.secDataSignature = secDataSignature;
   }
 
-  public User(String id, String pubKey, String dhValue, String seaSpec, String secDataSignature) {
-    this.id = id;
+  public User(String pubKey, String dhSeaPubKey, String dhMacPubKey, String seaSpec, String macSpec, String secDataSignature) {
     this.pubKey = pubKey;
-    this.dhValue = dhValue;
+    this.dhSeaPubKey = dhSeaPubKey;
+    this.dhMacPubKey = dhMacPubKey;
     this.seaSpec = seaSpec;
+    this.macSpec = macSpec;
     this.secDataSignature = secDataSignature;
   }
 
@@ -40,12 +44,20 @@ public final class User implements Serializable {
     return uuid;
   }
 
-  public String getDhValue() {
-    return dhValue;
+  public String getDhSeaPubKey() {
+    return dhSeaPubKey;
+  }
+
+  public String getDhMacPubKey() {
+    return dhMacPubKey;
   }
 
   public String getSeaSpec() {
     return seaSpec;
+  }
+
+  public String getMacSpec() {
+    return macSpec;
   }
 
   public String getSecDataSignature() {
