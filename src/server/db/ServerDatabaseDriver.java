@@ -48,7 +48,7 @@ public final class ServerDatabaseDriver {
               // Security data
               "dh_pub_key TEXT    NOT NULL, " +
               // Signature of all data
-              "signature  TEXT    NOT NULL, " +
+              "signature  TEXT    NOT NULL " +
               ");";
 
       connection.createStatement().execute(query);
@@ -76,7 +76,7 @@ public final class ServerDatabaseDriver {
               "date       TEXT    NOT NULL, " +
               // Reader signature of message contents with private key
               "signature  TEXT    NOT NULL, " +
-              "FOREIGN KEY (message_id) REFERENCES messages(message_id)," +
+              "FOREIGN KEY (message_id) REFERENCES messages(message_id)" +
               ");";
 
       connection.createStatement().execute(query);

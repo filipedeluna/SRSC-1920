@@ -18,6 +18,7 @@ import shared.errors.request.MissingValueException;
 import shared.errors.request.RequestException;
 import shared.http.HTTPStatus;
 import shared.response.ErrorResponse;
+import shared.utils.CryptUtil;
 import shared.utils.GsonUtils;
 import shared.utils.SafeInputStreamReader;
 
@@ -68,7 +69,7 @@ final class ServerResources implements Runnable {
 
   private void handleRequest(JsonObject requestData, SSLSocket client) throws RequestException, IOException, DatabaseException, GeneralSecurityException, CriticalDatabaseException {
     try {
-      String requestName = GsonUtils.getString(requestData, "type");
+      String requestName = props.B64.decode(GsonUtils.getString(requestData, "type")).toString();
       ServerRequest request = ServerRequest.fromString(requestName);
       String nonce = null;
 
@@ -87,6 +88,9 @@ final class ServerResources implements Runnable {
           client.getSession().getPeerCertificateChain()[0].getSerialNumber() + ".");
 
       switch (request) {
+        case USEREQUESTDH:
+          requestDHuserPub(requestData, nonce);
+          break;
         case CREATE:
           createUser(requestData, nonce);
           break;
@@ -118,6 +122,20 @@ final class ServerResources implements Runnable {
     } catch (ClassCastException | IllegalStateException e) {
       throw new InvalidRouteException();
     }
+  }
+
+  private synchronized void requestDHuserPub(JsonObject requestData, String nonce) throws RequestException, CriticalDatabaseException, DatabaseException, IOException, GeneralSecurityException {
+    int uuid = Integer.parseInt(GsonUtils.getString(requestData, "destiny_uuid"));
+    User user = props.DB.getUser(uuid);
+
+    String dhdentinyvalue = user.dhValue;
+
+    PrivateKey privateKey = props.privateKey();
+    byte[] paramsJSONSigBytes = props.AEA.sign(privateKey, dhdentinyvalue.getBytes());
+    String paramsJSONSigEncoded = props.B64.encode(paramsJSONSigBytes);
+
+    RequestDestinyDHvalue req = new RequestDestinyDHvalue(nonce, dhdentinyvalue, paramsJSONSigEncoded);
+    send(req.json(props.GSON));
   }
 
   // Create user message box
@@ -222,7 +240,7 @@ final class ServerResources implements Runnable {
     } catch (MissingValueException e) {
       // Message has no attachments
     }
-
+    //aqui vai ser a pub key xd
     String macHash = GsonUtils.getString(requestData, "macHash");
 
     // Create and insert message

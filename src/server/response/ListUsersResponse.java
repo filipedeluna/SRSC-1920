@@ -7,4 +7,8 @@ public final class ListUsersResponse extends OkResponseWithNonce {
     super(nonce);
     this.users = users;
   }
+
+  public String getUsers() {
+    return users;
+  }
 }

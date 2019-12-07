@@ -1,0 +1,495 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T03:26:35</date>
+  <millis>1575516395913</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>Database critical error: CODE 1 - [SQLITE_ERROR] SQL error or missing database (near ")": syntax error)</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T03:28:37</date>
+  <millis>1575516517962</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>Database critical error: CODE 1 - [SQLITE_ERROR] SQL error or missing database (near ")": syntax error)</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T03:28:52</date>
+  <millis>1575516532399</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>Database critical error: CODE 1 - [SQLITE_ERROR] SQL error or missing database (near ")": syntax error)</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T03:29:55</date>
+  <millis>1575516595735</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>Database critical error: CODE 1 - [SQLITE_ERROR] SQL error or missing database (near ")": syntax error)</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T03:30:18</date>
+  <millis>1575516618346</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>Database critical error: CODE 1 - [SQLITE_ERROR] SQL error or missing database (near ")": syntax error)</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T03:31:56</date>
+  <millis>1575516716291</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>no such algorithm: ECDH for provider BC</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T03:33:03</date>
+  <millis>1575516783175</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>no such algorithm: ECDH for provider BC</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T03:37:25</date>
+  <millis>1575517045702</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>no such algorithm: ECDH for provider BCJSSE</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T03:38:16</date>
+  <millis>1575517096096</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>ECDH AlgorithmParameterGenerator not available</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T03:42:08</date>
+  <millis>1575517328668</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>no such algorithm: ECDH for provider BCJSSE</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T04:37:03</date>
+  <millis>1575520623844</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>no such provider: SC</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T04:43:46</date>
+  <millis>1575521026908</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>ECDH AlgorithmParameterGenerator not available</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T04:46:31</date>
+  <millis>1575521191864</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>no such algorithm: ECDH for provider BCJSSE</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T04:46:50</date>
+  <millis>1575521210548</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>no such algorithm: ECDH for provider BC</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T04:49:44</date>
+  <millis>1575521384477</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>no such algorithm: ECDH for provider BCJSSE</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T05:26:05</date>
+  <millis>1575523565103</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>WARNING</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>1344</thread>
+  <message>Request Exception: Request route not found.</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T05:28:30</date>
+  <millis>1575523710337</millis>
+  <sequence>3</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>518</thread>
+  <message>org.bouncycastle.tls.TlsFatalAlert: handshake_failure(40)</message>
+</record>
+<record>
+  <date>2019-12-05T05:28:30</date>
+  <millis>1575523710350</millis>
+  <sequence>4</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>518</thread>
+  <message>org.bouncycastle.tls.TlsFatalAlert: handshake_failure(40)</message>
+</record>
+<record>
+  <date>2019-12-05T05:28:58</date>
+  <millis>1575523738651</millis>
+  <sequence>5</sequence>
+  <logger>Server Logger</logger>
+  <level>WARNING</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>520</thread>
+  <message>Request Exception: Request route not found.</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T05:59:03</date>
+  <millis>1575525543345</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>WARNING</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>3582</thread>
+  <message>Request Exception: Request route not found.</message>
+</record>
+<record>
+  <date>2019-12-05T06:06:59</date>
+  <millis>1575526019765</millis>
+  <sequence>3</sequence>
+  <logger>Server Logger</logger>
+  <level>WARNING</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>3584</thread>
+  <message>Request Exception: Request route not found.</message>
+</record>
+<record>
+  <date>2019-12-05T06:07:20</date>
+  <millis>1575526040647</millis>
+  <sequence>4</sequence>
+  <logger>Server Logger</logger>
+  <level>WARNING</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>3582</thread>
+  <message>Request Exception: Request route not found.</message>
+</record>
+<record>
+  <date>2019-12-05T06:12:34</date>
+  <millis>1575526354260</millis>
+  <sequence>5</sequence>
+  <logger>Server Logger</logger>
+  <level>WARNING</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>3584</thread>
+  <message>Request Exception: Request route not found.</message>
+</record>
+<record>
+  <date>2019-12-05T06:12:54</date>
+  <millis>1575526374072</millis>
+  <sequence>6</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>3582</thread>
+  <message>No peer identity established</message>
+</record>
+<record>
+  <date>2019-12-05T06:13:46</date>
+  <millis>1575526426645</millis>
+  <sequence>7</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>3584</thread>
+  <message>No peer identity established</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-05T14:42:02</date>
+  <millis>1575556922432</millis>
+  <sequence>3</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>4278</thread>
+  <message>java.net.SocketException: Broken pipe (Write failed)</message>
+</record>
+<record>
+  <date>2019-12-05T14:42:02</date>
+  <millis>1575556922474</millis>
+  <sequence>4</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>4278</thread>
+  <message>java.net.SocketException: Broken pipe (Write failed)</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+                                                                                                       <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-06T00:51:42</date>
+  <millis>1575593502220</millis>
+  <sequence>5</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>5647</thread>
+  <message>java.net.SocketException: Broken pipe (Write failed)</message>
+</record>
+<record>
+  <date>2019-12-06T00:51:42</date>
+  <millis>1575593502220</millis>
+  <sequence>4</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>5649</thread>
+  <message>java.net.SocketException: Broken pipe (Write failed)</message>
+</record>
+<record>
+  <date>2019-12-06T00:51:42</date>
+  <millis>1575593502234</millis>
+  <sequence>6</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>5649</thread>
+  <message>java.net.SocketException: Broken pipe (Write failed)</message>
+</record>
+<record>
+  <date>2019-12-06T00:51:42</date>
+  <millis>1575593502235</millis>
+  <sequence>7</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>5647</thread>
+  <message>java.net.SocketException: Broken pipe (Write failed)</message>
+</record>
+<record>
+  <date>2019-12-06T00:51:42</date>
+  <millis>1575593502290</millis>
+  <sequence>9</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>5649</thread>
+  <message>org.bouncycastle.tls.TlsFatalAlert: handshake_failure(40)</message>
+</record>
+<record>
+  <date>2019-12-06T00:51:42</date>
+  <millis>1575593502292</millis>
+  <sequence>10</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>5649</thread>
+  <message>org.bouncycastle.tls.TlsFatalAlert: handshake_failure(40)</message>
+</record>
+</log>

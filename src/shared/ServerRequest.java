@@ -10,7 +10,8 @@ public enum ServerRequest {
   RECEIVE("recv"),
   RECEIPT("receipt"),
   STATUS("status"),
-  PARAMS("params");
+  PARAMS("params"),
+  USEREQUESTDH("dhvaluereq");
 
   private String val;
 

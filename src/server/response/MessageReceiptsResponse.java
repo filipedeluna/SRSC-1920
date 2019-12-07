@@ -14,4 +14,12 @@ public final class MessageReceiptsResponse extends OkResponseWithNonce {
     this.receipts = receipts;
     this.message = message;
   }
+
+  public ArrayList<Receipt> getReceipts() {
+    return receipts;
+  }
+
+  public Message getMessage() {
+    return message;
+  }
 }

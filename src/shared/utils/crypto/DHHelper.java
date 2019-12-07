@@ -1,5 +1,7 @@
 package shared.utils.crypto;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 import shared.utils.CryptUtil;
 
 import javax.crypto.KeyAgreement;
@@ -19,7 +21,7 @@ public class DHHelper {
   public DHHelper(String dhAlg, String hashAlg, int keySize) throws GeneralSecurityException {
     keyPairGenerator = KeyPairGenerator.getInstance(dhAlg, CryptUtil.PROVIDER);
     keyAgreement = KeyAgreement.getInstance(dhAlg, CryptUtil.PROVIDER);
-    hash = MessageDigest.getInstance(hashAlg, CryptUtil.PROVIDER);
+    hash = MessageDigest.getInstance(hashAlg, CryptUtil.PROVIDER);//outra vez o provider, mas para EC
     algParamsGenerator = AlgorithmParameterGenerator.getInstance(dhAlg, CryptUtil.PROVIDER);
 
     algParamsGenerator.init(keySize);
