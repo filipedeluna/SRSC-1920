@@ -2,6 +2,7 @@ package shared.utils.crypto;
 
 import shared.utils.CryptUtil;
 
+import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 
@@ -18,6 +19,10 @@ public final class HashHelper {
 
   public byte[] hash(byte[] data) {
     return messageDigest.digest(data);
+  }
+
+  public byte[] hash(byte[] ...data) throws IOException {
+    return hash(CryptUtil.joinByteArrays(data));
   }
 
   public String hashAndEncode(byte[] data) {

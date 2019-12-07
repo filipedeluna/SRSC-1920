@@ -39,10 +39,10 @@ public class KSHelper {
     store = KeyStore.getInstance(keyStoreType);
     store.load(stream, keyStorePass);
 
-    // Create SeA Helper for storing, use GCM to guarantee integrity
+    // Create sea Helper for storing keypairs, use GCM to guarantee integrity
     if (!isTrustStore) {
       keyFactory = KeyFactory.getInstance("DH", "BC");
-      seaHelper = new SEAHelper("AES", "GCM", "ZeroPadding");
+      seaHelper = new SEAHelper("AES", "GCM", "NoPadding");
       seaKey = seaHelper.getKeyFromBytes(String.valueOf(keyStorePass).getBytes());
     }
   }
@@ -132,14 +132,14 @@ public class KSHelper {
   }
 
   public KeyManagerFactory getKeyManagerFactory() throws GeneralSecurityException {
-    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509", "BCJSSE");
+    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
     keyManagerFactory.init(store, keyStorePass);
 
     return keyManagerFactory;
   }
 
   public TrustManagerFactory getTrustManagerFactory() throws GeneralSecurityException {
-    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("X509", "BCJSSE");
+    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("SunX509");
     trustManagerFactory.init(store);
 
     return trustManagerFactory;

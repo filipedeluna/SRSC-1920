@@ -22,7 +22,7 @@ public final class SEAHelper {
 
     spec = algorithm + "/" + mode + "/" + padding;
     cipher = Cipher.getInstance(spec, PROVIDER);
-    keyGen = KeyGenerator.getInstance(cipher.getAlgorithm(), PROVIDER);
+    keyGen = KeyGenerator.getInstance(algorithm, PROVIDER);
   }
 
   public byte[] decrypt(byte[] buff, Key key, byte[] iv) throws BadPaddingException, IllegalBlockSizeException, InvalidAlgorithmParameterException, InvalidKeyException {
@@ -54,7 +54,7 @@ public final class SEAHelper {
   }
 
   public SecretKey getKeyFromBytes(byte[] keyBytes) {
-    return new SecretKeySpec(keyBytes, 0, cipher.getBlockSize(), cipher.getAlgorithm());
+    return new SecretKeySpec(keyBytes, cipher.getAlgorithm());
   }
 
   public boolean cipherModeUsesIV() {

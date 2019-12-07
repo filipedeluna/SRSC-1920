@@ -3,10 +3,7 @@ package client;
 import client.crypt.DHKeyType;
 import client.errors.ClientException;
 import client.props.ClientProperty;
-import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import com.google.gson.stream.JsonReader;
-import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 import shared.ServerRequest;
 import shared.parameters.ServerParameterMap;
 import server.db.wrapper.Message;
@@ -15,8 +12,6 @@ import server.db.wrapper.User;
 import server.response.*;
 import shared.errors.properties.PropertyException;
 import shared.errors.request.InvalidFormatException;
-import shared.utils.GsonUtils;
-import shared.utils.SafeInputStreamReader;
 import shared.utils.crypto.KSHelper;
 import shared.utils.properties.CustomProperties;
 
@@ -37,10 +32,11 @@ import java.util.Date;
 
 public class Client {
   private static final String PROPS_PATH = "src/client/props/client.properties";
+  private static final boolean DEBUG_MODE = true;
 
   public static void main(String[] args) {
+    System.setProperty("javax.net.debug", DEBUG_MODE ? "true" : "false");
     System.setProperty("java.net.preferIPv4Stack", "true");
-    Security.addProvider(new BouncyCastleJsseProvider());
 
     // Get properties from file
     CustomProperties properties = null;
@@ -62,6 +58,7 @@ public class Client {
       SSLContext sslContext = buildSSLContext(ksHelper, tsHelper);
       SSLSocketFactory factory = sslContext.getSocketFactory();
       SSLSocket socket = (SSLSocket) factory.createSocket(serverAddress, serverPort);
+      socket.setSoTimeout(5 * 1000);
 
       // Set enabled protocols and cipher suites and start SSL socket handshake with server
       String[] enabledProtocols = properties.getStringArr(ClientProperty.TLS_PROTOCOLS);
@@ -69,7 +66,10 @@ public class Client {
       socket.setEnabledProtocols(enabledProtocols);
       socket.setEnabledCipherSuites(enabledCipherSuites);
 
+      // Start handshake
+      System.out.println("SSL setup finished.");
       socket.startHandshake();
+      System.out.println("Handshake completed..");
 
       // Create client properties
       ClientProperties cProps = new ClientProperties(properties, ksHelper, tsHelper, socket);
@@ -95,7 +95,7 @@ public class Client {
 
       // Get nonce if supposed to for the requested route
       if (request.needsNonce())
-        requestData.addProperty("nonce", cProps.RNDHelper.getString(16, true));
+        requestData.addProperty("nonce", cProps.rndHelper.getString(16, true));
 
       switch (request) {
         case CREATE:
@@ -127,10 +127,8 @@ public class Client {
           // TODO Also create args[0] with help command at start
           System.err.println("Invalid route");
       }
-    } catch (GeneralSecurityException e) {
-      //not the same signature
     } catch (Exception e) {
-      handleException(e, false);
+      handleException(e);
     } finally {
       System.exit(-1);
     }
@@ -139,40 +137,40 @@ public class Client {
   private static void createUser(ClientProperties cProps, JsonObject requestData) throws IOException, GeneralSecurityException, InvalidFormatException, ClientException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
 
-    // TODO uuid é gerado a partir de hash de pubkey. ver enunciado
-    String uuid = bf.readLine();
+    // Generate a uuid from a users chosen username, adding entropy to it
+    System.out.println("Insert desired username;");
+    String username = bf.readLine();
+    String uuid = cProps.generateUUID(username);
+
     requestData.addProperty("uuid", uuid);
 
-    // TODO nome de utilizador podera ser algo como hash(username + pubkeybytes)
-    // TODO permitindo assim diferentes usernames
     // Generate Parameter Spec and create dh keypairs for mac and sea
-    DHParameterSpec dhSpec = new DHParameterSpec(cProps.DHHelper.getP(), cProps.DHHelper.getG());
-    KeyPair dhSeaKeypair = cProps.DHHelper.genKeyPair(dhSpec);
-    KeyPair dhMacKeypair = cProps.DHHelper.genKeyPair(dhSpec);
+    DHParameterSpec dhSpec = new DHParameterSpec(cProps.dhHelper.getP(), cProps.dhHelper.getG());
+    KeyPair dhSeaKeypair = cProps.dhHelper.genKeyPair(dhSpec);
+    KeyPair dhMacKeypair = cProps.dhHelper.genKeyPair(dhSpec);
 
-    // Check user keyps exist
-    if (cProps.KSHelper.dhKeyPairExists(uuid, DHKeyType.SEA))
+    // Check user keys exist
+    if (cProps.ksHelper.dhKeyPairExists(uuid, DHKeyType.SEA))
       throw new ClientException("User sea key already exists.");
 
-    if (cProps.KSHelper.dhKeyPairExists(uuid, DHKeyType.MAC))
+    if (cProps.ksHelper.dhKeyPairExists(uuid, DHKeyType.MAC))
       throw new ClientException("User mac key already exists.");
 
     // Keys do not exist so save them to file
-    cProps.KSHelper.saveDHKeyPair(uuid, DHKeyType.SEA, dhSeaKeypair);
-    cProps.KSHelper.saveDHKeyPair(uuid, DHKeyType.MAC, dhSeaKeypair);
+    cProps.ksHelper.saveDHKeyPair(uuid, DHKeyType.SEA, dhSeaKeypair);
+    cProps.ksHelper.saveDHKeyPair(uuid, DHKeyType.MAC, dhSeaKeypair);
 
-    // TODO sign all the security properties
     // Add all security properties to the header
     byte[] seaDHPubKeyBytes = dhSeaKeypair.getPublic().getEncoded();
     byte[] macDHPubKeyBytes = dhMacKeypair.getPublic().getEncoded();
 
-    requestData.addProperty("seaDHValue", cProps.B64Helper.encode(seaDHPubKeyBytes));
-    requestData.addProperty("macDHValue", cProps.B64Helper.encode(macDHPubKeyBytes));
+    requestData.addProperty("dhSeaPubKey", cProps.b64Helper.encode(seaDHPubKeyBytes));
+    requestData.addProperty("dhMacPubKey", cProps.b64Helper.encode(macDHPubKeyBytes));
     requestData.addProperty("seaSpec", cProps.getSeaSpec());
     requestData.addProperty("macSpec", cProps.getMacSpec());
 
     // Get byte array of all properties and sign them
-    byte[] paramsSignatureBytes = cProps.AEAHelper.sign(cProps.getPrivateKey(),
+    byte[] paramsSignatureBytes = cProps.aeaHelper.sign(cProps.getPrivateKey(),
         seaDHPubKeyBytes,
         macDHPubKeyBytes,
         cProps.getSeaSpec().getBytes(),
@@ -180,7 +178,7 @@ public class Client {
     );
 
     // Add encoded signature to request and send request with JSON data
-    requestData.addProperty("secDataSignature", cProps.B64Helper.encode(paramsSignatureBytes));
+    requestData.addProperty("secDataSignature", cProps.b64Helper.encode(paramsSignatureBytes));
     cProps.sendRequest(requestData);
 
     JsonObject obj = cProps.receiveRequest();
@@ -275,7 +273,7 @@ public class Client {
    // }
 
     //load shared key
-    cProps.KSHelper.getKey(clientId + "-" + destinationId + "-shared");
+    cProps.ksHelper.getKey(clientId + "-" + destinationId + "-shared");
 
   }
 
@@ -326,14 +324,14 @@ public class Client {
     JsonObject requestData = new JsonObject();
     //vai explodir no server devido a nao ter o decode b64
     requestData.addProperty("type", "params");
-    requestData.addProperty("nonce", cProps.RNDHelper.getString(16, true));
+    requestData.addProperty("nonce", cProps.rndHelper.getString(16, true));
     cProps.sendRequest(requestData);
 
     //parses answer from server
     JsonObject obj = cProps.receiveRequest();
     ParametersResponse response = cProps.GSON.fromJson(obj.toString(), ParametersResponse.class);
 
-    cProps.AEAHelper.verifySignature(cProps.getServerPublicKey(), response.getParameters().getBytes(), response.getSignature().getBytes());
+    cProps.aeaHelper.verifySignature(cProps.getServerPublicKey(), response.getParameters().getBytes(), response.getSignature().getBytes());
     //gets the json
     return cProps.GSON.fromJson(response.getParameters(), JsonObject.class);
   }
@@ -341,7 +339,7 @@ public class Client {
   private static void getUsers(KeyStore keyStore, int sourceId, int destinationId, SSLSocket socket, ClientProperties cProps) throws IOException, InvalidFormatException, GeneralSecurityException, PropertyException {
     JsonObject requestData = new JsonObject();
     requestData.addProperty("type", "dhvaluereq");
-    requestData.addProperty("nonce", cProps.RNDHelper.getString(16, true));
+    requestData.addProperty("nonce", cProps.rndHelper.getString(16, true));
     requestData.addProperty("destiny_uuid", destinationId);
 
     socket.getOutputStream().write(cProps.GSON.toJson(requestData).getBytes());
@@ -351,7 +349,7 @@ public class Client {
     X509Certificate certificate = (X509Certificate) socket.getSession().getPeerCertificates()[0];
     //validar assinatura
     PublicKey publicKeyserv = certificate.getPublicKey();
-    cProps.AEAHelper.verifySignature(publicKeyserv, req.getDhdentinyvalue().getBytes(), req.getSecdata().getBytes());
+    cProps.aeaHelper.verifySignature(publicKeyserv, req.getDhdentinyvalue().getBytes(), req.getSecdata().getBytes());
 
     KeyFactory keyFactory = KeyFactory.getInstance("DiffieHellman");
     PublicKey publicKey = keyFactory.generatePublic(new X509EncodedKeySpec(req.getDhdentinyvalue().getBytes()));
@@ -375,7 +373,7 @@ public class Client {
 
   }
 
-  private static void handleException(Exception e, boolean debugMode) {
+  private static void handleException(Exception e) {
     boolean expected = false;
 
     if (e instanceof PropertyException)
@@ -387,7 +385,7 @@ public class Client {
       System.err.println("CRITICAL ERROR.");
     }
 
-    if (debugMode)
+    if (DEBUG_MODE)
       e.printStackTrace();
   }
 
@@ -407,13 +405,13 @@ public class Client {
     return new KSHelper(trustStoreLoc, trustStoreType, trustStorePass.toCharArray(), true);
   }
 
-  private static SSLContext buildSSLContext(KSHelper keyStore, KSHelper trustStore) throws GeneralSecurityException {
-    KeyManagerFactory keyManagerFactory = keyStore.getKeyManagerFactory();
-    TrustManagerFactory trustManagerFactory = trustStore.getTrustManagerFactory();
+  private static SSLContext buildSSLContext(KSHelper ksHelper, KSHelper tsHelper) throws GeneralSecurityException {
+    KeyManagerFactory keyManagerFactory = ksHelper.getKeyManagerFactory();
+    TrustManagerFactory trustManagerFactory = tsHelper.getTrustManagerFactory();
     KeyManager[] keyManagers = keyManagerFactory.getKeyManagers();
     TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
 
-    SSLContext sslContext = SSLContext.getInstance("TLS", "BC");
+    SSLContext sslContext = SSLContext.getInstance("TLS");
     sslContext.init(keyManagers, trustManagers, new SecureRandom());
 
     return sslContext;

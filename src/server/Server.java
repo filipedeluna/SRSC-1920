@@ -1,6 +1,5 @@
 package server;
 
-import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 import server.db.ServerDatabaseDriver;
 import server.props.ServerProperty;
 import shared.errors.properties.InvalidValueException;
@@ -14,7 +13,6 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
-import java.security.Security;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.logging.FileHandler;
@@ -27,7 +25,6 @@ final class Server {
   @SuppressWarnings("InfiniteLoopStatement")
   public static void main(String[] args) {
     System.setProperty("java.net.preferIPv4Stack", "true");
-    Security.addProvider(new BouncyCastleJsseProvider());
 
     CustomProperties properties = null;
     Logger logger = null;
@@ -48,6 +45,8 @@ final class Server {
     } catch (IOException e) {
       System.err.println("Failed to initiate logger: " + e.getMessage());
     }
+
+    System.setProperty("javax.net.debug", debugMode ? "true" : "false");
 
     // Start main thread
     try {
@@ -133,28 +132,6 @@ final class Server {
     return totalThreads > threadCount && threadCount > 0;
   }
 
-  private static KeyManagerFactory getKeyManagerFactory(CustomProperties properties, KeyStore keyStore, String providerTLS) throws PropertyException, GeneralSecurityException {
-    String keyStorePass = properties.getString(ServerProperty.KEYSTORE_PASS);
-
-    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509", providerTLS);
-    keyManagerFactory.init(keyStore, keyStorePass.toCharArray());
-
-    return keyManagerFactory;
-  }
-
-  private static TrustManagerFactory getTrustManagerFactory(CustomProperties properties, String providerTLS) throws PropertyException, GeneralSecurityException, IOException {
-    String trustStoreLoc = properties.getString(ServerProperty.TRUSTSTORE_LOC);
-    String trustStorePass = properties.getString(ServerProperty.TRUSTSTORE_PASS);
-    String trustStoreType = properties.getString(ServerProperty.TRUSTSTORE_TYPE);
-
-    KeyStore trustStore = CryptUtil.loadKeystore(trustStoreLoc, trustStoreType, trustStorePass.toCharArray());
-
-    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("X509", providerTLS);
-    trustManagerFactory.init(trustStore);
-
-    return trustManagerFactory;
-  }
-
   private static KSHelper getKeyStore(CustomProperties properties) throws PropertyException, GeneralSecurityException, IOException {
     String keyStoreLoc = properties.getString(ServerProperty.KEYSTORE_LOC);
     String keyStoreType = properties.getString(ServerProperty.KEYSTORE_TYPE);
@@ -177,7 +154,7 @@ final class Server {
     KeyManager[] keyManagers = keyManagerFactory.getKeyManagers();
     TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
 
-    SSLContext sslContext = SSLContext.getInstance("TLS", "BCJSSE");
+    SSLContext sslContext = SSLContext.getInstance("TLS");
     sslContext.init(keyManagers, trustManagers, new SecureRandom());
 
     return sslContext;

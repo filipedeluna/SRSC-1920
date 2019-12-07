@@ -5,6 +5,7 @@ import shared.utils.properties.ICustomProperty;
 
 public enum ClientProperty implements ICustomProperty {
   // Add properties here
+
   PUB_KEY_NAME("pub_key_name", CustomPropertyType.STRING),
   SEA_SPEC("sea_spec", CustomPropertyType.STRING),
   MAC_SPEC("mac_spec", CustomPropertyType.STRING),
@@ -16,12 +17,13 @@ public enum ClientProperty implements ICustomProperty {
   // Network
   PKI_ADDRESS("pki_address", CustomPropertyType.BOOL),
   PKI_PORT("pki_port", CustomPropertyType.INT),
-  SERVER_ADDRESS("server_address", CustomPropertyType.BOOL),
+  SERVER_ADDRESS("server_address", CustomPropertyType.STRING),
   SERVER_PORT("server_port", CustomPropertyType.INT),
   TLS_PROTOCOLS("tls_protocols", CustomPropertyType.STRING_ARRAY),
   TLS_CIPHERSUITES("tls_ciphersuites", CustomPropertyType.STRING_ARRAY),
 
   // Crypt
+  UUID_HASH("uuid_hash", CustomPropertyType.STRING),
   KEYSTORE_LOC("keystore_location", CustomPropertyType.STRING),
   KEYSTORE_TYPE("keystore_type", CustomPropertyType.STRING),
   KEYSTORE_PASS("keystore_pass", CustomPropertyType.STRING),

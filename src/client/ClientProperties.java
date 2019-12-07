@@ -19,39 +19,45 @@ import javax.net.ssl.SSLSocket;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.security.GeneralSecurityException;
+import java.security.KeyStoreException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.X509Certificate;
 
 final class ClientProperties {
-  final B64Helper B64Helper;
-  final RNDHelper RNDHelper;
+  final B64Helper b64Helper;
+  final RNDHelper rndHelper;
   final Gson GSON;
-  final ClientCacheController CACHE;
+  final ClientCacheController cache;
 
   final String KEYSTORE_LOC;
 
-  AEAHelper AEAHelper;
+  AEAHelper aeaHelper;
   PublicKey PUB_KEY;
-  ClientDHHelper DHHelper;
-  KSHelper KSHelper;
-  KSHelper TSHelper;
+  ClientDHHelper dhHelper;
+  KSHelper ksHelper;
+  KSHelper tshelper;
 
   // Comms
-  private JsonReader input;
-  private OutputStream output;
+  private final JsonReader input;
+  private final OutputStream output;
 
-  private CustomProperties props;
-
-  private String pubKeyName;
+  private final CustomProperties props;
+  private final HashHelper hashHelper;
   private final String seaSpec;
   private final String macSpec;
   private final PublicKey serverPubKey;
+  private final PublicKey clientPublicKey;
 
-  ClientProperties(CustomProperties props, KSHelper KSHelper, KSHelper TSHelper, SSLSocket socket) throws PropertyException, GeneralSecurityException, IOException {
+  private String pubKeyName;
+
+  ClientProperties(CustomProperties props, KSHelper ksHelper, KSHelper tsHelper, SSLSocket socket) throws PropertyException, GeneralSecurityException, IOException {
     this.props = props;
-    this.KSHelper = KSHelper;
-    this.TSHelper = TSHelper;
+    this.ksHelper = ksHelper;
+    this.tshelper = tsHelper;
+
+    // Create hash helper for generating uuids
+    hashHelper = new HashHelper(props.getString(ClientProperty.UUID_HASH));
 
     // Set socket input and output and get server public key
     input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), props.getInt(ClientProperty.BUFFER_SIZE_MB)));
@@ -59,17 +65,18 @@ final class ClientProperties {
     X509Certificate certificate = (X509Certificate) socket.getSession().getPeerCertificates()[0];
     serverPubKey = certificate.getPublicKey();
 
-    B64Helper = new B64Helper();
-    RNDHelper = new RNDHelper();
+    b64Helper = new B64Helper();
+    rndHelper = new RNDHelper();
     GSON = GsonUtils.buildGsonInstance();
 
     // System props
-    CACHE = new ClientCacheController(props.getInt(ClientProperty.CACHE_SIZE));
+    cache = new ClientCacheController(props.getInt(ClientProperty.CACHE_SIZE));
 
     // Crypt props
     seaSpec = props.getString(ClientProperty.SEA_SPEC);
     macSpec = props.getString(ClientProperty.MAC_SPEC);
     KEYSTORE_LOC = props.getString(ClientProperty.KEYSTORE_LOC);
+    clientPublicKey = ksHelper.getPublicKey(props.getString(ClientProperty.PUB_KEY_NAME));
   }
 
   // Initialize AEAHelper
@@ -78,11 +85,11 @@ final class ClientProperties {
     String certSignAlg = serverParams.getParameterValue(ServerParameterType.CERT_SIG_ALG);
     int pubKeySize = Integer.parseInt(serverParams.getParameterValue(ServerParameterType.CERT_SIG_ALG));
 
-    AEAHelper = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize);
+    aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize);
 
     // Get pub key and assign it
     pubKeyName = props.getString(ClientProperty.PUB_KEY_NAME);
-    PUB_KEY = KSHelper.getCertificate(pubKeyName).getPublicKey();
+    PUB_KEY = ksHelper.getCertificate(pubKeyName).getPublicKey();
   }
 
   // Initialize DHHelper
@@ -93,11 +100,11 @@ final class ClientProperties {
     int dhKeySize = Integer.parseInt(serverParams.getParameterValue(ServerParameterType.DH_KEYSIZE));
     String dhHashAlg = serverParams.getParameterValue(ServerParameterType.DH_HASH_ALG);
 
-    DHHelper = new ClientDHHelper(dhAlg, dhHashAlg, dhKeySize, dhP, dhG);
+    dhHelper = new ClientDHHelper(dhAlg, dhHashAlg, dhKeySize, dhP, dhG);
   }
 
   PrivateKey getPrivateKey() throws GeneralSecurityException {
-    return (PrivateKey) KSHelper.getKey(pubKeyName);
+    return (PrivateKey) ksHelper.getKey(pubKeyName);
   }
 
   public PublicKey getServerPublicKey() {
@@ -114,6 +121,12 @@ final class ClientProperties {
 
   public String getMacSpec() {
     return macSpec;
+  }
+
+  public String generateUUID(String username) throws IOException {
+    byte[] hash = hashHelper.hash(username.getBytes(), clientPublicKey.getEncoded());
+
+    return b64Helper.encode(hash);
   }
 
   public void sendRequest(JsonObject jsonObject) throws IOException {

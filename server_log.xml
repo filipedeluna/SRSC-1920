@@ -1,115 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE log SYSTEM "logger.dtd">
-<!--suppress SyntaxError, SyntaxError -->
 <log>
 <record>
-  <date>2019-12-05T18:07:40</date>
-  <millis>1575569260859</millis>
-  <sequence>2</sequence>
-  <logger>Server Logger</logger>
-  <level>SEVERE</level>
-  <class>server.Server</class>
-  <method>handleException</method>
-  <thread>1</thread>
-  <message>Database critical error: CODE 1 - [SQLITE_ERROR] SQL error or missing database (near ")": syntax error)</message>
-</record>
-</log>
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE log SYSTEM "logger.dtd">
-<log>
-<record>
-  <date>2019-12-05T18:08:14</date>
-  <millis>1575569294609</millis>
-  <sequence>2</sequence>
-  <logger>Server Logger</logger>
-  <level>SEVERE</level>
-  <class>server.Server</class>
-  <method>handleException</method>
-  <thread>1</thread>
-  <message>Database critical error: CODE 1 - [SQLITE_ERROR] SQL error or missing database (near ")": syntax error)</message>
-</record>
-</log>
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE log SYSTEM "logger.dtd">
-<log>
-<record>
-  <date>2019-12-05T18:09:07</date>
-  <millis>1575569347029</millis>
-  <sequence>2</sequence>
-  <logger>Server Logger</logger>
-  <level>SEVERE</level>
-  <class>server.Server</class>
-  <method>handleException</method>
-  <thread>1</thread>
-  <message>Database critical error: CODE 1 - [SQLITE_ERROR] SQL error or missing database (near ")": syntax error)</message>
-</record>
-</log>
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE log SYSTEM "logger.dtd">
-<log>
-<record>
-  <date>2019-12-05T18:09:36</date>
-  <millis>1575569376640</millis>
-  <sequence>2</sequence>
-  <logger>Server Logger</logger>
-  <level>SEVERE</level>
-  <class>server.Server</class>
-  <method>handleException</method>
-  <thread>1</thread>
-  <message>no such algorithm: ECDH for provider BC</message>
-</record>
-</log>
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE log SYSTEM "logger.dtd">
-<log>
-<record>
-  <date>2019-12-05T18:09:39</date>
-  <millis>1575569379727</millis>
-  <sequence>2</sequence>
-  <logger>Server Logger</logger>
-  <level>SEVERE</level>
-  <class>server.Server</class>
-  <method>handleException</method>
-  <thread>1</thread>
-  <message>no such algorithm: ECDH for provider BC</message>
-</record>
-</log>
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE log SYSTEM "logger.dtd">
-<log>
-</log>
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE log SYSTEM "logger.dtd">
-<log>
-<record>
-  <date>2019-12-05T23:00:49</date>
-  <millis>1575586849044</millis>
-  <sequence>2</sequence>
-  <logger>Server Logger</logger>
-  <level>INFO</level>
-  <class>server.Server</class>
-  <method>main</method>
-  <thread>1</thread>
-  <message>Started server on port: 9002</message>
-</record>
-<record>
-  <date>2019-12-05T23:00:49</date>
-  <millis>1575586849103</millis>
-  <sequence>3</sequence>
-  <logger>Server Logger</logger>
-  <level>SEVERE</level>
-  <class>server.Server</class>
-  <method>handleException</method>
-  <thread>1</thread>
-  <message>BC SecureRandom not available</message>
-</record>
-</log>
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE log SYSTEM "logger.dtd">
-<log>
-<record>
-  <date>2019-12-05T23:01:48</date>
-  <millis>1575586908554</millis>
+  <date>2019-12-07T22:16:55</date>
+  <millis>1575757015136</millis>
   <sequence>2</sequence>
   <logger>Server Logger</logger>
   <level>INFO</level>
@@ -119,3 +13,443 @@
   <message>Started server on port: 9002</message>
 </record>
 </log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T22:19:43</date>
+  <millis>1575757183495</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T22:23:15</date>
+  <millis>1575757395715</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T22:25:37</date>
+  <millis>1575757537274</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+<record>
+  <date>2019-12-07T22:30:40</date>
+  <millis>1575757840060</millis>
+  <sequence>4</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>22</thread>
+  <message>No peer identity established</message>
+</record>
+<record>
+  <date>2019-12-07T22:30:40</date>
+  <millis>1575757840065</millis>
+  <sequence>5</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>22</thread>
+  <message>No peer identity established</message>
+</record>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T22:39:51</date>
+  <millis>1575758391784</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T22:41:39</date>
+  <millis>1575758499382</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T22:47:30</date>
+  <millis>1575758850285</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+<record>
+  <date>2019-12-07T22:50:16</date>
+  <millis>1575759016903</millis>
+  <sequence>5</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>22</thread>
+  <message>No peer identity established</message>
+</record>
+<record>
+  <date>2019-12-07T22:50:16</date>
+  <millis>1575759016903</millis>
+  <sequence>6</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>24</thread>
+  <message>No peer identity established</message>
+</record>
+<record>
+  <date>2019-12-07T22:50:16</date>
+  <millis>1575759016910</millis>
+  <sequence>7</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>22</thread>
+  <message>No peer identity established</message>
+</record>
+<record>
+  <date>2019-12-07T22:50:16</date>
+  <millis>1575759016910</millis>
+  <sequence>8</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>24</thread>
+  <message>No peer identity established</message>
+</record>
+<record>
+  <date>2019-12-07T22:50:16</date>
+  <millis>1575759016928</millis>
+  <sequence>10</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>22</thread>
+  <message>No peer identity established</message>
+</record>
+<record>
+  <date>2019-12-07T22:50:16</date>
+  <millis>1575759016928</millis>
+  <sequence>11</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.ServerResources</class>
+  <method>handleException</method>
+  <thread>22</thread>
+  <message>No peer identity established</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T22:54:32</date>
+  <millis>1575759272834</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T22:57:30</date>
+  <millis>1575759450144</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T22:59:33</date>
+  <millis>1575759573677</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T23:00:29</date>
+  <millis>1575759629420</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T23:02:36</date>
+  <millis>1575759756928</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T23:06:23</date>
+  <millis>1575759983697</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T23:06:30</date>
+  <millis>1575759990580</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T23:06:56</date>
+  <millis>1575760016303</millis>
+  <sequence>2</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T23:12:08</date>
+  <millis>1575760328290</millis>
+  <sequence>0</sequence>
+  <logger>Server Logger</logger>
+  <level>SEVERE</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>Unsupported ciphersuite TLS_ECDHE_RSA_WITH_ARIA_256_GCM_SHA384</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T23:12:24</date>
+  <millis>1575760344897</millis>
+  <sequence>0</sequence>
+  <logger>Server Logger</logger>
+  <level>WARNING</level>
+  <class>server.Server</class>
+  <method>handleException</method>
+  <thread>1</thread>
+  <message>Property Exception: Property tls_protocols not set in file.</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T23:12:32</date>
+  <millis>1575760352661</millis>
+  <sequence>0</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T23:18:04</date>
+  <millis>1575760684434</millis>
+  <sequence>0</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T23:20:48</date>
+  <millis>1575760848994</millis>
+  <sequence>0</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T23:23:05</date>
+  <millis>1575760985511</millis>
+  <sequence>0</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T23:23:37</date>
+  <millis>1575761017370</millis>
+  <sequence>0</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>
+</log>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE log SYSTEM "logger.dtd">
+<log>
+<record>
+  <date>2019-12-07T23:23:45</date>
+  <millis>1575761025580</millis>
+  <sequence>0</sequence>
+  <logger>Server Logger</logger>
+  <level>INFO</level>
+  <class>server.Server</class>
+  <method>main</method>
+  <thread>1</thread>
+  <message>Started server on port: 9002</message>
+</record>

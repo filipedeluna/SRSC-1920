@@ -1,6 +1,5 @@
 package pki;
 
-import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 import pki.db.PKIDatabaseDriver;
 import pki.props.PKIProperty;
 import shared.errors.properties.InvalidValueException;
@@ -9,10 +8,7 @@ import shared.utils.crypto.KSHelper;
 import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.*;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.security.KeyStore;
-import java.security.Security;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.logging.FileHandler;
@@ -24,7 +20,6 @@ final class PKIServer {
 
   @SuppressWarnings("InfiniteLoopStatement")
   public static void main(String[] args) {
-    Security.addProvider(new BouncyCastleJsseProvider());
     System.setProperty("java.net.preferIPv4Stack", "true");
 
     CustomProperties props = null;

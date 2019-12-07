@@ -81,7 +81,6 @@ final class ServerProperties {
     PKI_ENABLED = properties.getBool(ServerProperty.USE_PKI);
     if (PKI_ENABLED)
       PKI_COMMS_MGR = new PKICommsManager(properties, sslContext, aeaHelper, logger);
-
   }
 
   private PrivateKey privateKey() throws GeneralSecurityException {
