@@ -5,7 +5,7 @@ import com.google.gson.stream.JsonReader;
 import server.db.wrapper.Message;
 import server.db.wrapper.Receipt;
 import server.response.*;
-import server.db.ServerParameterMap;
+import shared.parameters.ServerParameterMap;
 import server.db.wrapper.User;
 import shared.Pair;
 import shared.ServerRequest;
@@ -21,16 +21,11 @@ import shared.utils.SafeInputStreamReader;
 import javax.net.ssl.SSLSocket;
 import java.security.cert.X509Certificate;
 import java.security.*;
-import java.security.cert.X509Certificate;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 final class ServerResources implements Runnable {
   private final SSLSocket client;
@@ -290,7 +285,6 @@ final class ServerResources implements Runnable {
     }
   }
 
-
   private synchronized void insertReceipt(JsonObject requestData) throws RequestException, CriticalDatabaseException {
     // Get read message id
     int messageId = GsonUtils.getInt(requestData, "messageId");
@@ -328,7 +322,6 @@ final class ServerResources implements Runnable {
       throw new CustomRequestException("Message id not found", HTTPStatus.NOT_FOUND);
     }
   }
-
 
   // Get all server params
   private void params(String nonce) throws CriticalDatabaseException, IOException {
@@ -370,8 +363,6 @@ final class ServerResources implements Runnable {
       props.LOGGER.log(Level.SEVERE, exception.getMessage());
     }
 
-    String responseJson = response.json(props.GSON);
-
     try {
       send(response);
     } catch (IOException e) {
@@ -388,9 +379,5 @@ final class ServerResources implements Runnable {
     output.write(response.json(props.GSON).getBytes(StandardCharsets.UTF_8));
   }
 
-  private String getCurrentDate() {
-    DateFormat df = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 
-    return df.format(new Date());
-  }
 }

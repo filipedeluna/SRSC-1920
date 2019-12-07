@@ -87,7 +87,6 @@ public final class GsonUtils {
     }
   }
 
-
   private static JsonElement getElement(JsonObject obj, String val) throws RequestException {
     JsonElement elem = obj.get(val);
 

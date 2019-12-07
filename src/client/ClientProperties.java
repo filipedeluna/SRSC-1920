@@ -1,84 +1,93 @@
 package client;
 
+import client.cache.ClientCacheController;
+import client.crypt.ClientDHHelper;
 import client.props.ClientProperty;
 import com.google.gson.Gson;
-import server.db.ServerDatabaseDriver;
-import server.db.ServerParameterMap;
-import server.db.ServerParameterType;
-import server.errors.parameters.ParameterException;
-import server.props.ServerProperty;
-import shared.errors.db.CriticalDatabaseException;
-import shared.errors.db.DatabaseException;
 import shared.errors.properties.PropertyException;
+import shared.parameters.ServerParameterMap;
+import shared.parameters.ServerParameterType;
 import shared.utils.GsonUtils;
 import shared.utils.crypto.*;
 import shared.utils.properties.CustomProperties;
 
-import javax.crypto.spec.DHParameterSpec;
-import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
 final class ClientProperties {
+  final String PROVIDER;
 
-  DHHelper DH;
-  HashHelper HASH;
-  AEAHelper AEA;
-  B64Helper B64;
-  Gson GSON;
+  final B64Helper B64Helper;
+  final RNDHelper RNDHelper;
+  final Gson GSON;
+  final ClientCacheController CACHE;
+
+  final KeyStore KEYSTORE;
+  final KeyStore TRUSTSTORE;
+  final String KEYSTORE_LOC;
+
+  final String SEASPEC;
+
+  AEAHelper AEAHelper;
   PublicKey PUB_KEY;
-  private KeyStore keyStore;
-  private KeyStore tstore;
+  ClientDHHelper DHHelper;
+
   private CustomProperties props;
-  private String pubKeyName;
-  private String ksPassword;
-  private String tsPassword;
+
   private int bufferSizeInMB;
-  RNDHelper rndHelper;
+  private String pubKeyName;
 
-  ClientProperties(CustomProperties properties, KeyStore keyStore, KeyStore tstore) throws PropertyException, GeneralSecurityException, IOException, DatabaseException, CriticalDatabaseException, ParameterException {
-    this.props = properties;
-    this.keyStore = keyStore;
-    this.tstore = tstore;
-    RNDHelper rndHelper = new RNDHelper();
+  ClientProperties(CustomProperties props, KeyStore keyStore, KeyStore trustStore) throws PropertyException, GeneralSecurityException {
+    this.props = props;
+    KEYSTORE = keyStore;
+    TRUSTSTORE = trustStore;
 
-    bufferSizeInMB = properties.getInt(ClientProperty.BUFFER_SIZE_MB);
-
-
-    B64 = new B64Helper();
+    B64Helper = new B64Helper();
+    RNDHelper = new RNDHelper();
     GSON = GsonUtils.buildGsonInstance();
 
-    // Get and set password for keystore
-    ksPassword = props.getString(ClientProperty.KEYSTORE_PASS);
+    // System props
+    CACHE= new ClientCacheController(props.getInt(ClientProperty.CACHE_SIZE));
+    bufferSizeInMB = props.getInt(ClientProperty.BUFFER_SIZE_MB);
 
-    // Initialize hash helper
+    // Crypt props
+    PROVIDER = props.getString(ClientProperty.PROVIDER);
+    SEASPEC = props.getString(ClientProperty.SEASPEC);
+    KEYSTORE_LOC = props.getString(ClientProperty.KEYSTORE_LOC);
+  }
 
-    // Initialize AEA params
-    String pubKeyAlg = properties.getString(ClientProperty.PUB_KEY_ALG);
-    String certSignAlg = properties.getString(ClientProperty.CERT_SIGN_ALG);
-    int pubKeySize = properties.getInt(ClientProperty.PUB_KEY_SIZE);
-    String certformat= properties.getString(ClientProperty.CERT_FORMAT);
-    String provider = properties.getString(ClientProperty.PROVIDER);
-    AEA = new AEAHelper(pubKeyAlg, certSignAlg,certformat, pubKeySize, provider);
+  // Initialize AEAHelper
+  void initAEAHelper(ServerParameterMap serverParams) throws GeneralSecurityException, PropertyException {
+    String pubKeyAlg = serverParams.getParameter(ServerParameterType.PUB_KEY_ALG);
+    String certSignAlg = serverParams.getParameter(ServerParameterType.CERT_SIG_ALG);
+    int pubKeySize = Integer.parseInt(serverParams.getParameter(ServerParameterType.CERT_SIG_ALG));
+
+    AEAHelper = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize, PROVIDER);
 
     // Get pub key and assign it
-    pubKeyName = properties.getString(ClientProperty.PUB_KEY_NAME);
-    PUB_KEY = AEA.getCertFromKeystore(pubKeyName, this.keyStore).getPublicKey();
-
-    // Initialize DH params and helper
-
-    // check if supposed to reset server params and reset them if so
-
+    pubKeyName = props.getString(ClientProperty.PUB_KEY_NAME);
+    PUB_KEY = AEAHelper.getCertFromKeystore(pubKeyName, KEYSTORE).getPublicKey();
   }
 
-  PrivateKey privateKey() throws GeneralSecurityException {
-    return (PrivateKey) keyStore.getKey(pubKeyName, ksPassword.toCharArray());
+  // Initialize DHHelper
+  void initDHHelper(ServerParameterMap serverParams) throws GeneralSecurityException {
+    String dhAlg = serverParams.getParameter(ServerParameterType.DH_ALG);
+    String dhP = serverParams.getParameter(ServerParameterType.DH_P);
+    String dhG = serverParams.getParameter(ServerParameterType.DH_G);
+    int dhKeySize = Integer.parseInt(serverParams.getParameter(ServerParameterType.DH_KEYSIZE));
+    String dhHashAlg = serverParams.getParameter(ServerParameterType.DH_HASH_ALG);
+
+    DHHelper = new ClientDHHelper(dhAlg, dhHashAlg, dhKeySize, dhP, dhG, PROVIDER);
   }
 
-  public RNDHelper getRndHelper() {
-    return rndHelper;
+  PrivateKey privateKey() throws GeneralSecurityException, PropertyException {
+    return (PrivateKey) KEYSTORE.getKey(pubKeyName, keyStorePassword());
+  }
+
+  char[] keyStorePassword() throws PropertyException {
+    return props.getString(ClientProperty.KEYSTORE_PASS).toCharArray();
   }
 
   public int getBufferSizeInMB() {

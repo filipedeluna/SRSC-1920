@@ -6,7 +6,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.stream.JsonReader;
 import org.bouncycastle.asn1.x9.DHPublicKey;
 import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
-import server.db.ServerParameterMap;
+import shared.ServerRequest;
+import shared.parameters.ServerParameterMap;
 import server.db.wrapper.Message;
 import server.db.wrapper.Receipt;
 import server.db.wrapper.User;
@@ -29,13 +30,15 @@ import java.security.*;
 import java.security.cert.X509Certificate;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 
 public class Client {
   private static final String PROPS_PATH = "src/client/props/client.properties";
 
   public static void main(String[] args) {
-
     System.setProperty("java.net.preferIPv4Stack", "true");
     Security.addProvider(new BouncyCastleJsseProvider());
 
@@ -51,58 +54,77 @@ public class Client {
     try {
       // Gets the client keystore
       KeyStore keyStore = getKeyStore(properties);
-      KeyStore tstore = getTrustStore(properties);
+      KeyStore trustStore = getTrustStore(properties);
 
       // Create SSL Socket
-      int serverport = properties.getInt(ClientProperty.SERVER_PORT);
+      int serverPort = properties.getInt(ClientProperty.SERVER_PORT);
       SSLContext sslContext = buildSSLContext(properties, keyStore);
       SSLSocketFactory factory = sslContext.getSocketFactory();
-      SSLSocket socket = (SSLSocket) factory.createSocket("localhost", serverport);
+      SSLSocket socket = (SSLSocket) factory.createSocket("localhost", serverPort);
+
       // Set enabled protocols and cipher suites
       String[] enabledProtocols = properties.getStringArr(ClientProperty.TLS_PROTOCOLS);
       String[] enabledCipherSuites = properties.getStringArr(ClientProperty.TLS_CIPHERSUITES);
       socket.setEnabledProtocols(enabledProtocols);
       socket.setEnabledCipherSuites(enabledCipherSuites);
-      ClientProperties cp = new ClientProperties(properties, keyStore, tstore);
 
+      // Create client properties
+      ClientProperties cProps = new ClientProperties(properties, keyStore, trustStore);
 
+      // Start SSL socket handshake with server and request shared parameters
       socket.startHandshake();
+      JsonObject serverParamsJSON = requestParams(socket, cProps);
 
+      // Create DH and AEA helper from params
+      ServerParameterMap serverParams = cProps.GSON.fromJson(serverParamsJSON.toString(), ServerParameterMap.class);
+      cProps.initAEAHelper(serverParams);
+      cProps.initDHHelper(serverParams);
 
-      JsonObject jsonObject = requestParam(socket, cp);
+      ServerRequest request = ServerRequest.fromString(args[0]);
 
-      ServerParameterMap spm = cp.GSON.fromJson(jsonObject.toString(), ServerParameterMap.class);
-      ClientDHHelper cdhhelper = new ClientDHHelper(spm);
-
-      //checks user command
-      String command = args[0];
-      switch (command.toLowerCase()) {
-        case "create":
-          createUser(cdhhelper, socket, cp, properties, keyStore);
-        case "list":
-          list(cdhhelper, socket, cp, properties, keyStore);
-          break;
-        case "new":
-          listNew(cdhhelper, socket, cp, properties, keyStore);
-          break;
-        case "all":
-          listall(cdhhelper, socket, cp, properties, keyStore);
-          break;
-        case "send":
-          //missing message encryption
-          send(cdhhelper, socket, cp, properties, keyStore);
-        case "recv":
-          //missing message decryption
-          //contem o receipt, receipt enviado dps de ler
-          receive(cdhhelper, socket, cp, properties, keyStore);
-          break;
-        case "status":
-          status(cdhhelper, socket, cp, properties, keyStore);
-          break;
+      if (request == null) {
+        System.err.print("Invalid option.");
+        System.exit(-1);
       }
 
+      // Initialize response object with request type
+      JsonObject requestData = new JsonObject();
+      requestData.addProperty("type", request.val());
 
-      System.out.print("Connected to server " + serverport + "\n");
+      // Get nonce if supposed to for the requested route
+      if (request.needsNonce())
+        requestData.addProperty("nonce", cProps.RNDHelper.getString(16, true));
+
+      switch (request) {
+        case CREATE:
+          createUser(socket, cProps, requestData);
+        case LIST:
+          listUsers(socket, cProps, requestData);
+          break;
+        case NEW:
+          listNewMessages(socket, cProps, requestData);
+          break;
+        case ALL:
+          listAllMessages(socket, cProps, requestData);
+          break;
+        case SEND:
+          //missing message encryption
+          sendMessages(socket, cProps, requestData);
+        case RECEIVE:
+          //missing message decryption
+          //contem o receipt, receipt enviado dps de ler
+          receiveMessages(socket, cProps, requestData);
+          break;
+        case STATUS:
+          status(socket, cProps, requestData);
+          break;
+        case RECEIPT:
+        default:
+          // TODO Invalid command
+          // TODO print available commands here
+          // TODO Also create args[0] with help command at start
+          System.err.println("Invalid route");
+      }
     } catch (GeneralSecurityException e) {
       //not the same signature
     } catch (Exception e) {
@@ -110,20 +132,15 @@ public class Client {
     } finally {
       System.exit(-1);
     }
-
   }
 
-  private static void receive(ClientDHHelper cdhhelper, SSLSocket socket, ClientProperties cp, CustomProperties properties, KeyStore keyStore) throws IOException, InvalidFormatException {
-    JsonObject requestData = new JsonObject();
-    requestData.addProperty("type", "recv");
-    requestData.addProperty("nonce", cp.rndHelper.getString(16, true));
-
+  private static void receiveMessages(SSLSocket socket, ClientProperties cProps, JsonObject requestData) throws IOException, InvalidFormatException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
     int messageid = Integer.parseInt(bf.readLine());
     requestData.addProperty("userId", messageid);
 
-    socket.getOutputStream().write(cp.GSON.toJson(requestData).getBytes());
-    JsonReader input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), cp.getBufferSizeInMB()));
+    socket.getOutputStream().write(cProps.GSON.toJson(requestData).getBytes());
+    JsonReader input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), cProps.getBufferSizeInMB()));
     JsonObject obj = GsonUtils.parseRequest(input);
     Gson g = new Gson();
     ReceiveMessageResponse lmr = g.fromJson(obj, ReceiveMessageResponse.class);
@@ -143,16 +160,13 @@ public class Client {
     //SEND RECEIPT WITH CONTENT SIGNATURE
   }
 
-  private static void status(ClientDHHelper cdhhelper, SSLSocket socket, ClientProperties cp, CustomProperties properties, KeyStore keyStore) throws IOException, InvalidFormatException {
-    JsonObject requestData = new JsonObject();
-    requestData.addProperty("type", "status");
-    requestData.addProperty("nonce", cp.rndHelper.getString(16, true));
+  private static void status(SSLSocket socket, ClientProperties cProps, JsonObject requestData) throws IOException, InvalidFormatException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
 
     int messageid = Integer.parseInt(bf.readLine());
     requestData.addProperty("userId", messageid);
-    socket.getOutputStream().write(cp.GSON.toJson(requestData).getBytes());
-    JsonReader input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), cp.getBufferSizeInMB()));
+    socket.getOutputStream().write(cProps.GSON.toJson(requestData).getBytes());
+    JsonReader input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), cProps.getBufferSizeInMB()));
     JsonObject obj = GsonUtils.parseRequest(input);
     Gson g = new Gson();
     MessageReceiptsResponse lmr = g.fromJson(obj, MessageReceiptsResponse.class);
@@ -164,17 +178,14 @@ public class Client {
 
   }
 
-  private static void listNew(ClientDHHelper cdhhelper, SSLSocket socket, ClientProperties cp, CustomProperties properties, KeyStore keyStore) throws IOException, InvalidFormatException {
-    JsonObject requestData = new JsonObject();
-    requestData.addProperty("type", "new");
-    requestData.addProperty("nonce", cp.rndHelper.getString(16, true));
+  private static void listNewMessages(SSLSocket socket, ClientProperties cProps, JsonObject requestData) throws IOException, InvalidFormatException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
 
     int userid = Integer.parseInt(bf.readLine());
     requestData.addProperty("userId", userid);
-    socket.getOutputStream().write(cp.GSON.toJson(requestData).getBytes());
+    socket.getOutputStream().write(cProps.GSON.toJson(requestData).getBytes());
 
-    JsonReader input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), cp.getBufferSizeInMB()));
+    JsonReader input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), cProps.getBufferSizeInMB()));
     JsonObject obj = GsonUtils.parseRequest(input);
     Gson g = new Gson();
     ListNewMessagesResponse lmr = g.fromJson(obj, ListNewMessagesResponse.class);
@@ -185,17 +196,14 @@ public class Client {
 
   }
 
-  private static void listall(ClientDHHelper cdhhelper, SSLSocket socket, ClientProperties cp, CustomProperties properties, KeyStore keyStore) throws IOException, InvalidFormatException {
-    JsonObject requestData = new JsonObject();
-    requestData.addProperty("type", "all");
-    requestData.addProperty("nonce", cp.rndHelper.getString(16, true));
+  private static void listAllMessages(SSLSocket socket, ClientProperties cProps, JsonObject requestData) throws IOException, InvalidFormatException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
 
     int userid = Integer.parseInt(bf.readLine());
     requestData.addProperty("userId", userid);
-    socket.getOutputStream().write(cp.GSON.toJson(requestData).getBytes());
+    socket.getOutputStream().write(cProps.GSON.toJson(requestData).getBytes());
 
-    JsonReader input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), cp.getBufferSizeInMB()));
+    JsonReader input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), cProps.getBufferSizeInMB()));
     JsonObject obj = GsonUtils.parseRequest(input);
     Gson g = new Gson();
     ListMessagesResponse lmr = g.fromJson(obj, ListMessagesResponse.class);
@@ -211,10 +219,7 @@ public class Client {
 
   }
 
-  private static User list(ClientDHHelper cdhhelper, SSLSocket socket, ClientProperties cp, CustomProperties properties, KeyStore keyStore) throws IOException, InvalidFormatException {
-    JsonObject requestData = new JsonObject();
-    requestData.addProperty("type", "list");
-    requestData.addProperty("nonce", cp.rndHelper.getString(16, true));
+  private static User listUsers(SSLSocket socket, ClientProperties cProps, JsonObject requestData) throws IOException, InvalidFormatException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
     int userid = 0;
     boolean u = true;
@@ -224,10 +229,10 @@ public class Client {
     } catch (IOException e) {
       u = false;
     }
-    socket.getOutputStream().write(cp.GSON.toJson(requestData).getBytes());
+    socket.getOutputStream().write(cProps.GSON.toJson(requestData).getBytes());
 
     //response
-    JsonReader input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), cp.getBufferSizeInMB()));
+    JsonReader input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), cProps.getBufferSizeInMB()));
     JsonObject obj = GsonUtils.parseRequest(input);
     Gson g = new Gson();
     ListUsersResponse lur = g.fromJson(obj, ListUsersResponse.class);
@@ -247,11 +252,9 @@ public class Client {
     return null;
   }
 
-  private static void send(ClientDHHelper cdhhelper, SSLSocket socket, ClientProperties cp, CustomProperties properties, KeyStore keyStore) throws IOException, InvalidFormatException, GeneralSecurityException, PropertyException {
+  private static void sendMessages(SSLSocket socket, ClientProperties cProps, JsonObject requestData) throws IOException, InvalidFormatException, GeneralSecurityException, PropertyException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
-    JsonObject requestData = new JsonObject();
-    requestData.addProperty("type", "send");
-    requestData.addProperty("nonce", cp.rndHelper.getString(16, true));
+
     int uuid = Integer.parseInt(bf.readLine());
     requestData.addProperty("source", uuid);
 
@@ -260,37 +263,32 @@ public class Client {
 
     String text = bf.readLine();
 
-    if (!checkanotherUserDHkey(keyStore, uuid, destinUuid, properties)) {
-      saveAnotherUserDHkey(properties, keyStore, uuid, destinUuid, socket, cp);
+    if (!checkAnotherUserDHkey(cProps, uuid, destinUuid)) {
+      saveAnotherUserDHkey(cProps.KEYSTORE, uuid, destinUuid, socket, cProps);
     }
 
     //load shared key
-    keyStore.getKey(uuid + "-" + destinUuid + "-shared", properties.getString(ClientProperty.TRUSTSTORE_PASS).toCharArray());
+    cProps.KEYSTORE.getKey(uuid + "-" + destinUuid + "-shared", cProps.keyStorePassword());
 
   }
 
-  private static void createUser(ClientDHHelper cdhhelper, SSLSocket socket, ClientProperties cp, CustomProperties properties, KeyStore keyStore) throws IOException, GeneralSecurityException, PropertyException, InvalidFormatException {
+  private static void createUser(SSLSocket socket, ClientProperties cProps, JsonObject requestData) throws IOException, GeneralSecurityException, PropertyException, InvalidFormatException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
-    JsonObject requestData = new JsonObject();
-    requestData.addProperty("type", "create");
-    requestData.addProperty("nonce", cp.rndHelper.getString(16, true));
 
     String uuid = bf.readLine();
     requestData.addProperty("uuid", uuid);
 
-    byte[] dhpublickeybytes = createmyDH(cp, uuid, cdhhelper, properties, keyStore);
+    byte[] dhpublickeybytes = createMyDH(cProps, uuid, cProps.KEYSTORE);
     requestData.addProperty("dhValue", String.valueOf(dhpublickeybytes));
-    String seaspec = properties.getString(ClientProperty.SEASPEC);
-    requestData.addProperty("seaSpec", seaspec);
+    requestData.addProperty("seaSpec", cProps.SEASPEC);
 
-
-    PrivateKey privateKey = cp.privateKey();
-    byte[] paramsJSONSigBytes = cp.AEA.sign(privateKey, dhpublickeybytes);
+    PrivateKey privateKey = cProps.privateKey();
+    byte[] paramsJSONSigBytes = cProps.AEAHelper.sign(privateKey, dhpublickeybytes);
     requestData.addProperty("secDataSignature", String.valueOf(paramsJSONSigBytes));
 
-    socket.getOutputStream().write(cp.GSON.toJson(requestData).getBytes());
+    socket.getOutputStream().write(cProps.GSON.toJson(requestData).getBytes());
 
-    JsonReader input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), cp.getBufferSizeInMB()));
+    JsonReader input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), cProps.getBufferSizeInMB()));
     JsonObject obj = GsonUtils.parseRequest(input);
     Gson g = new Gson();
     CreateUserResponse resp = g.fromJson(obj, CreateUserResponse.class);
@@ -299,17 +297,15 @@ public class Client {
 
   }
 
-  private static byte[] createmyDH(ClientProperties cp, String uuid, ClientDHHelper cdhhelper, CustomProperties properties, KeyStore keyStore) throws GeneralSecurityException, PropertyException, IOException {
-    BigInteger p = new BigInteger(cdhhelper.getDh_p());
-    BigInteger g = new BigInteger(cdhhelper.getDh_g());
-    DHParameterSpec dhspec = new DHParameterSpec(p, g);
+  private static byte[] createMyDH(ClientProperties cProps, String uuid, KeyStore keyStore) throws GeneralSecurityException, PropertyException, IOException {
+    // Generate Parameter Spec and create keypair
+    DHParameterSpec dhSpec = new DHParameterSpec(cProps.DHHelper.getP(), cProps.DHHelper.getG());
+    KeyPair kp = cProps.DHHelper.genKeyPair(dhSpec);
 
-    KeyPair kp = cp.DH.genKeyPair(dhspec);
-
-    KeyStore.SecretKeyEntry dhprivkey = new KeyStore.SecretKeyEntry((SecretKey) kp.getPrivate());
-    KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection(properties.getString(ClientProperty.KEYSTORE_PASS).toCharArray());
-    keyStore.setEntry(uuid + "-priv", dhprivkey, protectionParam);
-    keyStore.store(new FileOutputStream(new File(properties.getString(ClientProperty.KEYSTORE_LOC))), properties.getString(ClientProperty.KEYSTORE_PASS).toCharArray());
+    KeyStore.SecretKeyEntry dhPrivKey = new KeyStore.SecretKeyEntry((SecretKey) kp.getPrivate());
+    KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection(cProps.keyStorePassword());
+    keyStore.setEntry(uuid + "-priv", dhPrivKey, protectionParam);
+    keyStore.store(new FileOutputStream(new File(cProps.KEYSTORE_LOC)), cProps.keyStorePassword());
 
     BigInteger pubKeyBI = ((DHPublicKey) kp.getPublic()).getY();
     return pubKeyBI.toByteArray();
@@ -323,16 +319,15 @@ public class Client {
     return CryptUtil.loadKeystore(keyStoreLoc, keyStoreType, keyStorePass.toCharArray());
   }
 
-
-  private static JsonObject requestParam(SSLSocket sslSocket, ClientProperties clientProperties) throws IOException, InvalidFormatException, GeneralSecurityException {
+  private static JsonObject requestParams(SSLSocket sslSocket, ClientProperties cProps) throws IOException, InvalidFormatException, GeneralSecurityException {
     JsonObject requestData = new JsonObject();
     //vai explodir no server devido a nao ter o decode b64
     requestData.addProperty("type", "params");
-    requestData.addProperty("nonce", clientProperties.rndHelper.getString(16, true));
-    sslSocket.getOutputStream().write(clientProperties.GSON.toJson(requestData).getBytes());
+    requestData.addProperty("nonce", cProps.RNDHelper.getString(16, true));
+    sslSocket.getOutputStream().write(cProps.GSON.toJson(requestData).getBytes());
 
     //parses answer from server
-    JsonReader input = new JsonReader(new SafeInputStreamReader(sslSocket.getInputStream(), clientProperties.getBufferSizeInMB()));
+    JsonReader input = new JsonReader(new SafeInputStreamReader(sslSocket.getInputStream(), cProps.getBufferSizeInMB()));
     JsonObject obj = GsonUtils.parseRequest(input);
     Gson g = new Gson();
     ParametersResponse response = g.fromJson(obj.toString(), ParametersResponse.class);
@@ -340,44 +335,45 @@ public class Client {
 
     //validate signature
     PublicKey publicKey = certificate.getPublicKey();
-    clientProperties.AEA.verifySignature(publicKey, response.getParameters().getBytes(), response.getSignature().getBytes());
+    cProps.AEAHelper.verifySignature(publicKey, response.getParameters().getBytes(), response.getSignature().getBytes());
     //gets the json
-    return clientProperties.GSON.fromJson(response.getParameters(), JsonObject.class);
+    return cProps.GSON.fromJson(response.getParameters(), JsonObject.class);
   }
 
   //checks if x user has a in its ks y users dh generated key
-  private static boolean checkanotherUserDHkey(KeyStore keyStore, int uuid, int destinUuid, CustomProperties properties) throws PropertyException {
+  // TODO DH keys are stored in keystore not truststore... truststores are not safe
+  private static boolean checkAnotherUserDHkey(ClientProperties cProps, int uuid, int destinUuid) {
     try {
-      keyStore.getKey(uuid + "-" + destinUuid + "-shared", properties.getString(ClientProperty.TRUSTSTORE_PASS).toCharArray());
+      cProps.KEYSTORE.getKey(uuid + "-" + destinUuid + "-shared", cProps.keyStorePassword());
       return true;
     } catch (Exception e) {
       return false;
     }
   }
 
-  private static void saveAnotherUserDHkey(CustomProperties cp, KeyStore ks, int src, int destinUuid, SSLSocket socket, ClientProperties clientProperties) throws IOException, InvalidFormatException, GeneralSecurityException, PropertyException {
+  private static void saveAnotherUserDHkey(KeyStore keyStore, int src, int destinUuid, SSLSocket socket, ClientProperties cProps) throws IOException, InvalidFormatException, GeneralSecurityException, PropertyException {
     JsonObject requestData = new JsonObject();
     requestData.addProperty("type", "dhvaluereq");
-    requestData.addProperty("nonce", clientProperties.rndHelper.getString(16, true));
+    requestData.addProperty("nonce", cProps.RNDHelper.getString(16, true));
     requestData.addProperty("destiny_uuid", destinUuid);
 
-    socket.getOutputStream().write(clientProperties.GSON.toJson(requestData).getBytes());
+    socket.getOutputStream().write(cProps.GSON.toJson(requestData).getBytes());
 
-    JsonReader input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), clientProperties.getBufferSizeInMB()));
+    JsonReader input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), cProps.getBufferSizeInMB()));
     JsonObject obj = GsonUtils.parseRequest(input);
     Gson g = new Gson();
     RequestDestinyDHvalue req = g.fromJson(obj.toString(), RequestDestinyDHvalue.class);
     X509Certificate certificate = (X509Certificate) socket.getSession().getPeerCertificates()[0];
     //validar assinatura
     PublicKey publicKeyserv = certificate.getPublicKey();
-    clientProperties.AEA.verifySignature(publicKeyserv, req.getDhdentinyvalue().getBytes(), req.getSecdata().getBytes());
+    cProps.AEAHelper.verifySignature(publicKeyserv, req.getDhdentinyvalue().getBytes(), req.getSecdata().getBytes());
 
     KeyFactory keyFactory = KeyFactory.getInstance("DiffieHellman");
     PublicKey publicKey = keyFactory.generatePublic(new X509EncodedKeySpec(req.getDhdentinyvalue().getBytes()));
 
     //generate shared key between src - dst
     KeyAgreement keyAgree = KeyAgreement.getInstance("DiffieHellman");
-    PrivateKey pk = (PrivateKey) ks.getKey(src + "-priv", cp.getString(ClientProperty.KEYSTORE_PASS).toCharArray());
+    PrivateKey pk = (PrivateKey) keyStore.getKey(src + "-priv", cProps.keyStorePassword());
     keyAgree.init(pk);
     keyAgree.doPhase(publicKey, true);
     byte[] sharedKeyBytes = keyAgree.generateSecret();
@@ -385,13 +381,10 @@ public class Client {
     //gravar na keystore
     PrivateKey shared = keyFactory.generatePrivate(new PKCS8EncodedKeySpec(sharedKeyBytes));
     KeyStore.SecretKeyEntry sharedkeyentry = new KeyStore.SecretKeyEntry((SecretKey) shared);
-    KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection(cp.getString(ClientProperty.KEYSTORE_PASS).toCharArray());
-    ks.setEntry(src + "-" + destinUuid + "-shared", sharedkeyentry, protectionParam);
-    ks.store(new FileOutputStream(new File(cp.getString(ClientProperty.KEYSTORE_LOC))), cp.getString(ClientProperty.KEYSTORE_PASS).toCharArray());
-
-
+    KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection(cProps.keyStorePassword());
+    keyStore.setEntry(src + "-" + destinUuid + "-shared", sharedkeyentry, protectionParam);
+    keyStore.store(new FileOutputStream(new File(cProps.KEYSTORE_LOC)), cProps.keyStorePassword());
   }
-
 
   private static void handleException(Exception e, boolean debugMode) {
     boolean expected = false;
@@ -440,7 +433,6 @@ public class Client {
   }
 
   private static SSLContext buildSSLContext(CustomProperties properties, KeyStore keyStore) throws GeneralSecurityException, IOException, PropertyException {
-    // Build default context for use with custom trust manager (OCSP) Extension
     KeyManagerFactory keyManagerFactory = getKeyManagerFactory(properties, keyStore);
     TrustManagerFactory trustManagerFactory = getTrustManagerFactory(properties);
     KeyManager[] keyManagers = keyManagerFactory.getKeyManagers();
@@ -452,4 +444,12 @@ public class Client {
     return sslContext;
   }
 
+  /*
+    UTILS
+  */
+  private String getCurrentDate() {
+    DateFormat df = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+
+    return df.format(new Date());
+  }
 }

@@ -15,6 +15,7 @@ public enum ClientProperty implements ICustomProperty {
 
   // System
   OUTPUT_FOLDER("output_folder", CustomPropertyType.STRING),
+  CACHE_SIZE("cache_size", CustomPropertyType.INT),
 
   // Network
   PKI_ADDRESS("pki_address", CustomPropertyType.BOOL),

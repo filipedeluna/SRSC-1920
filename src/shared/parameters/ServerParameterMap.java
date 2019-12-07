@@ -1,4 +1,4 @@
-package server.db;
+package shared.parameters;
 
 import server.errors.parameters.DuplicateParameterException;
 import server.errors.parameters.InvalidParameterOrderException;
@@ -24,6 +24,10 @@ public final class ServerParameterMap extends LinkedHashMap<String, Pair<Integer
       throw new DuplicateParameterException(name);
 
     put(name, new Pair<>(id, value));
+  }
+
+  public String getParameter(ServerParameterType type) {
+    return get(type.dbName()).getB();
   }
 
   public byte[] getAllParametersBytes() throws IOException, ParameterException {

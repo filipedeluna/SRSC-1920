@@ -1,12 +1,7 @@
-package server.db;
+package shared.parameters;
 
 public enum ServerParameterType {
   // Add parameters here
-
-  // Providers
-  PROVIDER("provider"),
-  PROVIDER_TLS("provider_tls"),
-
 
   // AEA
   PUB_KEY_ALG("pub_key_alg"),

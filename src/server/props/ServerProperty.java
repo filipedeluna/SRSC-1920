@@ -34,7 +34,6 @@ public enum ServerProperty implements ICustomProperty {
   PUB_KEY_SIZE("pub_key_size", CustomPropertyType.INT),
   PUB_KEY_NAME("pub_key_name", CustomPropertyType.STRING),
   CERT_SIGN_ALG("cert_sign_alg", CustomPropertyType.STRING),
-  CERT_FORMAT("cert_format", CustomPropertyType.STRING),
 
   DH_KEY_ALG("dh_key_alg", CustomPropertyType.STRING),
   DH_KEY_HASH_ALG("dh_key_hash_alg", CustomPropertyType.STRING),

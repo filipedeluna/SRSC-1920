@@ -64,10 +64,9 @@ final class PKIServer {
 
       // Get TLS Provider and cert format
       String providerTLS = props.getString(PKIProperty.PROVIDER_TLS);
-      String certFormat = props.getString(PKIProperty.CERT_FORMAT);
 
       // Initiate KMF
-      KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(certFormat, providerTLS);
+      KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509", providerTLS);
       keyManagerFactory.init(keyStore, keyStorePass.toCharArray());
 
       // Create SSL Socket and initialize server

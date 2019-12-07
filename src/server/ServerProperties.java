@@ -3,8 +3,8 @@ package server;
 import com.google.gson.Gson;
 import server.crypt.PKICommsManager;
 import server.db.ServerDatabaseDriver;
-import server.db.ServerParameterMap;
-import server.db.ServerParameterType;
+import shared.parameters.ServerParameterMap;
+import shared.parameters.ServerParameterType;
 import server.errors.parameters.ParameterException;
 import server.props.ServerProperty;
 import shared.errors.db.CriticalDatabaseException;
@@ -36,9 +36,6 @@ final class ServerProperties {
   private String pubKeyName;
   private String ksPassword;
 
-  private String provider;
-  private String providerTLS;
-
   private int bufferSizeInMB;
 
   boolean PKI_ENABLED;
@@ -61,16 +58,14 @@ final class ServerProperties {
     // Get and set password for keystore
     ksPassword = properties.getString(ServerProperty.KEYSTORE_PASS);
 
-    // Get providers
-    provider = properties.getString(ServerProperty.PROVIDER);
-    providerTLS = properties.getString(ServerProperty.PROVIDER_TLS);
+    // Get provider
+    String provider = properties.getString(ServerProperty.PROVIDER);
 
     // Initialize AEA params
     String pubKeyAlg = properties.getString(ServerProperty.PUB_KEY_ALG);
     String certSignAlg = properties.getString(ServerProperty.CERT_SIGN_ALG);
     int pubKeySize = properties.getInt(ServerProperty.PUB_KEY_SIZE);
-    String certType = properties.getString(ServerProperty.CERT_FORMAT);
-    AEA = new AEAHelper(pubKeyAlg, certSignAlg, certType, pubKeySize, provider);
+    AEA = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize, provider);
 
     // Get pub key and assign it
     pubKeyName = properties.getString(ServerProperty.PUB_KEY_NAME);
@@ -103,13 +98,9 @@ final class ServerProperties {
     // Create parameter list
     ServerParameterMap params = new ServerParameterMap();
 
-    // Insert Provider params
-    params.put(ServerParameterType.PROVIDER, provider);
-    params.put(ServerParameterType.PROVIDER_TLS, providerTLS);
-
     // Insert AEA parameters
-    params.put(ServerParameterType.PUB_KEY_ALG, AEA.keyAlg());
-    params.put(ServerParameterType.CERT_SIG_ALG, AEA.certAlg());
+    params.put(ServerParameterType.PUB_KEY_ALG, AEA.getKeyAlg());
+    params.put(ServerParameterType.CERT_SIG_ALG, AEA.getCertAlg());
 
     // Generate DH Spec and insert DH parameters
     DHParameterSpec spec = dhHelper.genParams();

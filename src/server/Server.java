@@ -132,23 +132,23 @@ final class Server {
     return totalThreads > threadCount && threadCount > 0;
   }
 
-  private static KeyManagerFactory getKeyManagerFactory(CustomProperties properties, KeyStore keyStore, String certificateType, String providerTLS) throws PropertyException, GeneralSecurityException {
+  private static KeyManagerFactory getKeyManagerFactory(CustomProperties properties, KeyStore keyStore, String providerTLS) throws PropertyException, GeneralSecurityException {
     String keyStorePass = properties.getString(ServerProperty.KEYSTORE_PASS);
 
-    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(certificateType, providerTLS);
+    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509", providerTLS);
     keyManagerFactory.init(keyStore, keyStorePass.toCharArray());
 
     return keyManagerFactory;
   }
 
-  private static TrustManagerFactory getTrustManagerFactory(CustomProperties properties, String certificateType, String providerTLS) throws PropertyException, GeneralSecurityException, IOException {
+  private static TrustManagerFactory getTrustManagerFactory(CustomProperties properties, String providerTLS) throws PropertyException, GeneralSecurityException, IOException {
     String trustStoreLoc = properties.getString(ServerProperty.TRUSTSTORE_LOC);
     String trustStorePass = properties.getString(ServerProperty.TRUSTSTORE_PASS);
     String trustStoreType = properties.getString(ServerProperty.TRUSTSTORE_TYPE);
 
     KeyStore trustStore = CryptUtil.loadKeystore(trustStoreLoc, trustStoreType, trustStorePass.toCharArray());
 
-    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(certificateType, providerTLS);
+    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("X509", providerTLS);
     trustManagerFactory.init(trustStore);
 
     return trustManagerFactory;
@@ -163,10 +163,8 @@ final class Server {
   }
 
   private static SSLContext buildSSLContext(CustomProperties properties, KeyStore keyStore, String providerTLS) throws GeneralSecurityException, IOException, PropertyException {
-    String certificateType = properties.getString(ServerProperty.CERT_FORMAT);
-
-    KeyManagerFactory keyManagerFactory = getKeyManagerFactory(properties, keyStore, certificateType, providerTLS);
-    TrustManagerFactory trustManagerFactory = getTrustManagerFactory(properties, certificateType, providerTLS);
+    KeyManagerFactory keyManagerFactory = getKeyManagerFactory(properties, keyStore, providerTLS);
+    TrustManagerFactory trustManagerFactory = getTrustManagerFactory(properties, providerTLS);
     KeyManager[] keyManagers = keyManagerFactory.getKeyManagers();
     TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
 

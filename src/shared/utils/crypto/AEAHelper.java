@@ -57,13 +57,13 @@ public final class AEAHelper {
   private int keySize;
 
   // Public Keys ----------------------------------------------------------------------------------------
-  public AEAHelper(String keyAlg, String certSignAlg, String certFormat, int keySize, String provider) throws GeneralSecurityException {
+  public AEAHelper(String keyAlg, String certSignAlg, int keySize, String provider) throws GeneralSecurityException {
     random = new RNDHelper();
     cipher = Cipher.getInstance(keyAlg, provider);
     keyFactory = KeyFactory.getInstance(keyAlg, provider);
     keyPairGenerator = KeyPairGenerator.getInstance(keyAlg, provider);
 
-    certFactory = CertificateFactory.getInstance(certFormat, provider);
+    certFactory = CertificateFactory.getInstance("X509", provider);
     signature = Signature.getInstance(certSignAlg, provider);
 
     jcaCertConverter = new JcaX509CertificateConverter().setProvider(provider);
@@ -242,11 +242,11 @@ public final class AEAHelper {
     return new PKCS10CertificationRequest(csrBytes);
   }
 
-  public String keyAlg() {
+  public String getKeyAlg() {
     return keyAlg;
   }
 
-  public String certAlg() {
+  public String getCertAlg() {
     return certSignAlg;
   }
 }
