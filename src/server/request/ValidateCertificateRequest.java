@@ -3,10 +3,10 @@ package server.request;
 import shared.request.GsonRequest;
 
 public final class ValidateCertificateRequest extends GsonRequest {
-  private String serialNumber;
+  private final String certificate;
 
-  public ValidateCertificateRequest(String serialNumber) {
+  public ValidateCertificateRequest(String certificate) {
     super("validate");
-    this.serialNumber = serialNumber;
+    this.certificate = certificate;
   }
 }

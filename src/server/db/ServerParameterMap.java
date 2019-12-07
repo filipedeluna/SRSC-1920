@@ -38,10 +38,10 @@ public final class ServerParameterMap extends LinkedHashMap<String, Pair<Integer
 
       pair = entry.getValue();
 
-      if (pair.A != count++)
+      if (pair.getA() != count++)
         throw new InvalidParameterOrderException();
 
-      resultArray = CryptUtil.joinByteArrays(resultArray, pair.B.getBytes());
+      resultArray = CryptUtil.joinByteArrays(resultArray, pair.getB().getBytes());
     }
 
     return resultArray;

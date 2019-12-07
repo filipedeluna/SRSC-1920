@@ -6,8 +6,8 @@ import server.db.wrapper.Receipt;
 import java.util.ArrayList;
 
 public final class MessageReceiptsResponse extends OkResponseWithNonce {
-  private ArrayList<Receipt> receipts;
-  private Message message;
+  private final ArrayList<Receipt> receipts;
+  private final Message message;
 
   public MessageReceiptsResponse(String nonce, Message message, ArrayList<Receipt> receipts) {
     super(nonce);

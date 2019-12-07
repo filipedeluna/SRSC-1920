@@ -4,7 +4,7 @@ import shared.errors.IHTTPStatusException;
 import shared.http.HTTPStatus;
 
 public abstract class RequestException extends Exception implements IHTTPStatusException {
-  private HTTPStatus status;
+  private final HTTPStatus status;
 
   RequestException(String s, HTTPStatus status) {
     super("Request Exception: " + s + ".");

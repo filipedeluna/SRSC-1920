@@ -17,8 +17,9 @@ public enum PKIProperty implements ICustomProperty {
   TLS_CIPHERSUITES("tls_ciphersuites", CustomPropertyType.STRING_ARRAY),
   TLS_PROTOCOLS("tls_protocols", CustomPropertyType.STRING_ARRAY),
 
-
   // Crypt
+  PROVIDER("provider", CustomPropertyType.STRING),
+  PROVIDER_TLS("provider_tls", CustomPropertyType.STRING),
   KEYSTORE_LOC("keystore_location", CustomPropertyType.STRING),
   KEYSTORE_TYPE("keystore_type", CustomPropertyType.STRING),
   KEYSTORE_PASS("keystore_pass", CustomPropertyType.STRING),
@@ -29,6 +30,7 @@ public enum PKIProperty implements ICustomProperty {
   PUB_KEY_ALG("pub_key_alg", CustomPropertyType.STRING),
   PUB_KEY_SIZE("pub_key_size", CustomPropertyType.INT),
   CERT_SIGN_ALG("cert_sign_alg", CustomPropertyType.STRING),
+  CERT_FORMAT("cert_format", CustomPropertyType.STRING),
 
   HASH_ALG("hash_algorithm", CustomPropertyType.STRING),
 
@@ -37,8 +39,8 @@ public enum PKIProperty implements ICustomProperty {
   CERTIFICATE_VALIDITY("certificate_validity", CustomPropertyType.INT);
 
   /////////////////////////////////////////////////
-  private String val;
-  private CustomPropertyType type;
+  private final String val;
+  private final CustomPropertyType type;
 
   PKIProperty(String val, CustomPropertyType type) {
     this.val = val;

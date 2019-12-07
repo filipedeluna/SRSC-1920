@@ -3,9 +3,9 @@ package shared.request;
 import com.google.gson.Gson;
 
 public abstract class GsonRequest {
-  private String type;
+  private final String type;
 
-  public GsonRequest(String type) {
+  protected GsonRequest(String type) {
     this.type = type;
   }
 

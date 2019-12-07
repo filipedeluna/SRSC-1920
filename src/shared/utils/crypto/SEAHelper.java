@@ -6,22 +6,26 @@ import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.*;
+import java.util.Arrays;
 
 public final class SEAHelper {
-  private String spec;
-  private String mode;
+  private final String spec;
+  private final String mode;
   private Cipher cipher;
   private KeyGenerator keyGen;
 
-  public SEAHelper(String algorithm, String mode, String padding) throws GeneralSecurityException {
+  private final RNDHelper random;
+
+  public SEAHelper(String algorithm, String mode, String padding, String provider) throws GeneralSecurityException {
+    this.random = new RNDHelper();
     this.mode = mode;
 
     spec = algorithm + "/" + mode + "/" + padding;
-    cipher = Cipher.getInstance(spec, CryptUtil.PROVIDER);
-    keyGen = KeyGenerator.getInstance(cipher.getAlgorithm(), CryptUtil.PROVIDER);
+    cipher = Cipher.getInstance(spec, provider);
+    keyGen = KeyGenerator.getInstance(cipher.getAlgorithm(), provider);
   }
 
-  public byte[] decryptSymmetric(byte[] buff, Key key, byte[] iv) throws GeneralSecurityException {
+  public byte[] decrypt(byte[] buff, Key key, byte[] iv) throws BadPaddingException, IllegalBlockSizeException, InvalidAlgorithmParameterException, InvalidKeyException {
     IvParameterSpec ivSpec = new IvParameterSpec(iv);
 
     cipher.init(Cipher.DECRYPT_MODE, key, ivSpec);
@@ -29,13 +33,13 @@ public final class SEAHelper {
     return cipher.doFinal(buff);
   }
 
-  public byte[] decryptSymmetric(byte[] buff, Key key) throws GeneralSecurityException {
+  public byte[] decrypt(byte[] buff, Key key) throws InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
     cipher.init(Cipher.DECRYPT_MODE, key);
 
     return cipher.doFinal(buff);
   }
 
-  public byte[] encryptSymmetric(byte[] buff, Key key, byte[] iv) throws GeneralSecurityException {
+  public byte[] encrypt(byte[] buff, Key key, byte[] iv) throws BadPaddingException, IllegalBlockSizeException, InvalidAlgorithmParameterException, InvalidKeyException {
     IvParameterSpec ivSpec = new IvParameterSpec(iv);
 
     cipher.init(Cipher.ENCRYPT_MODE, key, ivSpec);
@@ -43,7 +47,7 @@ public final class SEAHelper {
     return cipher.doFinal(buff);
   }
 
-  public byte[] encryptSymmetric(byte[] buff, Key key) throws GeneralSecurityException {
+  public byte[] encrypt(byte[] buff, Key key) throws BadPaddingException, IllegalBlockSizeException, InvalidKeyException {
     cipher.init(Cipher.ENCRYPT_MODE, key);
 
     return cipher.doFinal(buff);
@@ -58,7 +62,7 @@ public final class SEAHelper {
   }
 
   public byte[] generateIV() {
-    return CryptUtil.randomBytes(cipher.getBlockSize());
+    return random.getBytes(cipher.getBlockSize(), true);
   }
 
   public SecretKey generateKey() {
@@ -67,7 +71,11 @@ public final class SEAHelper {
     return keyGen.generateKey();
   }
 
-  public String spec() {
+  public byte[] trimKeyToAlg(byte[] key) {
+    return Arrays.copyOfRange(key, 0, cipher.getBlockSize());
+  }
+
+  public String getSpec() {
     return spec;
   }
 }

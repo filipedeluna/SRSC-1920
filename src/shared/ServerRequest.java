@@ -13,7 +13,7 @@ public enum ServerRequest {
   PARAMS("params"),
   USEREQUESTDH("dhvaluereq");
 
-  private String val;
+  private final String val;
 
   ServerRequest(String val) {
     this.val = val;

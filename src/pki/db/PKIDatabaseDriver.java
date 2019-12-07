@@ -32,8 +32,9 @@ public final class PKIDatabaseDriver {
     try {
       String query =
           "CREATE TABLE IF NOT EXISTS entries (" +
-              "cert_hash       TEXT PRIMARY KEY, " +
-              "revoked         INTEGER NOT NULL DEFAULT 0, " +
+              "cert_sn         TEXT PRIMARY KEY, " +
+              "cert_hash       TEXT NOT NULL, " +
+              "revoked         INTEGER NOT NULL DEFAULT 0 " +
               ");";
 
       connection.createStatement().execute(query);
@@ -42,12 +43,13 @@ public final class PKIDatabaseDriver {
     }
   }
 
-  public void register(String certHash) throws DatabaseException, CriticalDatabaseException {
+  public void register(String certSN, String certHash) throws DatabaseException, CriticalDatabaseException {
     try {
-      String insertQuery = "INSERT INTO entries (cert_hash) VALUES (?);";
+      String insertQuery = "INSERT INTO entries (cert_sn, cert_hash) VALUES (?, ?);";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
-      ps.setString(1, certHash);
+      ps.setString(1, certSN);
+      ps.setString(2, certHash);
 
       ps.executeUpdate();
     } catch (SQLException e) {
@@ -58,29 +60,27 @@ public final class PKIDatabaseDriver {
     }
   }
 
-  public boolean isValid(String certHash) throws CriticalDatabaseException, DatabaseException {
+  public boolean isValid(String certSN, String certHash) throws CriticalDatabaseException {
     try {
-      String selectUser = "SELECT * FROM entries WHERE cert_hash = ? AND revoked = 0;";
+      String selectUser = "SELECT * FROM entries WHERE cert_sn = ? AND cert_hash = ? AND revoked = 0;";
 
       PreparedStatement ps = connection.prepareStatement(selectUser);
-      ps.setString(1, certHash);
+      ps.setString(1, certSN);
+      ps.setString(2, certHash);
 
       ResultSet rs = ps.executeQuery();
       return rs.next();
     } catch (SQLException e) {
-      if (e.getErrorCode() == ERR_NOT_FOUND)
-        throw new EntryNotFoundException();
-
       throw new CriticalDatabaseException(e);
     }
   }
 
-  public void revoke(String certHash) throws DatabaseException, CriticalDatabaseException {
+  public void revoke(String cert_sn) throws DatabaseException, CriticalDatabaseException {
     try {
-      String selectUser = "UPDATE entries SET revoked = 1 WHERE cert_hash = ?;";
+      String selectUser = "UPDATE entries SET revoked = 1 WHERE cert_sn = ?;";
 
       PreparedStatement ps = connection.prepareStatement(selectUser);
-      ps.setString(1, certHash);
+      ps.setString(1, cert_sn);
 
       int updated = ps.executeUpdate();
 
@@ -88,9 +88,6 @@ public final class PKIDatabaseDriver {
         throw new EntryNotFoundException();
 
     } catch (SQLException e) {
-      if (e.getErrorCode() == ERR_NOT_FOUND)
-        throw new EntryNotFoundException();
-
       throw new CriticalDatabaseException(e);
     }
   }

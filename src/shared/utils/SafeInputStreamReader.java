@@ -9,7 +9,7 @@ public final class SafeInputStreamReader extends InputStreamReader {
   private static final long MEGA_BYTE = 1024L * 1024L; // 1 MB
 
   private long bytesRead;
-  private long maxBufferSize;
+  private final long maxBufferSize;
 
   // This class makes it so users can't send HUGE files and DOS
   public SafeInputStreamReader(InputStream in, int maxBufferSizeInMB) {
@@ -51,5 +51,4 @@ public final class SafeInputStreamReader extends InputStreamReader {
 
     return lastRead;
   }
-
 }

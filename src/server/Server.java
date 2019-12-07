@@ -1,15 +1,11 @@
 package server;
 
-import com.google.gson.Gson;
 import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
-import server.crypt.CustomTrustManager;
 import server.db.ServerDatabaseDriver;
 import server.props.ServerProperty;
 import shared.errors.properties.InvalidValueException;
 import shared.errors.properties.PropertyException;
 import shared.utils.CryptUtil;
-import shared.utils.GsonUtils;
-import shared.utils.crypto.B4Helper;
 import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.*;
@@ -23,8 +19,6 @@ import java.util.concurrent.Executors;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static com.sun.xml.internal.ws.spi.db.BindingContextFactory.LOGGER;
 
 final class Server {
   private static final String PROPS_PATH = "src/server/props/server.properties";
@@ -59,18 +53,19 @@ final class Server {
       // Create thread pool for clients
       int threadPoolSize = properties.getInt(ServerProperty.THREAD_POOL_SIZE);
 
-      if (!validateThreadCount(threadPoolSize))
+      if (!isThreadCountValid(threadPoolSize))
         throw new InvalidValueException(ServerProperty.THREAD_POOL_SIZE.val());
 
       Executor executor = Executors.newFixedThreadPool(threadPoolSize);
 
-      // Get Keystore
+      // Get Keystore and providers
       KeyStore keyStore = getKeyStore(properties);
+      String providerTLS = properties.getString(ServerProperty.PROVIDER_TLS);
 
       // Create SSL Socket
       int port = properties.getInt(ServerProperty.PORT);
 
-      SSLContext sslContext = buildSSLContext(properties, keyStore);
+      SSLContext sslContext = buildSSLContext(properties, keyStore, providerTLS);
 
       SSLServerSocketFactory ssf = sslContext.getServerSocketFactory();
       SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port);
@@ -86,13 +81,14 @@ final class Server {
       boolean mutualAuth = properties.getBool(ServerProperty.TLS_MUTUAL_AUTH);
       serverSocket.setNeedClientAuth(mutualAuth);
 
+      logger.log(Level.INFO, "Started server on port: " + port);
       System.out.print("Started server on port " + port + "\n");
 
       // Build DB and create shared properties class
       String databaseLocation = properties.getString(ServerProperty.DATABASE_LOC);
       ServerDatabaseDriver db = new ServerDatabaseDriver(databaseLocation);
 
-      ServerProperties props = new ServerProperties(properties, keyStore, db, logger);
+      ServerProperties props = new ServerProperties(properties, keyStore, db, logger, sslContext);
 
       // Client serving loop
       SSLSocket sslClient;
@@ -122,38 +118,37 @@ final class Server {
       logger.log(Level.WARNING, e.getMessage());
     } else {
       logger.log(Level.SEVERE, e.getMessage());
-      System.err.println("CRITICAL ERROR.");
+      System.err.println("CRITICAL ERROR: " + e.getClass().getName());
     }
 
     if (debugMode)
       e.printStackTrace();
-
   }
 
-  private static boolean validateThreadCount(int threadCount) {
+  private static boolean isThreadCountValid(int threadCount) {
     int totalThreads = Runtime.getRuntime().availableProcessors();
 
     // Keep threads between 0 < threads < CPUTOTAL
     return totalThreads > threadCount && threadCount > 0;
   }
 
-  private static KeyManagerFactory getKeyManagerFactory(CustomProperties properties, KeyStore keyStore) throws PropertyException, GeneralSecurityException {
+  private static KeyManagerFactory getKeyManagerFactory(CustomProperties properties, KeyStore keyStore, String certificateType, String providerTLS) throws PropertyException, GeneralSecurityException {
     String keyStorePass = properties.getString(ServerProperty.KEYSTORE_PASS);
 
-    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509", CryptUtil.PROVIDER_TLS);
+    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(certificateType, providerTLS);
     keyManagerFactory.init(keyStore, keyStorePass.toCharArray());
 
     return keyManagerFactory;
   }
 
-  private static TrustManagerFactory getTrustManagerFactory(CustomProperties properties) throws PropertyException, GeneralSecurityException, IOException {
+  private static TrustManagerFactory getTrustManagerFactory(CustomProperties properties, String certificateType, String providerTLS) throws PropertyException, GeneralSecurityException, IOException {
     String trustStoreLoc = properties.getString(ServerProperty.TRUSTSTORE_LOC);
     String trustStorePass = properties.getString(ServerProperty.TRUSTSTORE_PASS);
     String trustStoreType = properties.getString(ServerProperty.TRUSTSTORE_TYPE);
 
     KeyStore trustStore = CryptUtil.loadKeystore(trustStoreLoc, trustStoreType, trustStorePass.toCharArray());
 
-    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("X509", CryptUtil.PROVIDER_TLS);
+    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(certificateType, providerTLS);
     trustManagerFactory.init(trustStore);
 
     return trustManagerFactory;
@@ -167,32 +162,17 @@ final class Server {
     return CryptUtil.loadKeystore(keyStoreLoc, keyStoreType, keyStorePass.toCharArray());
   }
 
-  private static SSLContext buildSSLContext(CustomProperties properties, KeyStore keyStore) throws GeneralSecurityException, IOException, PropertyException {
-    // Build default context for use with custom trust manager (OCSP) Extension
-    KeyManagerFactory keyManagerFactory = getKeyManagerFactory(properties, keyStore);
-    TrustManagerFactory trustManagerFactory = getTrustManagerFactory(properties);
+  private static SSLContext buildSSLContext(CustomProperties properties, KeyStore keyStore, String providerTLS) throws GeneralSecurityException, IOException, PropertyException {
+    String certificateType = properties.getString(ServerProperty.CERT_FORMAT);
+
+    KeyManagerFactory keyManagerFactory = getKeyManagerFactory(properties, keyStore, certificateType, providerTLS);
+    TrustManagerFactory trustManagerFactory = getTrustManagerFactory(properties, certificateType, providerTLS);
     KeyManager[] keyManagers = keyManagerFactory.getKeyManagers();
     TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
 
-    SSLContext defaultSSLContext = SSLContext.getInstance("TLS", CryptUtil.PROVIDER_TLS);
-    defaultSSLContext.init(keyManagers, trustManagers, new SecureRandom());
+    SSLContext sslContext = SSLContext.getInstance("TLS", providerTLS);
+    sslContext.init(keyManagers, trustManagers, new SecureRandom());
 
-    // Check if PKI is to be used, if not.. return regular socket
-    if (!properties.getBool(ServerProperty.USE_PKI))
-      return defaultSSLContext;
-
-    // Build server context with custom trust manager
-    TrustManager[] extendedTrustManagers = new TrustManager[trustManagers.length + 1];
-    System.arraycopy(trustManagers, 0, extendedTrustManagers, 0, trustManagers.length);
-    Gson gson = GsonUtils.buildGsonInstance();
-
-    // Add custom trust manager to trust managers
-    extendedTrustManagers[trustManagers.length] =
-        new CustomTrustManager(properties, defaultSSLContext.getSocketFactory(), trustManagers, new B4Helper(), gson);
-
-    SSLContext serverSSLContext = SSLContext.getInstance("TLS", CryptUtil.PROVIDER_TLS);
-    serverSSLContext.init(keyManagers, extendedTrustManagers, new SecureRandom());
-
-    return serverSSLContext;
+    return sslContext;
   }
 }

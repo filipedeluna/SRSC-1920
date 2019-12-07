@@ -21,6 +21,8 @@ public enum ServerProperty implements ICustomProperty {
   TLS_PROTOCOLS("tls_protocols", CustomPropertyType.STRING_ARRAY),
 
   // Crypt,
+  PROVIDER("provider", CustomPropertyType.STRING),
+  PROVIDER_TLS("provider_tls", CustomPropertyType.STRING),
   KEYSTORE_LOC("keystore_location", CustomPropertyType.STRING),
   KEYSTORE_TYPE("keystore_type", CustomPropertyType.STRING),
   KEYSTORE_PASS("keystore_pass", CustomPropertyType.STRING),
@@ -32,6 +34,7 @@ public enum ServerProperty implements ICustomProperty {
   PUB_KEY_SIZE("pub_key_size", CustomPropertyType.INT),
   PUB_KEY_NAME("pub_key_name", CustomPropertyType.STRING),
   CERT_SIGN_ALG("cert_sign_alg", CustomPropertyType.STRING),
+  CERT_FORMAT("cert_format", CustomPropertyType.STRING),
 
   DH_KEY_ALG("dh_key_alg", CustomPropertyType.STRING),
   DH_KEY_HASH_ALG("dh_key_hash_alg", CustomPropertyType.STRING),
@@ -42,12 +45,14 @@ public enum ServerProperty implements ICustomProperty {
   // PKI Server
   USE_PKI("use_pki", CustomPropertyType.BOOL),
   PKI_SERVER_ADDRESS("pki_server_address", CustomPropertyType.STRING),
-  PKI_SERVER_PORT("pki_server_port", CustomPropertyType.INT);
+  PKI_CHECK_VALIDITY("pki_check_validity", CustomPropertyType.INT),
+  PKI_SERVER_PORT("pki_server_port", CustomPropertyType.INT),
+  PKI_TIMEOUT("pki_timeout", CustomPropertyType.INT);
 
   /////////////////////////////////////////////////
 
-  private String val;
-  private CustomPropertyType type;
+  private final String val;
+  private final CustomPropertyType type;
 
   ServerProperty(String val, CustomPropertyType type) {
     this.val = val;

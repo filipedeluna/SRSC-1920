@@ -2,15 +2,15 @@ package pki;
 
 import java.io.*;
 import java.lang.Thread;
-import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
+import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.OperatorException;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.PKCSException;
@@ -20,6 +20,7 @@ import shared.errors.IHTTPStatusException;
 import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
 import shared.errors.request.CustomRequestException;
+import shared.response.GsonResponse;
 import shared.response.OKResponse;
 import shared.utils.GsonUtils;
 import shared.response.ErrorResponse;
@@ -30,12 +31,14 @@ import shared.utils.SafeInputStreamReader;
 
 import javax.net.ssl.SSLSocket;
 
+import static org.bouncycastle.asn1.x500.style.RFC4519Style.serialNumber;
+
 final class PKIServerResources implements Runnable {
-  private SSLSocket client;
+  private final SSLSocket client;
   private com.google.gson.stream.JsonReader input;
   private OutputStream output;
 
-  private PKIServerProperties props;
+  private final PKIServerProperties props;
 
   PKIServerResources(SSLSocket client, PKIServerProperties props) {
     this.client = client;
@@ -48,8 +51,7 @@ final class PKIServerResources implements Runnable {
       input = new JsonReader(new SafeInputStreamReader(client.getInputStream(), maxBufferSizeInMB));
       output = client.getOutputStream();
     } catch (Exception e) {
-      handleException(e, props.DEBUG_MODE);
-      Thread.currentThread().interrupt();
+      handleException(e);
     }
   }
 
@@ -61,15 +63,14 @@ final class PKIServerResources implements Runnable {
 
       client.close();
     } catch (Exception e) {
-      handleException(e, props.DEBUG_MODE);
+      handleException(e);
+      Thread.currentThread().interrupt();
     }
   }
 
-  private void handleRequest(JsonObject requestData) throws RequestException, IOException, DatabaseException, GeneralSecurityException, CriticalDatabaseException, OperatorException, PKCSException {
+  private void handleRequest(JsonObject requestData) throws RequestException, IOException, GeneralSecurityException, CriticalDatabaseException, OperatorException {
     try {
       String requestType = GsonUtils.getString(requestData, "type");
-
-      props.LOGGER.log(Level.FINE, "Request: " + requestType);
 
       switch (requestType) {
         case "sign":
@@ -90,73 +91,111 @@ final class PKIServerResources implements Runnable {
   }
 
   // Register
-  private synchronized void sign(JsonObject requestData) throws RequestException, GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException, OperatorException, PKCSException {
+  private synchronized void sign(JsonObject requestData) throws RequestException, GeneralSecurityException, IOException, OperatorCreationException, CriticalDatabaseException {
     // token validity should be verified but is out of work scope.
     // users could purchase a valid token to certify one certificate
     String token = GsonUtils.getString(requestData, "token");
 
     // We will use a predefined token value for test purposes
-    if (!props.validToken(token))
+    if (!props.isTokenValid(token))
       throw new CustomRequestException("Invalid token", HTTPStatus.UNAUTHORIZED);
 
     // Get csr encoded from request and decode it
     String certRequestEncoded = GsonUtils.getString(requestData, "certificationRequest");
     byte[] certRequestBytes = props.B64.decode(certRequestEncoded);
 
-    PKCS10CertificationRequest certRequest = new PKCS10CertificationRequest(certRequestBytes);
+    // Get CSR from bytes
+    PKCS10CertificationRequest certRequest;
+    try {
+      certRequest = props.AEA.csrFromBytes(certRequestBytes);
+    } catch (IOException e) {
+      throw new CustomRequestException("CSR is corrupted", HTTPStatus.BAD_REQUEST);
+    }
 
-    // Sign csr
-    X509Certificate signedCert =
-        props.AEA.signCSR(certRequest, props.CERT, props.privateKey(), props.CERT_VALIDITY);
+    // Attempt to create signed CSR
+    X509Certificate signedCert;
+    try {
+      signedCert = props.AEA.signCSR(certRequest, props.CERT, props.privateKey(), props.CERT_VALIDITY);
+    } catch (PKCSException e) {
+      throw new CustomRequestException("CSR signature is invalid", HTTPStatus.BAD_REQUEST);
+    }
 
-    // Get serial number and add to db
-    BigInteger serialNumber = signedCert.getSerialNumber();
-    String serialNumberString = serialNumber.toString();
+    // Get cert SN and hash
+    byte[] certBytes = props.AEA.getCertBytes(signedCert);
+    String certHashEncoded = props.HASH.hashAndEncode(certBytes);
+    String certSN = props.AEA.getCertSN(signedCert);
 
-    props.DB.register(serialNumberString);
+    // Attempt to register CSR
+    try {
+      props.DB.register(certSN, certHashEncoded);
+    } catch (DatabaseException e) {
+      throw new CustomRequestException("Duplicate certificate serial number", HTTPStatus.BAD_REQUEST);
+    }
 
     // encode signed certificate
     byte[] signedCertBytes = props.AEA.getCertBytes(signedCert);
     String signedCertEncoded = props.B64.encode(signedCertBytes);
 
     // Create payload and send response
-    SignResponse response = new SignResponse(signedCertEncoded);
-    send(response.json(props.GSON));
+    send(new SignResponse(signedCertEncoded));
 
     props.LOGGER.log(Level.FINE, "Certificate emitted with SN " + serialNumber);
   }
 
   // Is Revoked
-  private void validate(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
-    // Get certificate serial number
-    String serialNumber = GsonUtils.getString(requestData, "serialNumber");
+  private void validate(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException, InvalidKeyException, NoSuchProviderException, NoSuchAlgorithmException {
+    // Get certificate and decode it
+    String certEncoded = GsonUtils.getString(requestData, "certificate");
+    byte[] certDecoded = props.B64.decode(certEncoded);
 
-    // Validate, build and send response
-    boolean valid = props.DB.isValid(serialNumber);
+    // Build certificate and get serial number and build hash
+    X509Certificate certificate;
+    try {
+      certificate = props.AEA.getCertFromBytes(certDecoded);
+    } catch (CertificateException e) {
+      throw new CustomRequestException("Certificate is corrupted.", HTTPStatus.BAD_REQUEST);
+    }
 
-    ValidateResponse response = new ValidateResponse(valid);
+    String certSN = props.AEA.getCertSN(certificate);
+    String certHash = props.HASH.hashAndEncode(certDecoded);
 
-    send(response.json(props.GSON));
+    // Check cert belongs to public key
+    try {
+      certificate.verify(props.PUB_KEY);
+
+      // Look for certificate in Revocation DB
+      boolean valid = props.DB.isValid(certSN, certHash);
+
+      send(new ValidateResponse(valid));
+
+      props.LOGGER.log(Level.FINE, "Certificate " + certSN + " validated");
+    } catch (CertificateException | SignatureException e) {
+      // Cert does not belong to CA
+      send(new ValidateResponse(false));
+      props.LOGGER.log(Level.FINE, "Certificate " + certSN + " not validated");
+    }
   }
 
   // Revoke
-  private synchronized void revoke(JsonObject requestData) throws RequestException, IOException, DatabaseException, CriticalDatabaseException {
+  private synchronized void revoke(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException {
     // token validity should be verified but is out of work scope.
     // this token would be issued to an admin so he could revoke certificates at will
     String token = GsonUtils.getString(requestData, "token");
 
     // We will use a predefined token value for test purposes
-    if (!props.validToken(token))
+    if (!props.isTokenValid(token))
       throw new CustomRequestException("Invalid token", HTTPStatus.UNAUTHORIZED);
 
     // Get certificate and public key
     String serialNumber = GsonUtils.getString(requestData, "serialNumber");
 
-    props.DB.revoke(serialNumber);
+    try {
+      props.DB.revoke(serialNumber);
+    } catch (DatabaseException e) {
+      throw new CustomRequestException("Certificate not found.", HTTPStatus.NOT_FOUND);
+    }
 
-    OKResponse response = new OKResponse();
-
-    send(response.json(props.GSON));
+    send(new OKResponse());
 
     props.LOGGER.log(Level.FINE, "Certificate revoked with SN " + serialNumber);
   }
@@ -164,37 +203,36 @@ final class PKIServerResources implements Runnable {
   /*
     UTILS
   */
-  private void handleException(Exception exception, boolean debugMode) {
+  private void handleException(Exception exception) {
     ErrorResponse response;
 
     if (exception instanceof IHTTPStatusException) {
       HTTPStatus status = ((IHTTPStatusException) exception).status();
       response = status.buildErrorResponse(exception.getMessage());
+
       props.LOGGER.log(Level.WARNING, exception.getMessage());
     } else {
       System.err.println("Client disconnected due to critical error: " + exception.getMessage());
 
-      if (debugMode)
+      if (props.DEBUG_MODE)
         exception.printStackTrace();
 
       response = HTTPStatus.INTERNAL_SERVER_ERROR.buildErrorResponse();
       props.LOGGER.log(Level.SEVERE, exception.getMessage());
     }
 
-    String responseJson = response.json(props.GSON);
-
     try {
-      send(responseJson);
+      send(response);
     } catch (IOException e) {
       System.err.println("Failed to send error response to client");
       props.LOGGER.log(Level.SEVERE, exception.getMessage());
 
-      if (debugMode)
+      if (props.DEBUG_MODE)
         e.printStackTrace();
     }
   }
 
-  private void send(String message) throws IOException {
-    output.write(message.getBytes(StandardCharsets.UTF_8));
+  private void send(GsonResponse response) throws IOException {
+    output.write(response.json(props.GSON).getBytes(StandardCharsets.UTF_8));
   }
 }

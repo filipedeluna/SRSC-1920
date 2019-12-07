@@ -3,80 +3,74 @@ package pki;
 import com.google.gson.Gson;
 import pki.db.PKIDatabaseDriver;
 import pki.props.PKIProperty;
-import server.props.ServerProperty;
 import shared.errors.properties.PropertyException;
 import shared.utils.GsonUtils;
-import shared.utils.crypto.AEAHelper;
-import shared.utils.crypto.B4Helper;
-import shared.utils.crypto.DHHelper;
-import shared.utils.crypto.HashHelper;
+import shared.utils.crypto.*;
 import shared.utils.properties.CustomProperties;
 
-import java.security.GeneralSecurityException;
-import java.security.KeyStore;
-import java.security.PrivateKey;
-import java.security.PublicKey;
+import java.security.*;
 import java.security.cert.X509Certificate;
 import java.util.logging.Logger;
 
 final class PKIServerProperties {
   boolean DEBUG_MODE;
 
-  DHHelper DH;
   HashHelper HASH;
   AEAHelper AEA;
-  B4Helper B64;
+  B64Helper B64;
   Gson GSON;
-  Logger LOGGER;
+  final Logger LOGGER;
 
   PKIDatabaseDriver DB;
-  KeyStore KEYSTORE;
 
   PublicKey PUB_KEY;
   X509Certificate CERT;
   int CERT_VALIDITY;
 
-  private CustomProperties props;
+  private KeyStore keyStore;
+
   private String pubKeyName;
   private String ksPassword;
   private String token;
 
   PKIServerProperties(CustomProperties props, KeyStore keyStore, PKIDatabaseDriver db, Logger logger) throws PropertyException, GeneralSecurityException {
-    this.props = props;
-
     LOGGER = logger;
-    DEBUG_MODE = props.getBool(ServerProperty.DEBUG);
-    KEYSTORE = keyStore;
+    DEBUG_MODE = props.getBool(PKIProperty.DEBUG);
+    this.keyStore = keyStore;
     DB = db;
-    B64 = new B4Helper();
+    B64 = new B64Helper();
     GSON = GsonUtils.buildGsonInstance();
 
     token = props.getString(PKIProperty.TOKEN_VALUE);
+
+    // Get providers
+    String provider = props.getString(PKIProperty.PROVIDER);
 
     // Get and set password for keystore
     ksPassword = props.getString(PKIProperty.KEYSTORE_PASS);
 
     // Initialize hash helper
-    HASH = new HashHelper(props.getString(PKIProperty.HASH_ALG));
+    HASH = new HashHelper(props.getString(PKIProperty.HASH_ALG), provider);
 
     // Initialize AEA params
     String pubKeyAlg = props.getString(PKIProperty.PUB_KEY_ALG);
     String certSignAlg = props.getString(PKIProperty.CERT_SIGN_ALG);
+    String certFormat = props.getString(PKIProperty.CERT_FORMAT);
     int pubKeySize = props.getInt(PKIProperty.PUB_KEY_SIZE);
-    AEA = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize);
+    AEA = new AEAHelper(pubKeyAlg, certSignAlg, certFormat, pubKeySize, provider);
 
     // Get pub key and assign it
     pubKeyName = props.getString(PKIProperty.PKI_PUB_KEY);
-    CERT = AEA.getCertFromKeystore(pubKeyName, KEYSTORE);
+    CERT = AEA.getCertFromKeystore(pubKeyName, keyStore);
     PUB_KEY = CERT.getPublicKey();
     CERT_VALIDITY = props.getInt(PKIProperty.CERTIFICATE_VALIDITY);
   }
 
-  PrivateKey privateKey() throws GeneralSecurityException {
-    return (PrivateKey) KEYSTORE.getKey(pubKeyName, ksPassword.toCharArray());
+  PrivateKey privateKey() throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
+    return (PrivateKey) keyStore.getKey(pubKeyName, ksPassword.toCharArray());
   }
 
-  boolean validToken(String token) {
+  boolean isTokenValid(String token) {
     return this.token.equals(token);
   }
 }

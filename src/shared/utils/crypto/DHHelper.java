@@ -1,13 +1,12 @@
 package shared.utils.crypto;
 
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 import shared.utils.CryptUtil;
 
 import javax.crypto.KeyAgreement;
 import javax.crypto.spec.DHParameterSpec;
 import java.math.BigInteger;
 import java.security.*;
+import java.security.spec.InvalidParameterSpecException;
 
 public class DHHelper {
   private MessageDigest hash;
@@ -18,11 +17,11 @@ public class DHHelper {
   private String dhAlg;
   private String hashAlg;
 
-  public DHHelper(String dhAlg, String hashAlg, int keySize) throws GeneralSecurityException {
-    keyPairGenerator = KeyPairGenerator.getInstance(dhAlg, CryptUtil.PROVIDER);
-    keyAgreement = KeyAgreement.getInstance(dhAlg, CryptUtil.PROVIDER);
-    hash = MessageDigest.getInstance(hashAlg, CryptUtil.PROVIDER);//outra vez o provider, mas para EC
-    algParamsGenerator = AlgorithmParameterGenerator.getInstance(dhAlg, CryptUtil.PROVIDER);
+  public DHHelper(String dhAlg, String hashAlg, int keySize, String provider) throws GeneralSecurityException {
+    keyPairGenerator = KeyPairGenerator.getInstance(dhAlg, provider);
+    keyAgreement = KeyAgreement.getInstance(dhAlg, provider);
+    hash = MessageDigest.getInstance(hashAlg, provider);
+    algParamsGenerator = AlgorithmParameterGenerator.getInstance(dhAlg, provider);
 
     algParamsGenerator.init(keySize);
 
@@ -31,13 +30,13 @@ public class DHHelper {
     this.dhAlg = dhAlg;
   }
 
-  public KeyPair genKeyPair(DHParameterSpec spec) throws GeneralSecurityException {
+  public KeyPair genKeyPair(DHParameterSpec spec) throws InvalidAlgorithmParameterException {
     keyPairGenerator.initialize(spec);
 
     return keyPairGenerator.generateKeyPair();
   }
 
-  public byte[] genSharedKey(PrivateKey aKey, PublicKey bKey) throws GeneralSecurityException {
+  public byte[] genSharedKey(PrivateKey aKey, PublicKey bKey) throws InvalidKeyException {
     keyAgreement.init(aKey);
     keyAgreement.doPhase(bKey, true); // true - last phase
 
@@ -48,21 +47,21 @@ public class DHHelper {
     return BigInteger.probablePrime(size, new SecureRandom());
   }
 
-  public DHParameterSpec genParams() throws GeneralSecurityException {
+  public DHParameterSpec genParams() throws InvalidParameterSpecException {
     AlgorithmParameters algParams = algParamsGenerator.generateParameters();
 
     return algParams.getParameterSpec(DHParameterSpec.class);
   }
 
-  public int keySize() {
+  public int getKeySize() {
     return keySize;
   }
 
-  public String alg() {
+  public String getAlgorithm() {
     return dhAlg;
   }
 
-  public String hashAlg() {
+  public String getHashAlgorithm() {
     return hashAlg;
   }
 }

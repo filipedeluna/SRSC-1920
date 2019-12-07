@@ -10,19 +10,16 @@ import server.db.wrapper.User;
 import shared.Pair;
 import shared.ServerRequest;
 import shared.errors.IHTTPStatusException;
-import shared.errors.db.CriticalDatabaseException;
-import shared.errors.db.DatabaseException;
-import shared.errors.request.InvalidFormatException;
-import shared.errors.request.InvalidRouteException;
-import shared.errors.request.MissingValueException;
-import shared.errors.request.RequestException;
+import shared.errors.db.*;
+import shared.errors.request.*;
 import shared.http.HTTPStatus;
 import shared.response.ErrorResponse;
-import shared.utils.CryptUtil;
+import shared.response.GsonResponse;
 import shared.utils.GsonUtils;
 import shared.utils.SafeInputStreamReader;
 
 import javax.net.ssl.SSLSocket;
+import java.security.cert.X509Certificate;
 import java.security.*;
 import java.security.cert.X509Certificate;
 import java.io.IOException;
@@ -36,11 +33,12 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 final class ServerResources implements Runnable {
-  private SSLSocket client;
+  private final SSLSocket client;
   private JsonReader input;
   private OutputStream output;
 
-  private ServerProperties props;
+  private final ServerProperties props;
+  private X509Certificate clientCert;
 
   ServerResources(SSLSocket client, ServerProperties props) {
     this.client = client;
@@ -51,25 +49,36 @@ final class ServerResources implements Runnable {
       output = client.getOutputStream();
     } catch (Exception e) {
       handleException(e);
-      Thread.currentThread().interrupt();
     }
   }
 
   public void run() {
     try {
+      clientCert = props.AEA.getCertFromSession(client);
+
+      // Verify client certificate validity in PKI (like OCSP)
+      if (props.PKI_ENABLED) {
+        SSLSocket pkiSocket = props.PKI_COMMS_MGR.getSocket();
+
+        // Check certificate validity in PKI
+        props.PKI_COMMS_MGR.checkClientCertificateRevoked(clientCert, pkiSocket);
+      }
+
+      // Serve client request
       JsonObject parsedRequest = parseRequest(input);
 
-      handleRequest(parsedRequest, client);
+      handleRequest(parsedRequest);
 
       client.close();
     } catch (Exception e) {
       handleException(e);
+      Thread.currentThread().interrupt();
     }
   }
 
-  private void handleRequest(JsonObject requestData, SSLSocket client) throws RequestException, IOException, DatabaseException, GeneralSecurityException, CriticalDatabaseException {
+  private void handleRequest(JsonObject requestData) throws RequestException, IOException, CriticalDatabaseException {
     try {
-      String requestName = props.B64.decode(GsonUtils.getString(requestData, "type")).toString();
+      String requestName = GsonUtils.getString(requestData, "type");
       ServerRequest request = ServerRequest.fromString(requestName);
       String nonce = null;
 
@@ -84,15 +93,11 @@ final class ServerResources implements Runnable {
       // Log client request without any specific info.
       // Certificates emitted by CA should have unique serial numbers
       // This way, we can identify the principal if a DOS or other similar attack occurs
-      props.LOGGER.log(Level.FINE, "Request: " + requestName + " made by " +
-          client.getSession().getPeerCertificateChain()[0].getSerialNumber() + ".");
+      props.LOGGER.log(Level.FINE, "Request: " + requestName + " made by " + clientCert.getSerialNumber() + ".");
 
       switch (request) {
-        case USEREQUESTDH:
-          requestDHuserPub(requestData, nonce);
-          break;
         case CREATE:
-          createUser(requestData, nonce);
+          insertUser(requestData, nonce);
           break;
         case LIST:
           listUsers(requestData, nonce);
@@ -124,25 +129,11 @@ final class ServerResources implements Runnable {
     }
   }
 
-  private synchronized void requestDHuserPub(JsonObject requestData, String nonce) throws RequestException, CriticalDatabaseException, DatabaseException, IOException, GeneralSecurityException {
-    int uuid = Integer.parseInt(GsonUtils.getString(requestData, "destiny_uuid"));
-    User user = props.DB.getUser(uuid);
-
-    String dhdentinyvalue = user.dhValue;
-
-    PrivateKey privateKey = props.privateKey();
-    byte[] paramsJSONSigBytes = props.AEA.sign(privateKey, dhdentinyvalue.getBytes());
-    String paramsJSONSigEncoded = props.B64.encode(paramsJSONSigBytes);
-
-    RequestDestinyDHvalue req = new RequestDestinyDHvalue(nonce, dhdentinyvalue, paramsJSONSigEncoded);
-    send(req.json(props.GSON));
-  }
 
   // Create user message box
-  private synchronized void createUser(JsonObject requestData, String nonce) throws RequestException, IOException, DatabaseException, CriticalDatabaseException {
+  private synchronized void insertUser(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
     // Get public key and certificate from user
-    X509Certificate certificate = (X509Certificate) client.getSession().getPeerCertificates()[0];
-    PublicKey publicKey = certificate.getPublicKey();
+    PublicKey publicKey = clientCert.getPublicKey();
     String publicKeyEncoded = props.B64.encode(publicKey.getEncoded());
 
     // Get user intended uuid and message verification nonce
@@ -150,6 +141,7 @@ final class ServerResources implements Runnable {
 
     // Get extra fields
     String dhValue = GsonUtils.getString(requestData, "dhValue");
+    String seaSpec = GsonUtils.getString(requestData, "seaSpec");
 
     // Get extra fields signature
     String secDataSignature = GsonUtils.getString(requestData, "secDataSignature");
@@ -158,21 +150,26 @@ final class ServerResources implements Runnable {
         uuid,
         publicKeyEncoded,
         dhValue,
+        seaSpec,
         secDataSignature
     );
 
-    int userId = props.DB.insertUser(user);
+    // Insert user and send response
+    try {
+      int userId = props.DB.insertUser(user);
 
-    CreateUserResponse response = new CreateUserResponse(nonce, userId);
-
-    send(response.json(props.GSON));
+      send(new CreateUserResponse(nonce, userId));
+    } catch (DuplicateEntryException e) {
+      throw new CustomRequestException("User ID already registered.", HTTPStatus.BAD_REQUEST);
+    }
   }
 
   // List users details
-  private void listUsers(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
+  private void listUsers(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
     // Get intended user id or none if supposed to get all users
     int userId;
 
+    // User ID will be null if supposed to get all users
     try {
       userId = GsonUtils.getInt(requestData, "userId");
     } catch (MissingValueException e) {
@@ -186,11 +183,20 @@ final class ServerResources implements Runnable {
     else
       users = props.DB.getAllUsers();
 
+    // Detect if supposed to get 1 or multiple users
+    try {
+      if (userId > 0)
+        users.add(props.DB.getUser(userId));
+      else
+        users = props.DB.getAllUsers();
+    } catch (EntryNotFoundException e) {
+      throw new CustomRequestException("User id not found", HTTPStatus.NOT_FOUND);
+    }
+
+    // Parse user list to json and send
     String usersJSON = props.GSON.toJson(users);
 
-    ListUsersResponse response = new ListUsersResponse(nonce, usersJSON);
-
-    send(response.json(props.GSON));
+    send(new ListUsersResponse(nonce, usersJSON));
   }
 
   // List new messages
@@ -198,11 +204,9 @@ final class ServerResources implements Runnable {
     // Get intended user id or none if supposed to get all users
     int userId = GsonUtils.getInt(requestData, "userId");
 
-    // Get unread messages and crete response object
+    // Get unread messages and create response object
     ArrayList<Integer> newMessageIds = props.DB.getUnreadMessages(userId);
-    ListNewMessagesResponse response = new ListNewMessagesResponse(nonce, newMessageIds);
-
-    send(response.json(props.GSON));
+    send(new ListNewMessagesResponse(nonce, newMessageIds));
   }
 
   // List all messages
@@ -213,19 +217,17 @@ final class ServerResources implements Runnable {
     // Get all messages, split between received/sent and create response object
     Pair<ArrayList<String>, ArrayList<Integer>> messages = props.DB.getAllMessages(userId);
 
-    ArrayList<String> receivedMessageIds = messages.A;
-    ArrayList<Integer> sentMessagesIds = messages.B;
+    ArrayList<String> receivedMessageIds = messages.getA();
+    ArrayList<Integer> sentMessagesIds = messages.getB();
 
-    ListMessagesResponse response = new ListMessagesResponse(nonce, receivedMessageIds, sentMessagesIds);
-
-    send(response.json(props.GSON));
+    send(new ListMessagesResponse(nonce, receivedMessageIds, sentMessagesIds));
   }
 
   // Is Revoked
-  private synchronized void insertMessage(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
+  private synchronized void insertMessage(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
     // Get sender and receiver ids
-    int senderId = GsonUtils.getInt(requestData, "source");
-    int receiverId = GsonUtils.getInt(requestData, "destination");
+    int senderId = GsonUtils.getInt(requestData, "senderId");
+    int receiverId = GsonUtils.getInt(requestData, "receiverId");
 
     // Get message (encrypted and encoded) parts and respective mac hash of them
     String text = GsonUtils.getString(requestData, "text");
@@ -240,8 +242,16 @@ final class ServerResources implements Runnable {
     } catch (MissingValueException e) {
       // Message has no attachments
     }
-    //aqui vai ser a pub key xd
-    String macHash = GsonUtils.getString(requestData, "macHash");
+
+    String cipherIV = "";
+    //Security part
+    try {
+      cipherIV = GsonUtils.getString(requestData, "cipherIV");
+    } catch (MissingValueException e) {
+      // Message cipher does not use IV
+    }
+
+    String senderSignature = GsonUtils.getString(requestData, "senderSignature");
 
     // Create and insert message
     Message message = new Message(
@@ -250,75 +260,79 @@ final class ServerResources implements Runnable {
         text,
         attachmentData,
         attachments,
-        macHash
+        cipherIV,
+        senderSignature
     );
 
-    int insertedMessageId = props.DB.insertMessage(message);
-
-    SendMessageResponse response = new SendMessageResponse(nonce, insertedMessageId);
-
-    send(response.json(props.GSON));
+    // Try to insert message in db
+    try {
+      int insertedMessageId = props.DB.insertMessage(message);
+      send(new SendMessageResponse(nonce, insertedMessageId));
+    } catch (DatabaseException e) {
+      throw new CustomRequestException("User id not found", HTTPStatus.NOT_FOUND);
+    }
   }
 
-  private void getMessage(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException, DatabaseException {
+  private void getMessage(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
     // Get intended message id
     int messageId = GsonUtils.getInt(requestData, "messageId");
 
-    // Get all messages, split between received/sent and create response object
-    Message message = props.DB.getMessage(messageId);
-
-    ReceiveMessageResponse response = new ReceiveMessageResponse(nonce, message);
-
-    send(response.json(props.GSON));
+    // Get specific message and create response object
+    try {
+      Message message = props.DB.getMessage(messageId);
+      send(new ReceiveMessageResponse(nonce, message));
+    } catch (EntryNotFoundException e) {
+      throw new CustomRequestException("Message id not found", HTTPStatus.NOT_FOUND);
+    }
   }
 
 
-  private synchronized void insertReceipt(JsonObject requestData) throws RequestException, CriticalDatabaseException, DatabaseException {
+  private synchronized void insertReceipt(JsonObject requestData) throws RequestException, CriticalDatabaseException {
     // Get read message id
     int messageId = GsonUtils.getInt(requestData, "messageId");
 
-    // Get receipt -> message content signature
-    String signature = GsonUtils.getString(requestData, "receipt");
+    // Get receiver signature -> message contents signature
+    String receiverSignature = GsonUtils.getString(requestData, "receiverSignature");
 
     // Get current time
-    String date = getDate();
+    String date = getCurrentDate();
 
     // Insert message receipt
-    props.DB.insertReceipt(new Receipt(messageId, date, signature));
+    try {
+      props.DB.insertReceipt(new Receipt(messageId, date, receiverSignature));
 
-    // No response
+      // Set message as read
+      props.DB.setMessageAsRead(messageId);
+    } catch (FailedToInsertException | EntryNotFoundException e) {
+      throw new CustomRequestException("Message id not found", HTTPStatus.NOT_FOUND);
+    }
   }
 
-  private void getReceipts(JsonObject requestData, String nonce) throws RequestException, CriticalDatabaseException, DatabaseException, IOException {
+  private void getReceipts(JsonObject requestData, String nonce) throws RequestException, CriticalDatabaseException, IOException {
     // Get intended message id
     int messageId = GsonUtils.getInt(requestData, "messageId");
 
     // TODO Why send the message here? We have a dedicated route....
-    // Get the message and its respective receipts
-    ArrayList<Receipt> receipts = props.DB.getReceipts(messageId);
-    Message message = props.DB.getMessage(messageId);
+    try {
+      // Get the message and its respective receipts
+      ArrayList<Receipt> receipts = props.DB.getReceipts(messageId);
+      Message message = props.DB.getMessage(messageId);
 
-    // Create response and send
-    MessageReceiptsResponse response = new MessageReceiptsResponse(nonce, message, receipts);
-
-    send(response.json(props.GSON));
+      // Create response and send
+      send(new MessageReceiptsResponse(nonce, message, receipts));
+    } catch (EntryNotFoundException e) {
+      throw new CustomRequestException("Message id not found", HTTPStatus.NOT_FOUND);
+    }
   }
 
 
   // Get all server params
-  private void params(String nonce) throws GeneralSecurityException, CriticalDatabaseException, IOException {
+  private void params(String nonce) throws CriticalDatabaseException, IOException {
     // Get params and parse to json object
     ServerParameterMap params = props.DB.getAllParameters();
     String paramsJSON = props.GSON.toJson(params);
 
-    // Sign params
-    PrivateKey privateKey = props.privateKey();
-    byte[] paramsJSONSigBytes = props.AEA.sign(privateKey, paramsJSON.getBytes());
-    String paramsJSONSigEncoded = props.B64.encode(paramsJSONSigBytes);
-
-    ParametersResponse response = new ParametersResponse(nonce, paramsJSON, paramsJSONSigEncoded);
-
-    send(response.json(props.GSON));
+    send(new ParametersResponse(nonce, paramsJSON, paramsJSON));
   }
 
   /*
@@ -355,7 +369,7 @@ final class ServerResources implements Runnable {
     String responseJson = response.json(props.GSON);
 
     try {
-      send(responseJson);
+      send(response);
     } catch (IOException e) {
       System.err.println("Failed to send error response to client");
 
@@ -366,11 +380,11 @@ final class ServerResources implements Runnable {
     }
   }
 
-  private void send(String message) throws IOException {
-    output.write(message.getBytes(StandardCharsets.UTF_8));
+  private void send(GsonResponse response) throws IOException {
+    output.write(response.json(props.GSON).getBytes(StandardCharsets.UTF_8));
   }
 
-  private String getDate() {
+  private String getCurrentDate() {
     DateFormat df = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 
     return df.format(new Date());

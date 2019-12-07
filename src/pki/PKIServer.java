@@ -3,10 +3,8 @@ package pki;
 import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 import pki.db.PKIDatabaseDriver;
 import pki.props.PKIProperty;
-import server.props.ServerProperty;
 import shared.errors.properties.InvalidValueException;
 import shared.errors.properties.PropertyException;
-import shared.utils.CryptUtil;
 import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.*;
@@ -64,14 +62,18 @@ final class PKIServer {
       KeyStore keyStore = KeyStore.getInstance(keyStoreType);
       keyStore.load(new FileInputStream(props.getString(PKIProperty.KEYSTORE_LOC)), keyStorePass.toCharArray());
 
+      // Get TLS Provider and cert format
+      String providerTLS = props.getString(PKIProperty.PROVIDER_TLS);
+      String certFormat = props.getString(PKIProperty.CERT_FORMAT);
+
       // Initiate KMF
-      KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509", CryptUtil.PROVIDER_TLS);
+      KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(certFormat, providerTLS);
       keyManagerFactory.init(keyStore, keyStorePass.toCharArray());
 
       // Create SSL Socket and initialize server
       int port = props.getInt(PKIProperty.PORT);
 
-      SSLContext sslContext = SSLContext.getInstance("TLS", CryptUtil.PROVIDER_TLS);
+      SSLContext sslContext = SSLContext.getInstance("TLS", providerTLS);
       sslContext.init(keyManagerFactory.getKeyManagers(), null, null);
 
       SSLServerSocketFactory ssf = sslContext.getServerSocketFactory();
@@ -85,6 +87,7 @@ final class PKIServer {
       serverSocket.setEnabledCipherSuites(enabledCipherSuites);
       serverSocket.setNeedClientAuth(false); // Unilateral
 
+      logger.log(Level.INFO, "Started server on port: " + port);
       System.out.print("Started pki server on port " + port + "\n");
 
       // Create db and initiate properties
@@ -119,7 +122,7 @@ final class PKIServer {
       logger.log(Level.WARNING, e.getMessage());
     } else {
       logger.log(Level.SEVERE, e.getMessage());
-      System.err.println("CRITICAL ERROR.");
+      System.err.println("CRITICAL ERROR: " + e.getClass().getName());
     }
 
     if (debugMode)
