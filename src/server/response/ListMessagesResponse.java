@@ -11,4 +11,12 @@ public final class ListMessagesResponse extends OkResponseWithNonce {
     this.receivedMessageIds = receivedMessageIds;
     this.sentMessageIds = sentMessageIds;
   }
+
+  public ArrayList<String> getReceivedMessageIds() {
+    return receivedMessageIds;
+  }
+
+  public ArrayList<Integer> getSentMessageIds() {
+    return sentMessageIds;
+  }
 }

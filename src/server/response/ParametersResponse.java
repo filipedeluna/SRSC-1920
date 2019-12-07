@@ -9,4 +9,12 @@ public final class ParametersResponse extends OkResponseWithNonce {
     this.parameters = parameters;
     this.signature = signature;
   }
+
+  public String getParameters() {
+    return parameters;
+  }
+
+  public String getSignature() {
+    return signature;
+  }
 }

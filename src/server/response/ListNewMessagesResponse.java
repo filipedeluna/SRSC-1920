@@ -9,4 +9,9 @@ public final class ListNewMessagesResponse extends OkResponseWithNonce {
     super(nonce);
     this.newMessageIds = newMessageIds;
   }
+
+  public ArrayList<Integer> getNewMessageIds() {
+    return newMessageIds;
+  }
+
 }

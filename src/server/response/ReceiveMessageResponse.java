@@ -9,4 +9,8 @@ public final class ReceiveMessageResponse extends OkResponseWithNonce {
     super(nonce);
     this.message = message;
   }
+
+  public Message getMessage() {
+    return message;
+  }
 }

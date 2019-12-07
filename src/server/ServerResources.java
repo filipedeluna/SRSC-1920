@@ -21,6 +21,7 @@ import shared.utils.SafeInputStreamReader;
 import javax.net.ssl.SSLSocket;
 import java.security.cert.X509Certificate;
 import java.security.*;
+import java.security.cert.X509Certificate;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +30,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 final class ServerResources implements Runnable {
   private final SSLSocket client;
@@ -122,10 +124,11 @@ final class ServerResources implements Runnable {
           params(nonce);
           break;
       }
-    } catch (ClassCastException | IllegalStateException e) {
+    } catch (ClassCastException | IllegalStateException | EntryNotFoundException e) {
       throw new InvalidRouteException();
     }
   }
+
 
   // Create user message box
   private synchronized void insertUser(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
@@ -166,7 +169,7 @@ final class ServerResources implements Runnable {
   }
 
   // List users details
-  private void listUsers(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
+  private void listUsers(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException, EntryNotFoundException {
     // Get intended user id or none if supposed to get all users
     int userId;
 
@@ -179,6 +182,10 @@ final class ServerResources implements Runnable {
 
     ArrayList<User> users = new ArrayList<>();
 
+    if (userId < 0)
+      users.add(props.DB.getUser(userId));
+    else
+      users = props.DB.getAllUsers();
 
     // Detect if supposed to get 1 or multiple users
     try {
@@ -322,6 +329,7 @@ final class ServerResources implements Runnable {
     }
   }
 
+
   // Get all server params
   private void params(String nonce) throws CriticalDatabaseException, IOException {
     // Get params and parse to json object
@@ -358,8 +366,11 @@ final class ServerResources implements Runnable {
         exception.printStackTrace();
 
       response = HTTPStatus.INTERNAL_SERVER_ERROR.buildErrorResponse();
+
       props.LOGGER.log(Level.SEVERE, exception.getMessage());
     }
+
+    String responseJson = response.json(props.GSON);
 
     try {
       send(response);

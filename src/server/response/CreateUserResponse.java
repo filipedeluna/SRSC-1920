@@ -7,4 +7,8 @@ public final class CreateUserResponse extends OkResponseWithNonce {
     super(nonce);
     this.userId = userId;
   }
+
+  public int getUserId() {
+    return userId;
+  }
 }
