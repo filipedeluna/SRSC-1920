@@ -8,6 +8,7 @@ import client.utils.ClientRequest;
 import com.google.gson.JsonObject;
 import shared.errors.request.RequestException;
 import shared.parameters.ServerParameterMap;
+import shared.response.OKResponse;
 import shared.utils.Utils;
 import shared.wrappers.Message;
 import shared.wrappers.Receipt;
@@ -28,6 +29,7 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Scanner;
 
 public class Client {
   private static final String PROPS_PATH = "src/client/props/client.properties";
@@ -76,18 +78,27 @@ public class Client {
       // Request shared parameters and that initialize dh and aea helpers
       requestParams(cProps);
 
+      // Command reader
+      BufferedReader lineReader = new BufferedReader(new InputStreamReader(System.in));
+
       while (true) {
         try {
+          System.out.println();
+          System.out.println("Enter command: ");
+
+          // Read line commands and parse
+          String[] cmdArgs = lineReader.readLine().split(" (?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
+
           // Parse and validate request and create resquest object
-          ClientRequest request = ClientRequest.fromString(args[0]);
+          ClientRequest request = ClientRequest.fromString(cmdArgs[0]);
           JsonObject requestData = new JsonObject();
 
           // Check request is valid and argument length correct
           if (request == null)
             throw new ClientException("Invalid command.");
 
-          if (!request.checkArgs((args.length)))
-            throw new ClientException("Invalid arguments.");
+          if (!request.checkArgs((cmdArgs.length)))
+            throw new ClientException("Invalid command arguments.");
 
           // Initialize request object with request type
           requestData.addProperty("type", request.val());
@@ -98,44 +109,42 @@ public class Client {
 
           switch (request) {
             case CREATE:
-              createUser(cProps, requestData);
+              createUser(cProps, requestData, cmdArgs);
             case LIST:
-              listUsers(cProps, requestData, args);
+              listUsers(cProps, requestData, cmdArgs);
               break;
             case NEW:
-              listNewMessages(cProps, requestData, args);
+              listNewMessages(cProps, requestData, cmdArgs);
               break;
             case ALL:
-              listAllMessages(cProps, requestData);
+              listAllMessages(cProps, requestData, cmdArgs);
               break;
             case SEND:
               //missing message encryption
-              sendMessages(cProps, requestData);
+              sendMessages(cProps, requestData, cmdArgs);
             case RECEIVE:
               // TODO missing message decryption
               //contem o receipt, receipt enviado dps de ler
-              receiveMessages(cProps, requestData);
+              receiveMessages(cProps, requestData, cmdArgs);
               break;
             case STATUS:
-              status(cProps, requestData);
+              status(cProps, requestData, cmdArgs);
               break;
             case LOGIN:
-              login(cProps, requestData, args);
+              login(cProps, requestData, cmdArgs);
               break;
             case HELP:
               printCommands();
               break;
             case EXIT:
               System.out.println("Exited the client.");
+              System.exit(0);
               break;
-            default:
-              // TODO Invalid command
-              // TODO print available commands here
-              // TODO Also create args[0] with help command at start
-              System.err.println("Invalid route");
           }
         } catch (ClientException e) {
           System.err.println(e.getMessage());
+        } catch (ClassCastException e) {
+          System.err.println("Received an invalid format message.");
         }
       }
     } catch (Exception e) {
@@ -152,14 +161,11 @@ public class Client {
     requestData.addProperty("uuid", uuid);
 
     // Get response and check nonce
-    JsonObject responseJsonObj = cProps.receiveRequest();
-    LoginResponse resp = cProps.GSON.fromJson(responseJsonObj, LoginResponse.class);
-
-    checkNonce(requestData, resp.getNonce());
+    LoginResponse resp = (LoginResponse) cProps.receiveRequestAndCheckNonce(requestData);
 
     // Get user details from response and check data signature
     User user = resp.getUser();
-    verifyUserSecDataSignature(user, cProps);
+    PublicKey userPubKey = verifyUserSecDataSignature(user, cProps);
 
     // Check if user dh keys exist
     if (!cProps.ksHelper.dhKeyPairExists(username, DHKeyType.SEA) || !cProps.ksHelper.dhKeyPairExists(username, DHKeyType.SEA))
@@ -184,6 +190,21 @@ public class Client {
         macDhKeyPair
     );
 
+    // Also add user to cache
+    cProps.cache.addUser(
+        user.getId(),
+        new UserCacheEntry(
+            userPubKey,
+            cProps.b64Helper.decode(user.getDhSeaPubKey()),
+            cProps.b64Helper.decode(user.getDhMacPubKey()),
+            user.getSeaSpec(),
+            user.getMacSpec()
+        )
+    );
+
+    // Also associate uuid to cache
+    cProps.cache.addUUID(uuid, user.getId());
+
     cProps.establishSession(session);
 
     System.out.println("User " + username + " successfully logged in.");
@@ -201,9 +222,7 @@ public class Client {
     cProps.sendRequest(requestData);
 
     // Get response and check nonce
-    JsonObject responseJsonObj = cProps.receiveRequest();
-    ParametersResponse resp = cProps.GSON.fromJson(responseJsonObj, ParametersResponse.class);
-    checkNonce(requestData, resp.getNonce());
+    ParametersResponse resp = (ParametersResponse) cProps.receiveRequest();
 
     // Create parameters map class from received JSON
     ServerParameterMap paramsMap = resp.getParameters();
@@ -228,12 +247,9 @@ public class Client {
     return paramsMap;
   }
 
-  private static void createUser(ClientProperties cProps, JsonObject requestData) throws IOException, GeneralSecurityException, RequestException, ClientException {
-    BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
-
+  private static void createUser(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException, RequestException, ClientException {
     // Generate a uuid from a users chosen username, adding entropy to it
-    System.out.println("Insert desired username:");
-    String username = bf.readLine().trim();
+    String username = args[1].trim();
     String uuid = cProps.generateUUID(username);
 
     requestData.addProperty("uuid", uuid);
@@ -264,7 +280,8 @@ public class Client {
     requestData.addProperty("macSpec", cProps.getMacSpec());
 
     // Get byte array of all properties and sign them
-    byte[] paramsSignatureBytes = cProps.aeaHelper.sign(cProps.getPrivateKey(),
+    byte[] paramsSignatureBytes = cProps.aeaHelper.sign(
+        cProps.getPrivateKey(),
         seaDHPubKeyBytes,
         macDHPubKeyBytes,
         cProps.getSeaSpec().getBytes(),
@@ -276,12 +293,23 @@ public class Client {
     cProps.sendRequest(requestData);
 
     // Get response and check nonce
-    JsonObject responseJsonObj = cProps.receiveRequest();
-    CreateUserResponse resp = cProps.GSON.fromJson(responseJsonObj, CreateUserResponse.class);
+    CreateUserResponse resp = (CreateUserResponse) cProps.receiveRequest();
 
-    checkNonce(requestData, resp.getNonce());
+    // Get the user id and add user to cache
+    int userId = resp.getUserId();
 
-    System.out.println("User_ID: " + resp.getUserId());
+    cProps.cache.addUser(
+        userId,
+        new UserCacheEntry(
+            cProps.getClientPublicKey(),
+            seaDHPubKeyBytes,
+            macDHPubKeyBytes,
+            cProps.getSeaSpec(),
+            cProps.getMacSpec()
+        )
+    );
+
+    System.out.println("User created with id: " + userId);
   }
 
   private static void listUsers(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, InvalidFormatException, ClientException {
@@ -296,10 +324,7 @@ public class Client {
     cProps.sendRequest(requestData);
 
     // Get response and check the nonce
-    JsonObject jsonObject = cProps.receiveRequest();
-    ListUsersResponse resp = cProps.GSON.fromJson(jsonObject, ListUsersResponse.class);
-
-    checkNonce(requestData, resp.getNonce());
+    ListUsersResponse resp = (ListUsersResponse) cProps.receiveRequest();
 
     // Extract users from response an add them to the cache
     ArrayList<User> users = resp.getUsers();
@@ -340,83 +365,45 @@ public class Client {
   }
 
   private static void listNewMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, InvalidFormatException, ClientException {
-    // Add id of user to get new messages
-    int userId;
-    try {
-      userId = Integer.parseInt(args[1]);
-    } catch (NumberFormatException e) {
-      throw new ClientException("User id has an invalid format.");
-    }
-
-    requestData.addProperty("userId", userId);
+    // Add id of user to get new messages if it exists
+    if (args.length > 1)
+      try {
+        int userId = Integer.parseInt(args[1]);
+        requestData.addProperty("userId", userId);
+      } catch (NumberFormatException e) {
+        throw new ClientException("User id has an invalid format.");
+      }
 
     cProps.sendRequest(requestData);
 
     // Get response and check the nonce
-    JsonObject jsonObject = cProps.receiveRequest();
-    ListNewMessagesResponse resp = cProps.GSON.fromJson(jsonObject, ListNewMessagesResponse.class);
+    ListNewMessagesResponse resp = (ListNewMessagesResponse) cProps.receiveRequest();
 
-    checkNonce(requestData, resp.getNonce());
-
-    // Extract users from response an add them to the cache
-    ArrayList<User> users = resp.getUsers();
-
-    ArrayList<Integer> obtained = new ArrayList<>();
-    ArrayList<Integer> failed = new ArrayList<>();
-
-    PublicKey userPubKey;
-    for (User user : users) {
-      try {
-        verifyUserSecDataSignature(user, cProps);
-        userPubKey = cProps.aeaHelper.pubKeyFromBytes(cProps.b64Helper.decode(user.getPubKey()));
-      } catch (ClientException | InvalidKeySpecException e) {
-        if (e instanceof ClientException)
-          System.out.println("Failed to validate user with id " + user.getId());
-        else
-          System.out.println("User with id " + user.getId() + " has a corrupted public key.");
-        failed.add(user.getId());
-        continue;
-      }
-
-      cProps.cache.addUser(
-          user.getId(),
-          new UserCacheEntry(
-              userPubKey,
-              cProps.b64Helper.decode(user.getDhSeaPubKey()),
-              cProps.b64Helper.decode(user.getDhMacPubKey()),
-              user.getSeaSpec(),
-              user.getMacSpec()
-          )
-      );
-
-      obtained.add(user.getId());
-
-      System.out.println("Obtained users with ids (" + obtained.toString() + ") info.");
-      System.out.println("Failed to obtain user's with ids (" + failed.toString() + ") info.");
-    }
+    // Get new message ids an print them
+    System.out.println("Obtained the following unread message ids: (" + resp.getNewMessageIds().toString() + ").");
   }
 
-  private static void listAllMessages(ClientProperties cProps, JsonObject requestData) throws IOException, InvalidFormatException {
-    BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
+  private static void listAllMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, InvalidFormatException, ClientException {
+    // Add id of user to get new messages
+    try {
+      int userId = Integer.parseInt(args[1]);
+      requestData.addProperty("userId", userId);
+    } catch (NumberFormatException e) {
+      throw new ClientException("User id has an invalid format.");
+    }
 
-    int userid = Integer.parseInt(bf.readLine());
-    requestData.addProperty("userId", userid);
     cProps.sendRequest(requestData);
 
-    JsonObject jsonObject = cProps.receiveRequest();
-    ListMessagesResponse lmr = cProps.GSON.fromJson(jsonObject, ListMessagesResponse.class);
+    // Get response and check the nonce
+    ListMessagesResponse resp = (ListMessagesResponse) cProps.receiveRequest();
 
-    System.out.println("Received:");
-    for (String s : lmr.getReceivedMessageIds()) {
-      System.out.println("Message id: " + s);
-    }
-    System.out.println("Sent:");
-    for (int s : lmr.getSentMessageIds()) {
-      System.out.println("Message id: " + s);
-    }
+    // Get new message ids an print them
+    System.out.println("Obtained the following received message ids: (" + resp.getReceivedMessageIds().toString() + ").");
+    System.out.println("Obtained the following sent message ids: (" + resp.getSentMessageIds().toString() + ").");
+    System.out.println("Note: Read messages come with a prefixed \"_\".");
   }
 
-  private static void sendMessages(ClientProperties cProps, JsonObject requestData) throws IOException, InvalidFormatException, GeneralSecurityException, PropertyException {
+  private static void sendMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
 
     int clientId = Integer.parseInt(bf.readLine());
@@ -432,21 +419,31 @@ public class Client {
     //  cProps.KSHelper.saveDHKeyPair(clientId, destinationId, socket);
     // }
 
-    //load shared key
+    // load shared key
     cProps.ksHelper.getKey(clientId + "-" + destinationId + "-shared");
 
+
+    // 0 - VERIFICAR SE CHAVE JA TA NA KEYSTORE
+    // 1 - obter o nosso DH
+    // 2 - obter DH do outro ze (verificar se user ja esta na cache)
+    // 3 - fundir
+    // 4 - cortar chave para cifra (apos criar a instancia da cifra com seapec etc)
+    // 5 - guardar a chave na keystore (sea e mac)
+    // 6 - encriptar
+    // 5 - mac
+    // 6 - encode
+    // 7 mandar
   }
 
-  private static void receiveMessages(ClientProperties cProps, JsonObject requestData) throws IOException, InvalidFormatException {
+  private static void receiveMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, InvalidFormatException, ClientException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
     int messageid = Integer.parseInt(bf.readLine());
     requestData.addProperty("userId", messageid);
     cProps.sendRequest(requestData);
 
-    JsonObject obj = cProps.receiveRequest();
-    ReceiveMessageResponse lmr = cProps.GSON.fromJson(obj, ReceiveMessageResponse.class);
-    Message m = lmr.getMessage();
+    ReceiveMessageResponse lmr = (ReceiveMessageResponse) cProps.receiveRequest();
 
+    Message m = lmr.getMessage();
     //substituido depois pela chave publica para verificar assinatura
     String integrity = m.getSenderSignature();
     String text = m.getText();
@@ -462,16 +459,15 @@ public class Client {
     //SEND RECEIPT WITH CONTENT SIGNATURE
   }
 
-  private static void status(ClientProperties cProps, JsonObject requestData) throws IOException, InvalidFormatException {
+  private static void status(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, InvalidFormatException, ClientException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
 
     int messageid = Integer.parseInt(bf.readLine());
     requestData.addProperty("userId", messageid);
     cProps.sendRequest(requestData);
 
-    JsonObject obj = cProps.receiveRequest();
+    MessageReceiptsResponse lmr = (MessageReceiptsResponse) cProps.receiveRequestAndCheckNonce(requestData);
 
-    MessageReceiptsResponse lmr = cProps.GSON.fromJson(obj, MessageReceiptsResponse.class);
     System.out.println("Showing status for message: " + lmr.getMessage().getId());
     for (Receipt r : lmr.getReceipts()) {
       System.out.println("Date: " + r.getDate());
@@ -547,11 +543,6 @@ public class Client {
     return sslContext;
   }
 
-  private static void checkNonce(JsonObject jsonObject, String received) throws ClientException {
-    if (!jsonObject.get("nonce").getAsString().equals(received))
-      throw new ClientException("Server replied with invalid nonce.");
-  }
-
   private static void printCommands() {
     System.out.println(
         "CREATE <username>" + "\n" +
@@ -570,11 +561,18 @@ public class Client {
   /*
     UTILS
   */
-  private static void verifyUserSecDataSignature(User user, ClientProperties cProps) throws ClientException {
-    try {
-      byte[] pubKeyDecoded = cProps.b64Helper.decode(user.getPubKey());
-      PublicKey userPublicKey = cProps.aeaHelper.pubKeyFromBytes(pubKeyDecoded);
+  private static PublicKey verifyUserSecDataSignature(User user, ClientProperties cProps) throws ClientException {
+    byte[] pubKeyDecoded;
+    PublicKey userPublicKey;
 
+    try {
+      pubKeyDecoded = cProps.b64Helper.decode(user.getPubKey());
+      userPublicKey = cProps.aeaHelper.pubKeyFromBytes(pubKeyDecoded);
+    } catch (InvalidKeySpecException e) {
+      throw new ClientException("User has a corrupted public key.");
+    }
+
+    try {
       cProps.aeaHelper.verifySignature(
           userPublicKey,
           Utils.joinByteArrays(
@@ -585,9 +583,11 @@ public class Client {
           ),
           cProps.b64Helper.decode(user.getSecDataSignature())
       );
-    } catch (SignatureException | InvalidKeyException | InvalidKeySpecException e) {
+    } catch (SignatureException | InvalidKeyException e) {
       throw new ClientException("Failed to verify user security data signature: " + e.getClass().getName() + ".");
     }
+
+    return userPublicKey;
   }
 
   private static String getCurrentDate() {

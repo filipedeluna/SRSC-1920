@@ -2,14 +2,23 @@ package client;
 
 import client.cache.ClientCacheController;
 import client.crypt.ClientDHHelper;
+import client.errors.ClientException;
 import client.props.ClientProperty;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 import com.google.gson.stream.JsonReader;
 import shared.errors.properties.PropertyException;
 import shared.errors.request.InvalidFormatException;
+import shared.http.HTTPStatus;
+import shared.http.HTTPStatusPair;
 import shared.parameters.ServerParameterMap;
 import shared.parameters.ServerParameterType;
+import shared.response.ErrorResponse;
+import shared.response.GsonResponse;
+import shared.response.OKResponse;
+import shared.response.OkResponseWithNonce;
+import shared.response.server.LoginResponse;
 import shared.utils.GsonUtils;
 import shared.utils.SafeInputStreamReader;
 import shared.utils.crypto.*;
@@ -19,6 +28,7 @@ import javax.net.ssl.SSLSocket;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.security.GeneralSecurityException;
+import java.security.KeyStoreException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.X509Certificate;
@@ -110,6 +120,10 @@ final class ClientProperties {
     return serverPubKey;
   }
 
+  public PublicKey getClientPublicKey() throws KeyStoreException {
+    return ksHelper.getPublicKey(pubKeyName);
+  }
+
   char[] keyStorePassword() throws PropertyException {
     return props.getString(ClientProperty.KEYSTORE_PASS).toCharArray();
   }
@@ -132,8 +146,50 @@ final class ClientProperties {
     output.write(GSON.toJson(jsonObject).getBytes());
   }
 
-  public JsonObject receiveRequest() throws InvalidFormatException {
-    return GsonUtils.parseRequest(input);
+  public OKResponse receiveRequest() throws InvalidFormatException, ClientException {
+    JsonObject jsonObject = GsonUtils.parseRequest(input);
+
+    // Check if retrieved object is a GsonResponse as expected
+    GsonResponse response;
+    try {
+      response = GSON.fromJson(jsonObject, GsonResponse.class);
+    } catch (JsonSyntaxException e) {
+      throw new ClientException("Failed to parse response object. Probably corrupted");
+    }
+
+    // If there was an error (code != 200/OK), try to extract it
+    if (response.getStatus().getCode() != HTTPStatus.OK.code()) {
+      try {
+        response = GSON.fromJson(jsonObject, ErrorResponse.class);
+        throw new ClientException("Request Failed: " +
+            response.getStatus().getCode() + " " +
+            response.getStatus().getMessage() + " - " +
+            ((ErrorResponse) response).getError()
+        );
+      } catch (JsonSyntaxException e) {
+        throw new ClientException("Failed to parse error response object. Probably corrupted");
+      }
+    }
+
+    // Return the request data as an OKResponse object
+    try {
+      return GSON.fromJson(jsonObject, OKResponse.class);
+    } catch (JsonSyntaxException e) {
+      throw new ClientException("Failed to parse ok response object. Probably corrupted");
+    }
+  }
+
+  public OkResponseWithNonce receiveRequestAndCheckNonce(JsonObject requestData) throws InvalidFormatException, ClientException {
+    try {
+      OkResponseWithNonce response = (OkResponseWithNonce) receiveRequest();
+
+      if (!requestData.get("nonce").getAsString().equals(response.getNonce()))
+        throw new ClientException("The nonce retrieved from the server does not match.");
+
+      return response;
+    } catch (JsonSyntaxException e) {
+      throw new ClientException("Response nonce was expected but not received");
+    }
   }
 
   public ClientSession getSession() {

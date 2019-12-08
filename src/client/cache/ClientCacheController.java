@@ -1,9 +1,13 @@
 package client.cache;
 
+import shared.wrappers.User;
+
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 
 public final class ClientCacheController {
+  private static final int MAX_UUID_ASSOCS = 15;
   private long maxSize;
   private long currentSize;
 
@@ -16,6 +20,9 @@ public final class ClientCacheController {
   private HashMap<Integer, Integer> messageCacheAccesses;
   private HashMap<Integer, Integer> userCacheAccesses;
 
+  // Associate known uuids to ids
+  private LinkedHashMap<String, Integer> uuidAssociations;
+
   // Very basic cache implementation that doesn't allow the
   // memory to get completely full of entries
   public ClientCacheController(long maxSize) {
@@ -27,20 +34,32 @@ public final class ClientCacheController {
     messageCacheAccesses = new HashMap<>();
     userCache = new HashMap<>();
     userCacheAccesses = new HashMap<>();
+    uuidAssociations = new LinkedHashMap<>();
   }
 
   public void addMessage(int messageId, MessageCacheEntry message) {
+    if (messageCache.containsKey(messageId))
+      return;
+
     messageCache.put(messageId, message);
+
+    // Set the accesses to a really high value so they arent deleted immediately ( less uses)
+    messageCacheAccesses.put(messageId, Integer.MAX_VALUE);
+    manageCache();
     messageCacheAccesses.put(messageId, 0);
 
-    manageCache();
   }
 
   public void addUser(int userId, UserCacheEntry user) {
+    if (userCache.containsKey(userId))
+      return;
+
     userCache.put(userId, user);
+
+    userCacheAccesses.put(userId, Integer.MAX_VALUE);
+    manageCache();
     userCacheAccesses.put(userId, 0);
 
-    manageCache();
   }
 
   public MessageCacheEntry getMessage(int messageId) {
@@ -53,6 +72,32 @@ public final class ClientCacheController {
     addUserAccess(userId);
 
     return userCache.get(userId);
+  }
+
+  public void addUUID(String uuid, int userId) {
+    if (uuidAssociations.containsKey(uuid))
+      return;
+
+    uuidAssociations.put(uuid, userId);
+
+    // Don't let this association array get too big, remove first one added
+    if (uuidAssociations.size() > MAX_UUID_ASSOCS) {
+      String toRemove = uuidAssociations.entrySet().iterator().next().getKey();
+      uuidAssociations.remove(toRemove);
+    }
+  }
+
+  public UserCacheEntry getUserFromUUID(String uuid) {
+    if (uuidAssociations.containsKey(uuid)) {
+      int userId = uuidAssociations.get(uuid);
+
+      if (userCache.containsKey(userId)) {
+        addUserAccess(userId);
+
+        return userCache.get(userId);
+      }
+    }
+    return null;
   }
 
   // Free up memory if needed recursively
