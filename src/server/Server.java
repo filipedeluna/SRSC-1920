@@ -69,6 +69,7 @@ final class Server {
 
       SSLServerSocketFactory ssf = sslContext.getServerSocketFactory();
       SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port);
+      serverSocket.setSoTimeout(10 * 1000); // 10 seconds
 
       // Set enabled protocols and cipher suites
       String[] enabledProtocols = properties.getStringArr(ServerProperty.TLS_PROTOCOLS);

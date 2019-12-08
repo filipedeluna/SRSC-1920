@@ -51,7 +51,7 @@ public class KSHelper {
     return store.getKey(keyName, keyStorePass);
   }
 
-  public void saveDHKeyPair(String uuid, DHKeyType type, KeyPair keyPair) throws BadPaddingException, InvalidKeyException, IllegalBlockSizeException, IOException {
+  public void saveDHKeyPair(String username, DHKeyType type, KeyPair keyPair) throws BadPaddingException, InvalidKeyException, IllegalBlockSizeException, IOException {
     // Decode keypair
     byte[] privKeyEncoded = keyPair.getPrivate().getEncoded();
     byte[] pubKeyEncoded = keyPair.getPublic().getEncoded();
@@ -72,14 +72,14 @@ public class KSHelper {
     objectOutput.close();
 
     // Write bytes to file
-    Path filePath = getDHKeyPairPath(uuid, type);
+    Path filePath = getDHKeyPairPath(username, type);
     // Files.deleteIfExists(getDHKeyPairPath(uuid)); // TODO decide if we should use this
     Files.write(filePath, fileBytesEncrypted);
   }
 
-  public KeyPair loadDHKeyPair(String uuid, DHKeyType type) throws IOException, BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidKeySpecException {
+  public KeyPair loadDHKeyPair(String username, DHKeyType type) throws IOException, BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidKeySpecException {
     // Read encrypted bytes from file
-    byte[] fileBytesEncrypted = Files.readAllBytes(getDHKeyPairPath(uuid, type));
+    byte[] fileBytesEncrypted = Files.readAllBytes(getDHKeyPairPath(username, type));
     byte[] fileBytes = seaHelper.decrypt(fileBytesEncrypted, seaKey);
 
     // Read objects from the input stream

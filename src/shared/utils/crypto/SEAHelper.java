@@ -20,7 +20,12 @@ public final class SEAHelper {
     this.random = new RNDHelper();
     this.mode = mode;
 
-    spec = algorithm + "/" + mode + "/" + padding;
+    // Force removal of unnecessary padding for cipher types
+    if (mode.equals("GCM") || mode.equals("CCM"))
+      spec = algorithm + "/" + mode + "NoPadding";
+    else
+      spec = algorithm + "/" + mode + "/" + padding;
+
     cipher = Cipher.getInstance(spec, PROVIDER);
     keyGen = KeyGenerator.getInstance(algorithm, PROVIDER);
   }

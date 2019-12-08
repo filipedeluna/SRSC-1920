@@ -60,7 +60,7 @@ public class Client {
       SSLContext sslContext = buildSSLContext(ksHelper, tsHelper);
       SSLSocketFactory factory = sslContext.getSocketFactory();
       SSLSocket socket = (SSLSocket) factory.createSocket(serverAddress, serverPort);
-      socket.setSoTimeout(10 * 1000);
+      socket.setSoTimeout(10 * 1000); // 10 seconds
 
       // Set enabled protocols and cipher suites and start SSL socket handshake with server
       String[] enabledProtocols = properties.getStringArr(ClientProperty.TLS_PROTOCOLS);
@@ -184,8 +184,8 @@ public class Client {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
 
     // Generate a uuid from a users chosen username, adding entropy to it
-    System.out.println("Insert desired username;");
-    String username = bf.readLine();
+    System.out.println("Insert desired username:");
+    String username = bf.readLine().trim();
     String uuid = cProps.generateUUID(username);
 
     requestData.addProperty("uuid", uuid);
@@ -196,15 +196,15 @@ public class Client {
     KeyPair dhMacKeypair = cProps.dhHelper.genKeyPair(dhSpec);
 
     // Check user keys exist
-    if (cProps.ksHelper.dhKeyPairExists(uuid, DHKeyType.SEA))
+    if (cProps.ksHelper.dhKeyPairExists(username, DHKeyType.SEA))
       throw new ClientException("User sea key already exists.");
 
-    if (cProps.ksHelper.dhKeyPairExists(uuid, DHKeyType.MAC))
+    if (cProps.ksHelper.dhKeyPairExists(username, DHKeyType.MAC))
       throw new ClientException("User mac key already exists.");
 
     // Keys do not exist so save them to file
-    cProps.ksHelper.saveDHKeyPair(uuid, DHKeyType.SEA, dhSeaKeypair);
-    cProps.ksHelper.saveDHKeyPair(uuid, DHKeyType.MAC, dhSeaKeypair);
+    cProps.ksHelper.saveDHKeyPair(username, DHKeyType.SEA, dhSeaKeypair);
+    cProps.ksHelper.saveDHKeyPair(username, DHKeyType.MAC, dhSeaKeypair);
 
     // Add all security properties to the header
     byte[] seaDHPubKeyBytes = dhSeaKeypair.getPublic().getEncoded();
