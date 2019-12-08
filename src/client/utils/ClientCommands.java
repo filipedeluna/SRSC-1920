@@ -1,7 +1,7 @@
-package shared;
+package client.utils;
 
 
-public enum ServerRequest {
+public enum ClientCommands {
   CREATE("create"),
   LIST("list"),
   NEW("new"),
@@ -10,16 +10,18 @@ public enum ServerRequest {
   RECEIVE("recv"),
   RECEIPT("receipt"),
   STATUS("status"),
-  PARAMS("params");
+  PARAMS("params"),
+  HELP("help"),
+  EXIT("exit");
 
   private final String val;
 
-  ServerRequest(String val) {
+  ClientCommands(String val) {
     this.val = val;
   }
 
-  public static ServerRequest fromString(String name) {
-    for (ServerRequest request : values()) {
+  public static ClientCommands fromString(String name) {
+    for (ClientCommands request : values()) {
       if (request.val.equals(name.toLowerCase().trim()))
         return request;
     }
@@ -33,7 +35,7 @@ public enum ServerRequest {
   }
 
   public boolean needsNonce() {
-    return this != ServerRequest.RECEIPT;
+    return this != ClientCommands.RECEIPT;
   }
 }
 

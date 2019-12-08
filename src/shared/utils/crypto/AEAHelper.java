@@ -51,10 +51,9 @@ public final class AEAHelper {
 
   private String certSignAlg;
   private Signature signature;
-  private int keySize;
 
   // Public Keys ----------------------------------------------------------------------------------------
-  public AEAHelper(String keyAlg, String certSignAlg, int keySize) throws GeneralSecurityException {
+  public AEAHelper(String keyAlg, String certSignAlg) throws GeneralSecurityException {
     random = new RNDHelper();
     cipher = Cipher.getInstance(keyAlg, PROVIDER);
     keyFactory = KeyFactory.getInstance(keyAlg, PROVIDER);
@@ -68,7 +67,6 @@ public final class AEAHelper {
 
     this.certSignAlg = certSignAlg;
     this.keyAlg = keyAlg;
-    this.keySize = keySize;
   }
 
   public PublicKey pubKeyFromBytes(byte[] keyBytes) throws InvalidKeySpecException {
@@ -104,7 +102,7 @@ public final class AEAHelper {
     return cipher.doFinal(data);
   }
 
-  public KeyPair genKeyPair() {
+  public KeyPair genKeyPair(int keySize) {
     keyPairGenerator.initialize(keySize);
 
     return keyPairGenerator.genKeyPair();

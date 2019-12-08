@@ -83,9 +83,8 @@ final class ClientProperties {
   void initAEAHelper(ServerParameterMap serverParams) throws GeneralSecurityException, PropertyException {
     String pubKeyAlg = serverParams.getParameterValue(ServerParameterType.PUB_KEY_ALG);
     String certSignAlg = serverParams.getParameterValue(ServerParameterType.CERT_SIG_ALG);
-    int pubKeySize = Integer.parseInt(serverParams.getParameterValue(ServerParameterType.CERT_SIG_ALG));
 
-    aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize);
+    aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg);
 
     // Get pub key and assign it
     pubKeyName = props.getString(ClientProperty.PUB_KEY_NAME);

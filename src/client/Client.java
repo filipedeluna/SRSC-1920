@@ -5,6 +5,7 @@ import client.errors.ClientException;
 import client.props.ClientProperty;
 import com.google.gson.JsonObject;
 import shared.ServerRequest;
+import shared.errors.request.RequestException;
 import shared.parameters.ServerParameterMap;
 import server.db.wrapper.Message;
 import server.db.wrapper.Receipt;
@@ -12,6 +13,8 @@ import server.db.wrapper.User;
 import server.response.*;
 import shared.errors.properties.PropertyException;
 import shared.errors.request.InvalidFormatException;
+import shared.parameters.ServerParameterType;
+import shared.utils.GsonUtils;
 import shared.utils.crypto.KSHelper;
 import shared.utils.properties.CustomProperties;
 
@@ -58,7 +61,7 @@ public class Client {
       SSLContext sslContext = buildSSLContext(ksHelper, tsHelper);
       SSLSocketFactory factory = sslContext.getSocketFactory();
       SSLSocket socket = (SSLSocket) factory.createSocket(serverAddress, serverPort);
-      socket.setSoTimeout(5 * 1000);
+      socket.setSoTimeout(10 * 1000);
 
       // Set enabled protocols and cipher suites and start SSL socket handshake with server
       String[] enabledProtocols = properties.getStringArr(ClientProperty.TLS_PROTOCOLS);
@@ -69,72 +72,108 @@ public class Client {
       // Start handshake
       System.out.println("SSL setup finished.");
       socket.startHandshake();
-      System.out.println("Handshake completed..");
+      System.out.println("Handshake completed.");
 
       // Create client properties
       ClientProperties cProps = new ClientProperties(properties, ksHelper, tsHelper, socket);
 
-      // Request shared parameters
-      JsonObject serverParamsJSON = requestParams(cProps);
+      // Request shared parameters and that initialize dh and aea helpers
+      requestParams(cProps);
 
-      // Create DH and AEA helper from params
-      ServerParameterMap serverParams = cProps.GSON.fromJson(serverParamsJSON.toString(), ServerParameterMap.class);
-      cProps.initAEAHelper(serverParams);
-      cProps.initDHHelper(serverParams);
+      while (true) {
+        try {
+          // Parse and validate request and create resquest object
+          ServerRequest request = ServerRequest.fromString(args[0]);
+          JsonObject requestData = new JsonObject();
 
-      ServerRequest request = ServerRequest.fromString(args[0]);
+          if (request != null) {
+            // Initialize resquest object with request type
+            requestData.addProperty("type", request.val());
 
-      if (request == null) {
-        System.err.print("Invalid option.");
-        System.exit(-1);
-      }
+            // Get nonce if supposed to for the requested route
+            if (request.needsNonce())
+              requestData.addProperty("nonce", cProps.rndHelper.getString(16, false));
+          }
 
-      // Initialize response object with request type
-      JsonObject requestData = new JsonObject();
-      requestData.addProperty("type", request.val());
-
-      // Get nonce if supposed to for the requested route
-      if (request.needsNonce())
-        requestData.addProperty("nonce", cProps.rndHelper.getString(16, true));
-
-      switch (request) {
-        case CREATE:
-          createUser(cProps, requestData);
-        case LIST:
-          listUsers(cProps, requestData);
-          break;
-        case NEW:
-          listNewMessages(cProps, requestData);
-          break;
-        case ALL:
-          listAllMessages(cProps, requestData);
-          break;
-        case SEND:
-          //missing message encryption
-          sendMessages(cProps, requestData);
-        case RECEIVE:
-          // TODO missing message decryption
-          //contem o receipt, receipt enviado dps de ler
-          receiveMessages(cProps, requestData);
-          break;
-        case STATUS:
-          status(cProps, requestData);
-          break;
-        case RECEIPT:
-        default:
-          // TODO Invalid command
-          // TODO print available commands here
-          // TODO Also create args[0] with help command at start
-          System.err.println("Invalid route");
+          switch (request) {
+            case CREATE:
+              createUser(cProps, requestData);
+            case LIST:
+              listUsers(cProps, requestData);
+              break;
+            case NEW:
+              listNewMessages(cProps, requestData);
+              break;
+            case ALL:
+              listAllMessages(cProps, requestData);
+              break;
+            case SEND:
+              //missing message encryption
+              sendMessages(cProps, requestData);
+            case RECEIVE:
+              // TODO missing message decryption
+              //contem o receipt, receipt enviado dps de ler
+              receiveMessages(cProps, requestData);
+              break;
+            case STATUS:
+              status(cProps, requestData);
+              break;
+            case RECEIPT:
+            default:
+              // TODO Invalid command
+              // TODO print available commands here
+              // TODO Also create args[0] with help command at start
+              System.err.println("Invalid route");
+          }
+        } catch (ClientException e) {
+          System.err.println(e.getMessage());
+        }
       }
     } catch (Exception e) {
-      handleException(e);
-    } finally {
+      System.err.println("CRITICAL ERROR: " + e.getMessage());
       System.exit(-1);
     }
   }
+  // TODO OOOOOOOOOOOOOOOOO VERIFY THE NONCES
 
-  private static void createUser(ClientProperties cProps, JsonObject requestData) throws IOException, GeneralSecurityException, InvalidFormatException, ClientException {
+  private static ServerParameterMap requestParams(ClientProperties cProps) throws InvalidFormatException, GeneralSecurityException, IOException, ClientException {
+    JsonObject requestData = new JsonObject();
+
+    // Create request parameters and send request
+    requestData.addProperty("type", "params");
+    String nonce = cProps.rndHelper.getString(16, false);
+    requestData.addProperty("nonce", nonce);
+    cProps.sendRequest(requestData);
+
+    // Get response and check nonce
+    JsonObject responseJsonObj = cProps.receiveRequest();
+    ParametersResponse paramsResponse = cProps.GSON.fromJson(responseJsonObj, ParametersResponse.class);
+    checkNonce(nonce, paramsResponse.getNonce());
+
+    // Create parameters map class from received JSON
+    ServerParameterMap paramsMap = paramsResponse.getParameters();
+
+    // Initialize AEA and DH Helper with the server parameters
+    try {
+      cProps.initAEAHelper(paramsMap);
+      cProps.initDHHelper(paramsMap);
+    } catch (Exception e) {
+      throw new ClientException("The server parameters received are corrupted.");
+    }
+
+    // Verify parameters signature
+    byte[] signatureDecoded = cProps.b64Helper.decode(paramsMap.getParameterValue(ServerParameterType.PARAM_SIG));
+    byte[] paramsBytes = paramsMap.getAllParametersBytes();
+
+    boolean sigValid = cProps.aeaHelper.verifySignature(cProps.getServerPublicKey(), paramsBytes, signatureDecoded);
+
+    if (!sigValid)
+      throw new ClientException("The server parameters signature is not valid.");
+
+    return paramsMap;
+  }
+
+  private static void createUser(ClientProperties cProps, JsonObject requestData) throws IOException, GeneralSecurityException, RequestException, ClientException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
 
     // Generate a uuid from a users chosen username, adding entropy to it
@@ -181,8 +220,11 @@ public class Client {
     requestData.addProperty("secDataSignature", cProps.b64Helper.encode(paramsSignatureBytes));
     cProps.sendRequest(requestData);
 
-    JsonObject obj = cProps.receiveRequest();
-    CreateUserResponse resp = cProps.GSON.fromJson(obj, CreateUserResponse.class);
+    // Get response and check nonce
+    JsonObject responseJsonObj = cProps.receiveRequest();
+    CreateUserResponse resp = cProps.GSON.fromJson(responseJsonObj, CreateUserResponse.class);
+
+    checkNonce(requestData, resp.getNonce());
 
     System.out.println("User_ID: " + resp.getUserId());
   }
@@ -270,7 +312,7 @@ public class Client {
     // TODO Create and save dh shared sea and mac keys
     //if (!cProps.KSHelper.dhKeyPairExists(clientId, destinationId)) {
     //  cProps.KSHelper.saveDHKeyPair(clientId, destinationId, socket);
-   // }
+    // }
 
     //load shared key
     cProps.ksHelper.getKey(clientId + "-" + destinationId + "-shared");
@@ -320,22 +362,6 @@ public class Client {
 
   }
 
-  private static JsonObject requestParams(ClientProperties cProps) throws InvalidFormatException, GeneralSecurityException, IOException {
-    JsonObject requestData = new JsonObject();
-    //vai explodir no server devido a nao ter o decode b64
-    requestData.addProperty("type", "params");
-    requestData.addProperty("nonce", cProps.rndHelper.getString(16, true));
-    cProps.sendRequest(requestData);
-
-    //parses answer from server
-    JsonObject obj = cProps.receiveRequest();
-    ParametersResponse response = cProps.GSON.fromJson(obj.toString(), ParametersResponse.class);
-
-    cProps.aeaHelper.verifySignature(cProps.getServerPublicKey(), response.getParameters().getBytes(), response.getSignature().getBytes());
-    //gets the json
-    return cProps.GSON.fromJson(response.getParameters(), JsonObject.class);
-  }
-
   private static void getUsers(KeyStore keyStore, int sourceId, int destinationId, SSLSocket socket, ClientProperties cProps) throws IOException, InvalidFormatException, GeneralSecurityException, PropertyException {
     JsonObject requestData = new JsonObject();
     requestData.addProperty("type", "dhvaluereq");
@@ -373,22 +399,6 @@ public class Client {
 
   }
 
-  private static void handleException(Exception e) {
-    boolean expected = false;
-
-    if (e instanceof PropertyException)
-      expected = true;
-
-    if (expected) {
-      System.err.println(e.getMessage());
-    } else {
-      System.err.println("CRITICAL ERROR.");
-    }
-
-    if (DEBUG_MODE)
-      e.printStackTrace();
-  }
-
   private static KSHelper getKeyStore(CustomProperties properties) throws PropertyException, GeneralSecurityException, IOException {
     String keyStoreLoc = properties.getString(ClientProperty.KEYSTORE_LOC);
     String keyStorePass = properties.getString(ClientProperty.KEYSTORE_PASS);
@@ -417,6 +427,15 @@ public class Client {
     return sslContext;
   }
 
+  private static void checkNonce(String sent, String received) throws ClientException {
+    if (!sent.equals(received))
+      throw new ClientException("Server replied with invalid nonce.");
+  }
+
+  private static void checkNonce(JsonObject jsonObject, String received) throws ClientException {
+    if (!jsonObject.get("nonce").getAsString().equals(received))
+      throw new ClientException("Server replied with invalid nonce.");
+  }
   /*
     UTILS
   */

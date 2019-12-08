@@ -4,7 +4,6 @@ import org.sqlite.JDBC;
 import server.db.wrapper.Message;
 import server.db.wrapper.Receipt;
 import server.db.wrapper.User;
-import server.errors.parameters.ParameterException;
 import shared.Pair;
 import shared.errors.db.*;
 import shared.parameters.ServerParameterMap;
@@ -85,7 +84,6 @@ public final class ServerDatabaseDriver {
 
       query =
           "CREATE TABLE IF NOT EXISTS server_params (" +
-              "id    INTEGER NOT NULL UNIQUE, " +
               "name  TEXT    NOT NULL UNIQUE, " +
               "value TEXT    NOT NULL " +
               ");";
@@ -382,11 +380,10 @@ public final class ServerDatabaseDriver {
   public void insertParameter(ServerParameterType parameter, String value) throws CriticalDatabaseException, FailedToInsertException {
     try {
       // Does not exist so we create it
-      String statement = "INSERT INTO server_params (id, name, value) VALUES (?, ?, ?);";
+      String statement = "INSERT INTO server_params (name, value) VALUES (?, ?);";
       PreparedStatement ps = connection.prepareStatement(statement);
-      ps.setInt(1, paramCounter++);
-      ps.setString(2, parameter.dbName());
-      ps.setString(3, value);
+      ps.setString(1, parameter.dbName());
+      ps.setString(2, value);
 
       int updated = ps.executeUpdate();
 
@@ -410,29 +407,9 @@ public final class ServerDatabaseDriver {
     }
   }
 
-  // TODO useless?
-  public String getParameter(ServerParameterType parameter) throws CriticalDatabaseException, EntryNotFoundException {
-    try {
-      String selectUser = "SELECT value FROM server_params WHERE name = ?;";
-
-      PreparedStatement ps = connection.prepareStatement(selectUser);
-      ps.setString(1, parameter.dbName());
-
-      ResultSet rs = ps.executeQuery();
-
-      // Param was not found
-      if (!rs.next())
-        throw new EntryNotFoundException();
-
-      return rs.getString("value");
-    } catch (SQLException e) {
-      throw new CriticalDatabaseException(e);
-    }
-  }
-
   public ServerParameterMap getAllParameters() throws CriticalDatabaseException {
     try {
-      String selectUser = "SELECT * FROM server_params ORDER BY id;";
+      String selectUser = "SELECT * FROM server_params ORDER BY ROWID;";
 
       PreparedStatement ps = connection.prepareStatement(selectUser);
 
@@ -442,17 +419,13 @@ public final class ServerDatabaseDriver {
 
       while (rs.next()) {
         params.put(
-            rs.getInt("id"),
             rs.getString("name"),
             rs.getString("value"));
       }
 
       return params;
-    } catch (SQLException | ParameterException e) {
-      if (e instanceof ParameterException)
-        throw new CriticalDatabaseException((ParameterException) e);
-
-      throw new CriticalDatabaseException((SQLException) e);
+    } catch (SQLException e) {
+      throw new CriticalDatabaseException(e);
     }
   }
 }

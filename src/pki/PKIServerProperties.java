@@ -31,6 +31,7 @@ final class PKIServerProperties {
   private String pubKeyName;
   private String ksPassword;
   private String token;
+  private int pubKeySize;
 
   PKIServerProperties(CustomProperties props, PKIDatabaseDriver db, Logger logger, KSHelper ksHelper) throws PropertyException, GeneralSecurityException {
     this.ksHelper = ksHelper;
@@ -54,8 +55,8 @@ final class PKIServerProperties {
     // Initialize AEA params
     String pubKeyAlg = props.getString(PKIProperty.PUB_KEY_ALG);
     String certSignAlg = props.getString(PKIProperty.CERT_SIGN_ALG);
-    int pubKeySize = props.getInt(PKIProperty.PUB_KEY_SIZE);
-    aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize);
+    pubKeySize = props.getInt(PKIProperty.PUB_KEY_SIZE);
+    aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg);
 
     // Get pub key and assign it
     pubKeyName = props.getString(PKIProperty.PKI_PUB_KEY);
@@ -70,5 +71,9 @@ final class PKIServerProperties {
 
   boolean isTokenValid(String token) {
     return this.token.equals(token);
+  }
+
+  public int getPubKeySize() {
+    return pubKeySize;
   }
 }

@@ -9,6 +9,7 @@ import shared.utils.properties.CustomProperties;
 
 import javax.net.ssl.*;
 import java.io.IOException;
+import java.security.SecureRandom;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.logging.FileHandler;
@@ -70,7 +71,7 @@ final class PKIServer {
       int port = props.getInt(PKIProperty.PORT);
 
       SSLContext sslContext = SSLContext.getInstance("TLS", providerTLS);
-      sslContext.init(keyManagerFactory.getKeyManagers(), null, null);
+      sslContext.init(keyManagerFactory.getKeyManagers(), null, new SecureRandom());
 
       SSLServerSocketFactory ssf = sslContext.getServerSocketFactory();
       SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port);

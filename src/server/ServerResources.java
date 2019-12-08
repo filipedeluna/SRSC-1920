@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.logging.Level;
 
 final class ServerResources implements Runnable {
@@ -327,9 +328,8 @@ final class ServerResources implements Runnable {
   private void params(String nonce) throws CriticalDatabaseException, IOException {
     // Get params and parse to json object
     ServerParameterMap params = props.DB.getAllParameters();
-    String paramsJSON = props.GSON.toJson(params);
 
-    send(new ParametersResponse(nonce, paramsJSON, paramsJSON));
+    send(new ParametersResponse(nonce, params));
   }
 
   /*

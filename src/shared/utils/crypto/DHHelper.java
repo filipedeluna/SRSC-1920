@@ -21,7 +21,7 @@ public class DHHelper {
     keyPairGenerator = KeyPairGenerator.getInstance(dhAlg, PROVIDER);
     keyAgreement = KeyAgreement.getInstance(dhAlg, PROVIDER);
     hash = MessageDigest.getInstance(hashAlg, PROVIDER);
-    algParamsGenerator = AlgorithmParameterGenerator.getInstance(dhAlg, PROVIDER);
+    algParamsGenerator = AlgorithmParameterGenerator.getInstance(dhAlg);
 
     algParamsGenerator.init(keySize);
 

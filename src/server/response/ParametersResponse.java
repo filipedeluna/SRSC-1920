@@ -1,20 +1,16 @@
 package server.response;
 
-public final class ParametersResponse extends OkResponseWithNonce {
-  private final String parameters;
-  private final String signature;
+import shared.parameters.ServerParameterMap;
 
-  public ParametersResponse(String nonce, String parameters, String signature) {
+public final class ParametersResponse extends OkResponseWithNonce {
+  private final ServerParameterMap parameters;
+
+  public ParametersResponse(String nonce, ServerParameterMap parameters) {
     super(nonce);
     this.parameters = parameters;
-    this.signature = signature;
   }
 
-  public String getParameters() {
+  public ServerParameterMap getParameters() {
     return parameters;
-  }
-
-  public String getSignature() {
-    return signature;
   }
 }

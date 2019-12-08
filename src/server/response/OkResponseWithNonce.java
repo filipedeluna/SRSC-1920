@@ -8,4 +8,8 @@ abstract class OkResponseWithNonce extends OKResponse {
   OkResponseWithNonce(String nonce) {
     this.nonce = nonce;
   }
+
+  public String getNonce() {
+    return nonce;
+  }
 }

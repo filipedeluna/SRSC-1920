@@ -3,6 +3,8 @@ package server;
 import com.google.gson.Gson;
 import server.crypt.PKICommsManager;
 import server.db.ServerDatabaseDriver;
+import shared.Pair;
+import shared.errors.db.FailedToInsertException;
 import shared.parameters.ServerParameterMap;
 import shared.parameters.ServerParameterType;
 import server.errors.parameters.ParameterException;
@@ -18,6 +20,7 @@ import javax.crypto.spec.DHParameterSpec;
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.security.*;
+import java.util.Map.Entry;
 import java.util.logging.Logger;
 
 final class ServerProperties {
@@ -34,6 +37,7 @@ final class ServerProperties {
   private DHHelper dhHelper;
 
   private String pubKeyName;
+  private int pubKeySize;
   private String ksPassword;
 
   private int bufferSizeInMB;
@@ -61,8 +65,8 @@ final class ServerProperties {
     // Initialize AEA params
     String pubKeyAlg = properties.getString(ServerProperty.PUB_KEY_ALG);
     String certSignAlg = properties.getString(ServerProperty.CERT_SIGN_ALG);
-    int pubKeySize = properties.getInt(ServerProperty.PUB_KEY_SIZE);
-    aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg, pubKeySize);
+    pubKeySize = properties.getInt(ServerProperty.PUB_KEY_SIZE);
+    aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg);
 
     // Get pub key and assign it
     pubKeyName = properties.getString(ServerProperty.PUB_KEY_NAME);
@@ -95,25 +99,37 @@ final class ServerProperties {
     ServerParameterMap params = new ServerParameterMap();
 
     // Insert AEA parameters
-    params.put(ServerParameterType.PUB_KEY_ALG, aeaHelper.getKeyAlg());
-    params.put(ServerParameterType.CERT_SIG_ALG, aeaHelper.getCertAlg());
+    insertParameter(params, ServerParameterType.PUB_KEY_ALG, aeaHelper.getKeyAlg());
+    insertParameter(params, ServerParameterType.CERT_SIG_ALG, aeaHelper.getCertAlg());
 
     // Generate DH Spec and insert DH parameters
     DHParameterSpec spec = dhHelper.genParams();
-    params.put(ServerParameterType.DH_ALG, dhHelper.getAlgorithm());
-    params.put(ServerParameterType.DH_P, spec.getP().toString()); // Big Int
-    params.put(ServerParameterType.DH_G, spec.getG().toString()); // Big Int
-    params.put(ServerParameterType.DH_KEYSIZE, String.valueOf(dhHelper.getKeySize())); // int
-    params.put(ServerParameterType.DH_HASH_ALG, dhHelper.getHashAlgorithm());
+    insertParameter(params, ServerParameterType.DH_ALG, dhHelper.getAlgorithm());
+    insertParameter(params, ServerParameterType.DH_P, spec.getP().toString()); // Big Int
+    insertParameter(params, ServerParameterType.DH_G, spec.getG().toString()); // Big Int
+    insertParameter(params, ServerParameterType.DH_KEYSIZE, String.valueOf(dhHelper.getKeySize())); // int
+    insertParameter(params, ServerParameterType.DH_HASH_ALG, dhHelper.getHashAlgorithm());
 
     // Join all parameters, sign them, encode them and insert them in DB
     byte[] paramBytes = params.getAllParametersBytes();
     byte[] paramSigBytes = aeaHelper.sign(privateKey(), paramBytes);
 
-    DB.insertParameter(ServerParameterType.PARAM_SIG, b64Helper.encode(paramSigBytes));
+    insertParameter(params, ServerParameterType.PARAM_SIG, b64Helper.encode(paramSigBytes));
   }
 
   public int getBufferSizeInMB() {
     return bufferSizeInMB;
+  }
+
+  public int getPubKeySize() {
+    return pubKeySize;
+  }
+
+  /*
+      Utils
+    */
+  private void insertParameter(ServerParameterMap params, ServerParameterType type, String value) throws CriticalDatabaseException, FailedToInsertException {
+    params.put(type, value);
+    DB.insertParameter(type, value);
   }
 }

@@ -88,7 +88,10 @@ final class Server {
       String databaseLocation = properties.getString(ServerProperty.DATABASE_LOC);
       ServerDatabaseDriver db = new ServerDatabaseDriver(databaseLocation);
 
+      // Generate props (with new parameters if configured)
       ServerProperties props = new ServerProperties(properties, ksHelper, db, logger, sslContext);
+      if (properties.getBool(ServerProperty.PARAMS_RESET))
+        System.out.println("Parameters have been generated.");
 
       // Client serving loop
       SSLSocket sslClient;
