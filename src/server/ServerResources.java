@@ -194,10 +194,8 @@ final class ServerResources implements Runnable {
       throw new CustomRequestException("User id not found", HTTPStatus.NOT_FOUND);
     }
 
-    // Parse user list to json and send
-    String usersJSON = props.GSON.toJson(users);
-
-    send(new ListUsersResponse(nonce, usersJSON));
+    // Send user list
+    send(new ListUsersResponse(nonce, users));
   }
 
   // List new messages

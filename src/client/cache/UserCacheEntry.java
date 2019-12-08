@@ -1,26 +1,26 @@
 package client.cache;
 
+import java.security.PublicKey;
+
 public class UserCacheEntry extends CacheEntry {
-  private byte[] pubKey;
+  private PublicKey pubKey;
   private byte[] dhSeaPubKey;
   private byte[] dhMacPubKey;
-  private byte[] seaSpec;
-  private byte[] macSpec;
-  private byte[] secDataSignature;
+  private String seaSpec;
+  private String macSpec;
 
-  public UserCacheEntry(byte[] pubKey, byte[] dhSeaPubKey, byte[] dhMacPubKey, byte[] seaSpec, byte[] macSpec, byte[] secDataSignature) {
+  public UserCacheEntry(PublicKey pubKey, byte[] dhSeaPubKey, byte[] dhMacPubKey, String seaSpec, String macSpec) {
     this.pubKey = pubKey;
     this.dhSeaPubKey = dhSeaPubKey;
     this.dhMacPubKey = dhMacPubKey;
     this.seaSpec = seaSpec;
     this.macSpec = macSpec;
-    this.secDataSignature = secDataSignature;
 
     // Get rough estimate of size
-    size = pubKey.length + dhSeaPubKey.length + dhMacPubKey.length + seaSpec.length + macSpec.length + secDataSignature.length;
+    size = pubKey.getEncoded().length + dhSeaPubKey.length + dhMacPubKey.length + seaSpec.getBytes().length + macSpec.getBytes().length;
   }
 
-  public byte[] getPubKey() {
+  public PublicKey getPubKey() {
     return pubKey;
   }
 
@@ -32,15 +32,11 @@ public class UserCacheEntry extends CacheEntry {
     return dhMacPubKey;
   }
 
-  public byte[] getSeaSpec() {
+  public String getSeaSpec() {
     return seaSpec;
   }
 
-  public byte[] getMacSpec() {
+  public String getMacSpec() {
     return macSpec;
-  }
-
-  public byte[] getSecDataSignature() {
-    return secDataSignature;
   }
 }

@@ -1,7 +1,5 @@
 package shared.utils.crypto;
 
-import shared.utils.CryptUtil;
-
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;

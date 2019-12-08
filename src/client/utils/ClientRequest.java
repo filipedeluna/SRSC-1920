@@ -4,7 +4,7 @@ package client.utils;
 public enum ClientRequest {
   LOGIN("login", 1),
   CREATE("create", 1),
-  LIST("list",1),
+  LIST("list", -1),
   NEW("new", 1),
   ALL("all", 1),
   SEND("send", 1),
@@ -40,8 +40,11 @@ public enum ClientRequest {
   }
 
   // Number of args not counting with args[0] (command)
-  public int numberOfArgs() {
-    return arguments;
+  public boolean checkArgs(int argSize) {
+    if (this == LIST && argSize < 3)
+      return true;
+
+    return argSize - 1 == arguments;
   }
 }
 

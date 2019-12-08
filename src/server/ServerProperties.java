@@ -6,7 +6,6 @@ import server.db.ServerDatabaseDriver;
 import shared.errors.db.FailedToInsertException;
 import shared.parameters.ServerParameterMap;
 import shared.parameters.ServerParameterType;
-import server.errors.ParameterException;
 import server.props.ServerProperty;
 import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
@@ -17,7 +16,6 @@ import shared.utils.properties.CustomProperties;
 
 import javax.crypto.spec.DHParameterSpec;
 import javax.net.ssl.SSLContext;
-import java.io.IOException;
 import java.security.*;
 import java.util.logging.Logger;
 
@@ -43,7 +41,7 @@ final class ServerProperties {
   boolean PKI_ENABLED;
   volatile PKICommsManager PKI_COMMS_MGR;
 
-  ServerProperties(CustomProperties properties, KSHelper ksHelper, ServerDatabaseDriver db, Logger logger, SSLContext sslContext) throws PropertyException, GeneralSecurityException, IOException, DatabaseException, CriticalDatabaseException, ParameterException {
+  ServerProperties(CustomProperties properties, KSHelper ksHelper, ServerDatabaseDriver db, Logger logger, SSLContext sslContext) throws PropertyException, GeneralSecurityException, DatabaseException, CriticalDatabaseException {
     this.ksHelper = ksHelper;
 
     // Set Debug mode
@@ -89,7 +87,7 @@ final class ServerProperties {
     return (PrivateKey) ksHelper.getKey(pubKeyName);
   }
 
-  private void resetParams() throws GeneralSecurityException, DatabaseException, CriticalDatabaseException, IOException, ParameterException {
+  private void resetParams() throws GeneralSecurityException, DatabaseException, CriticalDatabaseException {
     // Delete all params
     DB.deleteAllParameters();
 

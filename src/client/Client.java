@@ -1,5 +1,6 @@
 package client;
 
+import client.cache.UserCacheEntry;
 import client.crypt.DHKeyType;
 import client.errors.ClientException;
 import client.props.ClientProperty;
@@ -7,7 +8,7 @@ import client.utils.ClientRequest;
 import com.google.gson.JsonObject;
 import shared.errors.request.RequestException;
 import shared.parameters.ServerParameterMap;
-import shared.utils.CryptUtil;
+import shared.utils.Utils;
 import shared.wrappers.Message;
 import shared.wrappers.Receipt;
 import shared.wrappers.User;
@@ -18,12 +19,9 @@ import shared.response.server.*;
 import shared.utils.crypto.KSHelper;
 import shared.utils.properties.CustomProperties;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.spec.DHParameterSpec;
 import javax.net.ssl.*;
 import java.io.*;
-import java.lang.reflect.Type;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.text.DateFormat;
@@ -88,7 +86,7 @@ public class Client {
           if (request == null)
             throw new ClientException("Invalid command.");
 
-          if (args.length != request.numberOfArgs() + 1)
+          if (!request.checkArgs((args.length)))
             throw new ClientException("Invalid arguments.");
 
           // Initialize request object with request type
@@ -102,10 +100,10 @@ public class Client {
             case CREATE:
               createUser(cProps, requestData);
             case LIST:
-              listUsers(cProps, requestData);
+              listUsers(cProps, requestData, args);
               break;
             case NEW:
-              listNewMessages(cProps, requestData);
+              listNewMessages(cProps, requestData, args);
               break;
             case ALL:
               listAllMessages(cProps, requestData);
@@ -204,11 +202,11 @@ public class Client {
 
     // Get response and check nonce
     JsonObject responseJsonObj = cProps.receiveRequest();
-    ParametersResponse paramsResponse = cProps.GSON.fromJson(responseJsonObj, ParametersResponse.class);
-    checkNonce(nonce, paramsResponse.getNonce());
+    ParametersResponse resp = cProps.GSON.fromJson(responseJsonObj, ParametersResponse.class);
+    checkNonce(requestData, resp.getNonce());
 
     // Create parameters map class from received JSON
-    ServerParameterMap paramsMap = paramsResponse.getParameters();
+    ServerParameterMap paramsMap = resp.getParameters();
 
     // Initialize AEA and DH Helper with the server parameters
     try {
@@ -286,52 +284,115 @@ public class Client {
     System.out.println("User_ID: " + resp.getUserId());
   }
 
-  private static User listUsers(ClientProperties cProps, JsonObject requestData) throws IOException, InvalidFormatException {
-    BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
-    int userid = 0;
-    boolean u = true;
+  private static void listUsers(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, InvalidFormatException, ClientException {
+    // Add id if inserted and send the request
     try {
-      userid = Integer.parseInt(bf.readLine());
-      requestData.addProperty("userId", userid);
-    } catch (IOException e) {
-      u = false;
+      if (args.length == 2)
+        requestData.addProperty("userId", Integer.valueOf(args[1]));
+    } catch (NumberFormatException e) {
+      throw new ClientException("User id has an invalid format.");
     }
+
     cProps.sendRequest(requestData);
 
-    //response
+    // Get response and check the nonce
     JsonObject jsonObject = cProps.receiveRequest();
-    ListUsersResponse lur = cProps.GSON.fromJson(jsonObject, ListUsersResponse.class);
+    ListUsersResponse resp = cProps.GSON.fromJson(jsonObject, ListUsersResponse.class);
 
-    ArrayList<User> l = cProps.GSON.fromJson(lur.getUsers(), (Type) new ArrayList<User>() {
-    }.getClass());
-    if (u) {
-      System.out.println("Listing user :" + userid);
-      System.out.println(l.get(0).getUuid());
-      return l.get(0);
-    } else {
-      System.out.println("Listing users");
-      for (User user : l) {
-        System.out.printf("User id : %s \t User uuid : %s\n", user.getId(), user.getUuid());
+    checkNonce(requestData, resp.getNonce());
+
+    // Extract users from response an add them to the cache
+    ArrayList<User> users = resp.getUsers();
+
+    ArrayList<Integer> obtained = new ArrayList<>();
+    ArrayList<Integer> failed = new ArrayList<>();
+
+    PublicKey userPubKey;
+    for (User user : users) {
+      try {
+        verifyUserSecDataSignature(user, cProps);
+        userPubKey = cProps.aeaHelper.pubKeyFromBytes(cProps.b64Helper.decode(user.getPubKey()));
+      } catch (ClientException | InvalidKeySpecException e) {
+        if (e instanceof ClientException)
+          System.out.println("Failed to validate user with id " + user.getId());
+        else
+          System.out.println("User with id " + user.getId() + " has a corrupted public key.");
+        failed.add(user.getId());
+        continue;
       }
 
+      cProps.cache.addUser(
+          user.getId(),
+          new UserCacheEntry(
+              userPubKey,
+              cProps.b64Helper.decode(user.getDhSeaPubKey()),
+              cProps.b64Helper.decode(user.getDhMacPubKey()),
+              user.getSeaSpec(),
+              user.getMacSpec()
+          )
+      );
+
+      obtained.add(user.getId());
+
+      System.out.println("Obtained users with ids (" + obtained.toString() + ") info.");
+      System.out.println("Failed to obtain user's with ids (" + failed.toString() + ") info.");
     }
-    return null;
   }
 
-  private static void listNewMessages(ClientProperties cProps, JsonObject requestData) throws IOException, InvalidFormatException {
-    BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
+  private static void listNewMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, InvalidFormatException, ClientException {
+    // Add id of user to get new messages
+    int userId;
+    try {
+      userId = Integer.parseInt(args[1]);
+    } catch (NumberFormatException e) {
+      throw new ClientException("User id has an invalid format.");
+    }
 
-    int userid = Integer.parseInt(bf.readLine());
-    requestData.addProperty("userId", userid);
+    requestData.addProperty("userId", userId);
+
     cProps.sendRequest(requestData);
 
+    // Get response and check the nonce
+    JsonObject jsonObject = cProps.receiveRequest();
+    ListNewMessagesResponse resp = cProps.GSON.fromJson(jsonObject, ListNewMessagesResponse.class);
 
-    JsonObject obj = cProps.receiveRequest();
+    checkNonce(requestData, resp.getNonce());
 
-    ListNewMessagesResponse lmr = cProps.GSON.fromJson(obj, ListNewMessagesResponse.class);
-    System.out.println("New messages:");
-    for (int s : lmr.getNewMessageIds()) {
-      System.out.println("Message id: " + s);
+    // Extract users from response an add them to the cache
+    ArrayList<User> users = resp.getUsers();
+
+    ArrayList<Integer> obtained = new ArrayList<>();
+    ArrayList<Integer> failed = new ArrayList<>();
+
+    PublicKey userPubKey;
+    for (User user : users) {
+      try {
+        verifyUserSecDataSignature(user, cProps);
+        userPubKey = cProps.aeaHelper.pubKeyFromBytes(cProps.b64Helper.decode(user.getPubKey()));
+      } catch (ClientException | InvalidKeySpecException e) {
+        if (e instanceof ClientException)
+          System.out.println("Failed to validate user with id " + user.getId());
+        else
+          System.out.println("User with id " + user.getId() + " has a corrupted public key.");
+        failed.add(user.getId());
+        continue;
+      }
+
+      cProps.cache.addUser(
+          user.getId(),
+          new UserCacheEntry(
+              userPubKey,
+              cProps.b64Helper.decode(user.getDhSeaPubKey()),
+              cProps.b64Helper.decode(user.getDhMacPubKey()),
+              user.getSeaSpec(),
+              user.getMacSpec()
+          )
+      );
+
+      obtained.add(user.getId());
+
+      System.out.println("Obtained users with ids (" + obtained.toString() + ") info.");
+      System.out.println("Failed to obtain user's with ids (" + failed.toString() + ") info.");
     }
   }
 
@@ -486,11 +547,6 @@ public class Client {
     return sslContext;
   }
 
-  private static void checkNonce(String sent, String received) throws ClientException {
-    if (!sent.equals(received))
-      throw new ClientException("Server replied with invalid nonce.");
-  }
-
   private static void checkNonce(JsonObject jsonObject, String received) throws ClientException {
     if (!jsonObject.get("nonce").getAsString().equals(received))
       throw new ClientException("Server replied with invalid nonce.");
@@ -514,14 +570,14 @@ public class Client {
   /*
     UTILS
   */
-  private static void verifyUserSecDataSignature(User user, ClientProperties cProps) throws IOException, ClientException {
+  private static void verifyUserSecDataSignature(User user, ClientProperties cProps) throws ClientException {
     try {
       byte[] pubKeyDecoded = cProps.b64Helper.decode(user.getPubKey());
       PublicKey userPublicKey = cProps.aeaHelper.pubKeyFromBytes(pubKeyDecoded);
 
       cProps.aeaHelper.verifySignature(
           userPublicKey,
-          CryptUtil.joinByteArrays(
+          Utils.joinByteArrays(
               cProps.b64Helper.decode(user.getDhSeaPubKey()),
               cProps.b64Helper.decode(user.getDhMacPubKey()),
               user.getSeaSpec().getBytes(),

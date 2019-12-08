@@ -1,8 +1,7 @@
 package shared.parameters;
 
-import shared.utils.CryptUtil;
+import shared.utils.Utils;
 
-import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 
@@ -19,7 +18,7 @@ public final class ServerParameterMap extends LinkedHashMap<String, String> {
     return get(type.dbName());
   }
 
-  public byte[] getAllParametersBytes() throws IOException {
+  public byte[] getAllParametersBytes() {
     byte[] resultArray = new byte[1];
 
     for (Entry<String, String> entry : entrySet()) {
@@ -27,7 +26,7 @@ public final class ServerParameterMap extends LinkedHashMap<String, String> {
       if (entry.getKey().equals(ServerParameterType.PARAM_SIG.dbName()))
         continue;
 
-      resultArray = CryptUtil.joinByteArrays(resultArray, entry.getValue().getBytes());
+      resultArray = Utils.joinByteArrays(resultArray, entry.getValue().getBytes());
     }
 
     return resultArray;
