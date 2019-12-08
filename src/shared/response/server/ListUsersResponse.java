@@ -1,4 +1,6 @@
-package server.response;
+package shared.response.server;
+
+import shared.response.OkResponseWithNonce;
 
 public final class ListUsersResponse extends OkResponseWithNonce {
   private final String users;

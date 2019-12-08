@@ -1,4 +1,4 @@
-package pki.responses;
+package shared.response.pki;
 
 import shared.response.OKResponse;
 

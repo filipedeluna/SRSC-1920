@@ -1,4 +1,6 @@
-package server.response;
+package shared.response.server;
+
+import shared.response.OkResponseWithNonce;
 
 public final class CreateUserResponse extends OkResponseWithNonce {
   private final int userId;

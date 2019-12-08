@@ -4,17 +4,16 @@ import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
 import server.db.wrapper.Message;
 import server.db.wrapper.Receipt;
-import server.response.*;
 import shared.parameters.ServerParameterMap;
 import server.db.wrapper.User;
 import shared.Pair;
-import shared.ServerRequest;
+import server.request.ServerRequest;
 import shared.errors.IHTTPStatusException;
 import shared.errors.db.*;
 import shared.errors.request.*;
 import shared.http.HTTPStatus;
-import shared.response.ErrorResponse;
-import shared.response.GsonResponse;
+import shared.response.*;
+import shared.response.server.*;
 import shared.utils.GsonUtils;
 import shared.utils.SafeInputStreamReader;
 
@@ -25,7 +24,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.logging.Level;
 
 final class ServerResources implements Runnable {
@@ -113,6 +111,9 @@ final class ServerResources implements Runnable {
         case RECEIPT:
           insertReceipt(requestData);
           break;
+        case LOGIN:
+          searchUser(requestData, nonce);
+          break;
         case STATUS:
           getReceipts(requestData, nonce);
           break;
@@ -179,14 +180,14 @@ final class ServerResources implements Runnable {
     ArrayList<User> users = new ArrayList<>();
 
     if (userId < 0)
-      users.add(props.DB.getUser(userId));
+      users.add(props.DB.getUserById(userId));
     else
       users = props.DB.getAllUsers();
 
     // Detect if supposed to get 1 or multiple users
     try {
       if (userId > 0)
-        users.add(props.DB.getUser(userId));
+        users.add(props.DB.getUserById(userId));
       else
         users = props.DB.getAllUsers();
     } catch (EntryNotFoundException e) {
@@ -267,8 +268,9 @@ final class ServerResources implements Runnable {
     // Try to insert message in db
     try {
       int insertedMessageId = props.DB.insertMessage(message);
+
       send(new SendMessageResponse(nonce, insertedMessageId));
-    } catch (DatabaseException e) {
+    } catch (FailedToInsertException e) {
       throw new CustomRequestException("User id not found", HTTPStatus.NOT_FOUND);
     }
   }
@@ -280,6 +282,7 @@ final class ServerResources implements Runnable {
     // Get specific message and create response object
     try {
       Message message = props.DB.getMessage(messageId);
+
       send(new ReceiveMessageResponse(nonce, message));
     } catch (EntryNotFoundException e) {
       throw new CustomRequestException("Message id not found", HTTPStatus.NOT_FOUND);
@@ -324,9 +327,25 @@ final class ServerResources implements Runnable {
     }
   }
 
+  // Get a user details by uuid
+  private void searchUser(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
+    // Get intended user from uuid
+    String uuid = GsonUtils.getString(requestData, "uuid");
+
+    User user;
+    try {
+      user = props.DB.getUserByUUID(uuid);
+
+      // Send requested user details
+      send(new LoginResponse(nonce, user));
+    } catch (EntryNotFoundException e) {
+      throw new CustomRequestException("User not found with this uuid.", HTTPStatus.NOT_FOUND);
+    }
+  }
+
   // Get all server params
   private void params(String nonce) throws CriticalDatabaseException, IOException {
-    // Get params and parse to json object
+    // Get params and send to user
     ServerParameterMap params = props.DB.getAllParameters();
 
     send(new ParametersResponse(nonce, params));

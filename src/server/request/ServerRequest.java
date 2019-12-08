@@ -1,4 +1,4 @@
-package shared;
+package server.request;
 
 
 public enum ServerRequest {
@@ -10,7 +10,8 @@ public enum ServerRequest {
   RECEIVE("recv"),
   RECEIPT("receipt"),
   STATUS("status"),
-  PARAMS("params");
+  PARAMS("params"),
+  LOGIN("login");
 
   private final String val;
 

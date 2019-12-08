@@ -3,7 +3,7 @@ package server.db.wrapper;
 import java.io.Serializable;
 
 public final class User implements Serializable {
-  private String id;
+  private int id;
   private String uuid;
   private String pubKey;
 
@@ -36,7 +36,17 @@ public final class User implements Serializable {
     this.secDataSignature = secDataSignature;
   }
 
-  public String getId() {
+  public User(int id, String pubKey, String dhSeaPubKey, String dhMacPubKey, String seaSpec, String macSpec, String secDataSignature) {
+    this.id = id;
+    this.pubKey = pubKey;
+    this.dhSeaPubKey = dhSeaPubKey;
+    this.dhMacPubKey = dhMacPubKey;
+    this.seaSpec = seaSpec;
+    this.macSpec = macSpec;
+    this.secDataSignature = secDataSignature;
+  }
+
+  public int getId() {
     return id;
   }
 

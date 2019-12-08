@@ -1,6 +1,7 @@
-package server.response;
+package shared.response.server;
 
 import shared.parameters.ServerParameterMap;
+import shared.response.OkResponseWithNonce;
 
 public final class ParametersResponse extends OkResponseWithNonce {
   private final ServerParameterMap parameters;

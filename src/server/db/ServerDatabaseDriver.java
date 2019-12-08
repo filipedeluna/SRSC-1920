@@ -18,12 +18,10 @@ public final class ServerDatabaseDriver {
   private static final int ERR_FOREIGN_KEY_CONSTRAINT = 787;
 
   private Connection connection;
-  private int paramCounter;
 
   public ServerDatabaseDriver(String dbPath) throws CriticalDatabaseException {
     // Connect to file
     connection = connect(dbPath);
-    paramCounter = 0; // control insertion of params so the order for hashing is known
 
     // Create tables they do not exist
     createTables();
@@ -125,7 +123,7 @@ public final class ServerDatabaseDriver {
     }
   }
 
-  public User getUser(int id) throws CriticalDatabaseException, EntryNotFoundException {
+  public User getUserById(int id) throws CriticalDatabaseException, EntryNotFoundException {
     try {
       String selectUser = "SELECT * FROM users WHERE user_id = ?;";
 
@@ -151,6 +149,35 @@ public final class ServerDatabaseDriver {
       throw new CriticalDatabaseException(e);
     }
   }
+
+  public User getUserByUUID(String uuid) throws CriticalDatabaseException, EntryNotFoundException {
+    try {
+      String selectUser = "SELECT * FROM users WHERE uuid = ?;";
+
+      PreparedStatement ps = connection.prepareStatement(selectUser);
+      ps.setString(1, uuid);
+
+      ResultSet rs = ps.executeQuery();
+
+      rs.next();
+
+      return new User(
+          rs.getInt("user_id"),
+          rs.getString("pub_key"),
+          rs.getString("dh_sea_pub_key"),
+          rs.getString("dh_mac_pub_key"),
+          rs.getString("sea_spec"),
+          rs.getString("mac_spec"),
+          rs.getString("sec_data_signature")
+      );
+    } catch (SQLException e) {
+      if (e.getErrorCode() == ERR_NOT_FOUND)
+        throw new EntryNotFoundException();
+
+      throw new CriticalDatabaseException(e);
+    }
+  }
+
 
   public ArrayList<User> getAllUsers() throws CriticalDatabaseException {
     try {

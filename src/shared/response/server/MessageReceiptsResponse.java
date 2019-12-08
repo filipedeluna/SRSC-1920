@@ -1,7 +1,8 @@
-package server.response;
+package shared.response.server;
 
 import server.db.wrapper.Message;
 import server.db.wrapper.Receipt;
+import shared.response.OkResponseWithNonce;
 
 import java.util.ArrayList;
 
