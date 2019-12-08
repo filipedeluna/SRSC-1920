@@ -1,6 +1,6 @@
 package shared.response.server;
 
-import server.db.wrapper.User;
+import shared.wrappers.User;
 import shared.response.OkResponseWithNonce;
 
 public class LoginResponse extends OkResponseWithNonce {

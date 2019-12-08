@@ -3,11 +3,10 @@ package server;
 import com.google.gson.Gson;
 import server.crypt.PKICommsManager;
 import server.db.ServerDatabaseDriver;
-import shared.Pair;
 import shared.errors.db.FailedToInsertException;
 import shared.parameters.ServerParameterMap;
 import shared.parameters.ServerParameterType;
-import server.errors.parameters.ParameterException;
+import server.errors.ParameterException;
 import server.props.ServerProperty;
 import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
@@ -20,7 +19,6 @@ import javax.crypto.spec.DHParameterSpec;
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.security.*;
-import java.util.Map.Entry;
 import java.util.logging.Logger;
 
 final class ServerProperties {

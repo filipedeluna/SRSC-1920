@@ -1,9 +1,9 @@
 package server.db;
 
 import org.sqlite.JDBC;
-import server.db.wrapper.Message;
-import server.db.wrapper.Receipt;
-import server.db.wrapper.User;
+import shared.wrappers.Message;
+import shared.wrappers.Receipt;
+import shared.wrappers.User;
 import shared.Pair;
 import shared.errors.db.*;
 import shared.parameters.ServerParameterMap;

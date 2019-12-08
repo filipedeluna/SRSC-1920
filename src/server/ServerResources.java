@@ -2,10 +2,10 @@ package server;
 
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
-import server.db.wrapper.Message;
-import server.db.wrapper.Receipt;
+import shared.wrappers.Message;
+import shared.wrappers.Receipt;
 import shared.parameters.ServerParameterMap;
-import server.db.wrapper.User;
+import shared.wrappers.User;
 import shared.Pair;
 import server.request.ServerRequest;
 import shared.errors.IHTTPStatusException;

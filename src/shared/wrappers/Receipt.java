@@ -1,4 +1,4 @@
-package server.db.wrapper;
+package shared.wrappers;
 
 import java.io.Serializable;
 

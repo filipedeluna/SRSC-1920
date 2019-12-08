@@ -1,6 +1,6 @@
 package shared.response.server;
 
-import server.db.wrapper.Message;
+import shared.wrappers.Message;
 import shared.response.OkResponseWithNonce;
 
 public final class ReceiveMessageResponse extends OkResponseWithNonce {

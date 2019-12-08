@@ -19,7 +19,6 @@ import javax.net.ssl.SSLSocket;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.security.GeneralSecurityException;
-import java.security.KeyStoreException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.X509Certificate;
@@ -50,6 +49,7 @@ final class ClientProperties {
   private final PublicKey clientPublicKey;
 
   private String pubKeyName;
+  private ClientSession session;
 
   ClientProperties(CustomProperties props, KSHelper ksHelper, KSHelper tsHelper, SSLSocket socket) throws PropertyException, GeneralSecurityException, IOException {
     this.props = props;
@@ -134,5 +134,13 @@ final class ClientProperties {
 
   public JsonObject receiveRequest() throws InvalidFormatException {
     return GsonUtils.parseRequest(input);
+  }
+
+  public ClientSession getSession() {
+    return session;
+  }
+
+  public void establishSession(ClientSession session) {
+    this.session = session;
   }
 }

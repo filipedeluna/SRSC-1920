@@ -1,6 +1,6 @@
 package shared.errors.db;
 
-import server.errors.parameters.ParameterException;
+import server.errors.ParameterException;
 
 import java.sql.SQLException;
 

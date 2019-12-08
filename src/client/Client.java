@@ -7,9 +7,10 @@ import client.utils.ClientRequest;
 import com.google.gson.JsonObject;
 import shared.errors.request.RequestException;
 import shared.parameters.ServerParameterMap;
-import server.db.wrapper.Message;
-import server.db.wrapper.Receipt;
-import server.db.wrapper.User;
+import shared.utils.CryptUtil;
+import shared.wrappers.Message;
+import shared.wrappers.Receipt;
+import shared.wrappers.User;
 import shared.errors.properties.PropertyException;
 import shared.errors.request.InvalidFormatException;
 import shared.parameters.ServerParameterType;
@@ -17,11 +18,14 @@ import shared.response.server.*;
 import shared.utils.crypto.KSHelper;
 import shared.utils.properties.CustomProperties;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.spec.DHParameterSpec;
 import javax.net.ssl.*;
 import java.io.*;
 import java.lang.reflect.Type;
 import java.security.*;
+import java.security.spec.InvalidKeySpecException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -80,14 +84,19 @@ public class Client {
           ClientRequest request = ClientRequest.fromString(args[0]);
           JsonObject requestData = new JsonObject();
 
-          if (request != null) {
-            // Initialize resquest object with request type
-            requestData.addProperty("type", request.val());
+          // Check request is valid and argument length correct
+          if (request == null)
+            throw new ClientException("Invalid command.");
 
-            // Get nonce if supposed to for the requested route
-            if (request.needsNonce())
-              requestData.addProperty("nonce", cProps.rndHelper.getNonce());
-          }
+          if (args.length != request.numberOfArgs() + 1)
+            throw new ClientException("Invalid arguments.");
+
+          // Initialize request object with request type
+          requestData.addProperty("type", request.val());
+
+          // Get nonce if supposed to for the requested route
+          if (request.needsNonce())
+            requestData.addProperty("nonce", cProps.rndHelper.getNonce());
 
           switch (request) {
             case CREATE:
@@ -113,6 +122,7 @@ public class Client {
               status(cProps, requestData);
               break;
             case LOGIN:
+              login(cProps, requestData, args);
               break;
             case HELP:
               printCommands();
@@ -136,7 +146,52 @@ public class Client {
     }
   }
 
-  // TODO OOOOOOOOOOOOOOOOO VERIFY THE NONCES
+  private static void login(ClientProperties cProps, JsonObject requestData, String[] args) throws ClientException, IOException, InvalidFormatException {
+    // Get username, compute uuid and add to request
+    String username = args[1].trim();
+    String uuid = cProps.generateUUID(username);
+
+    requestData.addProperty("uuid", uuid);
+
+    // Get response and check nonce
+    JsonObject responseJsonObj = cProps.receiveRequest();
+    LoginResponse resp = cProps.GSON.fromJson(responseJsonObj, LoginResponse.class);
+
+    checkNonce(requestData, resp.getNonce());
+
+    // Get user details from response and check data signature
+    User user = resp.getUser();
+    verifyUserSecDataSignature(user, cProps);
+
+    // Check if user dh keys exist
+    if (!cProps.ksHelper.dhKeyPairExists(username, DHKeyType.SEA) || !cProps.ksHelper.dhKeyPairExists(username, DHKeyType.SEA))
+      throw new ClientException("User keys not found.");
+
+    // Get user dh keys
+    KeyPair seaDhKeyPair;
+    KeyPair macDhKeyPair;
+    try {
+      seaDhKeyPair = cProps.ksHelper.loadDHKeyPair(username, DHKeyType.SEA);
+      macDhKeyPair = cProps.ksHelper.loadDHKeyPair(username, DHKeyType.MAC);
+    } catch (Exception e) {
+      throw new ClientException("User keys are corrupted.");
+    }
+
+    // Create session and establish it
+    ClientSession session = new ClientSession(
+        user.getId(),
+        user.getSeaSpec(),
+        user.getMacSpec(),
+        seaDhKeyPair,
+        macDhKeyPair
+    );
+
+    cProps.establishSession(session);
+
+    System.out.println("User " + username + " successfully logged in.");
+  }
+
+  // TODO OOOOOOOOOOOOOOOOO VERIFY THE NONCES EVERYWHERE
 
   private static ServerParameterMap requestParams(ClientProperties cProps) throws InvalidFormatException, GeneralSecurityException, IOException, ClientException {
     JsonObject requestData = new JsonObject();
@@ -459,6 +514,25 @@ public class Client {
   /*
     UTILS
   */
+  private static void verifyUserSecDataSignature(User user, ClientProperties cProps) throws IOException, ClientException {
+    try {
+      byte[] pubKeyDecoded = cProps.b64Helper.decode(user.getPubKey());
+      PublicKey userPublicKey = cProps.aeaHelper.pubKeyFromBytes(pubKeyDecoded);
+
+      cProps.aeaHelper.verifySignature(
+          userPublicKey,
+          CryptUtil.joinByteArrays(
+              cProps.b64Helper.decode(user.getDhSeaPubKey()),
+              cProps.b64Helper.decode(user.getDhMacPubKey()),
+              user.getSeaSpec().getBytes(),
+              user.getMacSpec().getBytes()
+          ),
+          cProps.b64Helper.decode(user.getSecDataSignature())
+      );
+    } catch (SignatureException | InvalidKeyException | InvalidKeySpecException e) {
+      throw new ClientException("Failed to verify user security data signature: " + e.getClass().getName() + ".");
+    }
+  }
 
   private static String getCurrentDate() {
     DateFormat df = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
