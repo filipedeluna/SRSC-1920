@@ -1,4 +1,5 @@
 .idea
 target
 out
-
+server_log*
+pki_log*
