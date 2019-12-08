@@ -11,6 +11,8 @@ public final class RNDHelper {
   private static final int MAX_USES = 50; // Max uses before reseed
   private static final int SEED_SIZE = 111; // 888bits
 
+  private static final int NONCE_SIZE = 16;
+
   private final Encoder stringifier;
   private SecureRandom strongRandom; // dev/random -> Blocking
   private SecureRandom weakRandom;// dev/urandom -> Non Blocking
@@ -33,6 +35,12 @@ public final class RNDHelper {
     byte[] randomBytes = getBytes(size, strong);
 
     return stringifier.encodeToString(randomBytes).substring(0, size - 1);
+  }
+
+  public String getNonce() {
+    byte[] randomBytes = getBytes(NONCE_SIZE, false);
+
+    return stringifier.encodeToString(randomBytes).substring(0, NONCE_SIZE - 1);
   }
 
   public byte[] getBytes(int size, boolean strong) {

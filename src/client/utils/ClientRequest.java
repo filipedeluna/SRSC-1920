@@ -1,27 +1,26 @@
 package client.utils;
 
 
-public enum ClientCommands {
+public enum ClientRequest {
+  LOGIN("login"),
   CREATE("create"),
   LIST("list"),
   NEW("new"),
   ALL("all"),
   SEND("send"),
   RECEIVE("recv"),
-  RECEIPT("receipt"),
   STATUS("status"),
-  PARAMS("params"),
   HELP("help"),
   EXIT("exit");
 
   private final String val;
 
-  ClientCommands(String val) {
+  ClientRequest(String val) {
     this.val = val;
   }
 
-  public static ClientCommands fromString(String name) {
-    for (ClientCommands request : values()) {
+  public static ClientRequest fromString(String name) {
+    for (ClientRequest request : values()) {
       if (request.val.equals(name.toLowerCase().trim()))
         return request;
     }
@@ -35,7 +34,7 @@ public enum ClientCommands {
   }
 
   public boolean needsNonce() {
-    return this != ClientCommands.RECEIPT;
+    return this != HELP && this != EXIT && this != LOGIN;
   }
 }
 

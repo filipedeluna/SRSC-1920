@@ -3,8 +3,8 @@ package client;
 import client.crypt.DHKeyType;
 import client.errors.ClientException;
 import client.props.ClientProperty;
+import client.utils.ClientRequest;
 import com.google.gson.JsonObject;
-import shared.ServerRequest;
 import shared.errors.request.RequestException;
 import shared.parameters.ServerParameterMap;
 import server.db.wrapper.Message;
@@ -14,7 +14,6 @@ import server.response.*;
 import shared.errors.properties.PropertyException;
 import shared.errors.request.InvalidFormatException;
 import shared.parameters.ServerParameterType;
-import shared.utils.GsonUtils;
 import shared.utils.crypto.KSHelper;
 import shared.utils.properties.CustomProperties;
 
@@ -83,7 +82,7 @@ public class Client {
       while (true) {
         try {
           // Parse and validate request and create resquest object
-          ServerRequest request = ServerRequest.fromString(args[0]);
+          ClientRequest request = ClientRequest.fromString(args[0]);
           JsonObject requestData = new JsonObject();
 
           if (request != null) {
@@ -92,7 +91,7 @@ public class Client {
 
             // Get nonce if supposed to for the requested route
             if (request.needsNonce())
-              requestData.addProperty("nonce", cProps.rndHelper.getString(16, false));
+              requestData.addProperty("nonce", cProps.rndHelper.getNonce());
           }
 
           switch (request) {
@@ -118,7 +117,14 @@ public class Client {
             case STATUS:
               status(cProps, requestData);
               break;
-            case RECEIPT:
+            case LOGIN:
+              break;
+            case HELP:
+              printCommands();
+              break;
+            case EXIT:
+              System.out.println("Exited the client.");
+              break;
             default:
               // TODO Invalid command
               // TODO print available commands here
@@ -134,6 +140,7 @@ public class Client {
       System.exit(-1);
     }
   }
+
   // TODO OOOOOOOOOOOOOOOOO VERIFY THE NONCES
 
   private static ServerParameterMap requestParams(ClientProperties cProps) throws InvalidFormatException, GeneralSecurityException, IOException, ClientException {
@@ -141,7 +148,7 @@ public class Client {
 
     // Create request parameters and send request
     requestData.addProperty("type", "params");
-    String nonce = cProps.rndHelper.getString(16, false);
+    String nonce = cProps.rndHelper.getNonce();
     requestData.addProperty("nonce", nonce);
     cProps.sendRequest(requestData);
 
@@ -362,6 +369,7 @@ public class Client {
 
   }
 
+/*
   private static void getUsers(KeyStore keyStore, int sourceId, int destinationId, SSLSocket socket, ClientProperties cProps) throws IOException, InvalidFormatException, GeneralSecurityException, PropertyException {
     JsonObject requestData = new JsonObject();
     requestData.addProperty("type", "dhvaluereq");
@@ -398,6 +406,7 @@ public class Client {
     //  cProps.KSHelper.save(sourceId + "-" + destinationId + "-shared", );
 
   }
+*/
 
   private static KSHelper getKeyStore(CustomProperties properties) throws PropertyException, GeneralSecurityException, IOException {
     String keyStoreLoc = properties.getString(ClientProperty.KEYSTORE_LOC);
@@ -436,6 +445,22 @@ public class Client {
     if (!jsonObject.get("nonce").getAsString().equals(received))
       throw new ClientException("Server replied with invalid nonce.");
   }
+
+  private static void printCommands() {
+    System.out.println(
+        "CREATE <username>" + "\n" +
+            "LIST (userId)?" + "\n" +
+            "NEW <messageBoxOwnerId>" + "\n" +
+            "ALL <messageBoxOwnerId>" + "\n" +
+            "SEND <destinationId> <messageText> (<attachmentFilePath>)*" + "\n" +
+            "RECEIVE <messageBoxOwnerId>" + "\n" +
+            "STATUS <messageId>" + "\n" +
+            "LOGIN <username" + "\n" +
+            "HELP" + "\n" +
+            "EXIT" + "\n"
+    );
+  }
+
   /*
     UTILS
   */
