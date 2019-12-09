@@ -27,6 +27,8 @@ import shared.utils.properties.CustomProperties;
 import javax.net.ssl.SSLSocket;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.Reader;
+import java.lang.reflect.Type;
 import java.security.GeneralSecurityException;
 import java.security.KeyStoreException;
 import java.security.PrivateKey;
@@ -146,14 +148,15 @@ final class ClientProperties {
     output.write(GSON.toJson(jsonObject).getBytes());
   }
 
-  public OKResponse receiveRequest() throws InvalidFormatException, ClientException {
-    JsonObject jsonObject = GsonUtils.parseRequest(input);
+  public <T> T receiveRequest(Type type) throws ClientException {
+    JsonObject jsonObject;
 
     // Check if retrieved object is a GsonResponse as expected
     GsonResponse response;
     try {
+      jsonObject = GsonUtils.parseRequest(input);
       response = GSON.fromJson(jsonObject, GsonResponse.class);
-    } catch (JsonSyntaxException e) {
+    } catch (JsonSyntaxException | InvalidFormatException e) {
       throw new ClientException("Failed to parse response object. Probably corrupted");
     }
 
@@ -173,27 +176,31 @@ final class ClientProperties {
 
     // Return the request data as an OKResponse object
     try {
-      return GSON.fromJson(jsonObject, OKResponse.class);
+      return  GSON.fromJson(jsonObject, type);
     } catch (JsonSyntaxException e) {
-      throw new ClientException("Failed to parse ok response object. Probably corrupted");
+      throw new ClientException("Failed to parse response object. Probably corrupted");
     }
   }
 
-  public OkResponseWithNonce receiveRequestAndCheckNonce(JsonObject requestData) throws InvalidFormatException, ClientException {
+  public <T> T receiveRequestWithNonce(JsonObject requestData, Type type) throws ClientException {
     try {
-      OkResponseWithNonce response = (OkResponseWithNonce) receiveRequest();
+      T response = receiveRequest(type);
 
-      if (!requestData.get("nonce").getAsString().equals(response.getNonce()))
+      if (!requestData.get("nonce").getAsString().equals(((OkResponseWithNonce) response).getNonce()))
         throw new ClientException("The nonce retrieved from the server does not match.");
 
-      return response;
+      return (T) response;
     } catch (JsonSyntaxException e) {
-      throw new ClientException("Response nonce was expected but not received");
+      throw new ClientException("Response with nonce was expected but not received");
     }
   }
 
   public ClientSession getSession() {
     return session;
+  }
+
+  public <T> T fromJson(JsonObject jsonObject, Type type) {
+    return GSON.fromJson(jsonObject, type);
   }
 
   public void establishSession(ClientSession session) {

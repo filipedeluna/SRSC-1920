@@ -6,15 +6,11 @@ import client.errors.ClientException;
 import client.props.ClientProperty;
 import client.utils.ClientRequest;
 import com.google.gson.JsonObject;
-import shared.errors.request.RequestException;
 import shared.parameters.ServerParameterMap;
-import shared.response.OKResponse;
 import shared.utils.Utils;
 import shared.wrappers.Message;
-import shared.wrappers.Receipt;
 import shared.wrappers.User;
 import shared.errors.properties.PropertyException;
-import shared.errors.request.InvalidFormatException;
 import shared.parameters.ServerParameterType;
 import shared.response.server.*;
 import shared.utils.crypto.KSHelper;
@@ -29,7 +25,6 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.Scanner;
 
 public class Client {
   private static final String PROPS_PATH = "src/client/props/client.properties";
@@ -149,11 +144,12 @@ public class Client {
       }
     } catch (Exception e) {
       System.err.println("CRITICAL ERROR: " + e.getMessage());
+      e.printStackTrace();
       System.exit(-1);
     }
   }
 
-  private static void login(ClientProperties cProps, JsonObject requestData, String[] args) throws ClientException, IOException, InvalidFormatException {
+  private static void login(ClientProperties cProps, JsonObject requestData, String[] args) throws ClientException, IOException {
     // Get username, compute uuid and add to request
     String username = args[1].trim();
     String uuid = cProps.generateUUID(username);
@@ -161,7 +157,7 @@ public class Client {
     requestData.addProperty("uuid", uuid);
 
     // Get response and check nonce
-    LoginResponse resp = (LoginResponse) cProps.receiveRequestAndCheckNonce(requestData);
+    LoginResponse resp = cProps.receiveRequestWithNonce(requestData, LoginResponse.class);
 
     // Get user details from response and check data signature
     User user = resp.getUser();
@@ -212,7 +208,7 @@ public class Client {
 
   // TODO OOOOOOOOOOOOOOOOO VERIFY THE NONCES EVERYWHERE
 
-  private static ServerParameterMap requestParams(ClientProperties cProps) throws InvalidFormatException, GeneralSecurityException, IOException, ClientException {
+  private static ServerParameterMap requestParams(ClientProperties cProps) throws GeneralSecurityException, IOException, ClientException {
     JsonObject requestData = new JsonObject();
 
     // Create request parameters and send request
@@ -222,10 +218,10 @@ public class Client {
     cProps.sendRequest(requestData);
 
     // Get response and check nonce
-    ParametersResponse resp = (ParametersResponse) cProps.receiveRequest();
+    ParametersResponse resp = cProps.receiveRequest(ParametersResponse.class);
 
     // Create parameters map class from received JSON
-    ServerParameterMap paramsMap = resp.getParameters();
+    ServerParameterMap paramsMap = ((ParametersResponse) resp).getParameters();
 
     // Initialize AEA and DH Helper with the server parameters
     try {
@@ -247,7 +243,7 @@ public class Client {
     return paramsMap;
   }
 
-  private static void createUser(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException, RequestException, ClientException {
+  private static void createUser(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException, ClientException {
     // Generate a uuid from a users chosen username, adding entropy to it
     String username = args[1].trim();
     String uuid = cProps.generateUUID(username);
@@ -293,7 +289,7 @@ public class Client {
     cProps.sendRequest(requestData);
 
     // Get response and check nonce
-    CreateUserResponse resp = (CreateUserResponse) cProps.receiveRequest();
+    CreateUserResponse resp = cProps.receiveRequestWithNonce(requestData, CreateUserResponse.class);
 
     // Get the user id and add user to cache
     int userId = resp.getUserId();
@@ -312,7 +308,7 @@ public class Client {
     System.out.println("User created with id: " + userId);
   }
 
-  private static void listUsers(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, InvalidFormatException, ClientException {
+  private static void listUsers(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
     // Add id if inserted and send the request
     try {
       if (args.length == 2)
@@ -324,7 +320,7 @@ public class Client {
     cProps.sendRequest(requestData);
 
     // Get response and check the nonce
-    ListUsersResponse resp = (ListUsersResponse) cProps.receiveRequest();
+    ListUsersResponse resp = cProps.receiveRequestWithNonce(requestData, ListUsersResponse.class);
 
     // Extract users from response an add them to the cache
     ArrayList<User> users = resp.getUsers();
@@ -364,7 +360,7 @@ public class Client {
     }
   }
 
-  private static void listNewMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, InvalidFormatException, ClientException {
+  private static void listNewMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
     // Add id of user to get new messages if it exists
     if (args.length > 1)
       try {
@@ -377,13 +373,13 @@ public class Client {
     cProps.sendRequest(requestData);
 
     // Get response and check the nonce
-    ListNewMessagesResponse resp = (ListNewMessagesResponse) cProps.receiveRequest();
+    ListNewMessagesResponse resp = cProps.receiveRequestWithNonce(requestData, ListNewMessagesResponse.class);
 
     // Get new message ids an print them
     System.out.println("Obtained the following unread message ids: (" + resp.getNewMessageIds().toString() + ").");
   }
 
-  private static void listAllMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, InvalidFormatException, ClientException {
+  private static void listAllMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
     // Add id of user to get new messages
     try {
       int userId = Integer.parseInt(args[1]);
@@ -395,7 +391,7 @@ public class Client {
     cProps.sendRequest(requestData);
 
     // Get response and check the nonce
-    ListMessagesResponse resp = (ListMessagesResponse) cProps.receiveRequest();
+    ListMessagesResponse resp = cProps.receiveRequestWithNonce(requestData, ListMessagesResponse.class);
 
     // Get new message ids an print them
     System.out.println("Obtained the following received message ids: (" + resp.getReceivedMessageIds().toString() + ").");
@@ -435,15 +431,15 @@ public class Client {
     // 7 mandar
   }
 
-  private static void receiveMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, InvalidFormatException, ClientException {
+  private static void receiveMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
     int messageid = Integer.parseInt(bf.readLine());
     requestData.addProperty("userId", messageid);
     cProps.sendRequest(requestData);
 
-    ReceiveMessageResponse lmr = (ReceiveMessageResponse) cProps.receiveRequest();
+    ReceiveMessageResponse resp = cProps.receiveRequestWithNonce(requestData, ReceiveMessageResponse.class);
 
-    Message m = lmr.getMessage();
+    Message m = resp.getMessage();
     //substituido depois pela chave publica para verificar assinatura
     String integrity = m.getSenderSignature();
     String text = m.getText();
@@ -459,21 +455,22 @@ public class Client {
     //SEND RECEIPT WITH CONTENT SIGNATURE
   }
 
-  private static void status(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, InvalidFormatException, ClientException {
+  private static void status(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
 
     int messageid = Integer.parseInt(bf.readLine());
     requestData.addProperty("userId", messageid);
     cProps.sendRequest(requestData);
 
-    MessageReceiptsResponse lmr = (MessageReceiptsResponse) cProps.receiveRequestAndCheckNonce(requestData);
+    MessageReceiptsResponse resp = cProps.receiveRequestWithNonce(requestData, MessageReceiptsResponse.class);
 
+    /*
     System.out.println("Showing status for message: " + lmr.getMessage().getId());
     for (Receipt r : lmr.getReceipts()) {
       System.out.println("Date: " + r.getDate());
       System.out.println("Signature: " + r.getReceiverSignature());
     }
-
+  */
   }
 
 /*
@@ -550,11 +547,11 @@ public class Client {
             "NEW <messageBoxOwnerId>" + "\n" +
             "ALL <messageBoxOwnerId>" + "\n" +
             "SEND <destinationId> <messageText> (<attachmentFilePath>)*" + "\n" +
-            "RECEIVE <messageBoxOwnerId>" + "\n" +
+            "RECEIVE <messageId>" + "\n" +
             "STATUS <messageId>" + "\n" +
             "LOGIN <username" + "\n" +
             "HELP" + "\n" +
-            "EXIT" + "\n"
+            "EXIT"
     );
   }
 

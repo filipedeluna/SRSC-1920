@@ -67,7 +67,6 @@ final class Server {
 
       SSLServerSocketFactory ssf = sslContext.getServerSocketFactory();
       SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port);
-      serverSocket.setSoTimeout(10 * 1000); // 10 seconds
 
       // Set enabled protocols and cipher suites
       String[] enabledProtocols = properties.getStringArr(ServerProperty.TLS_PROTOCOLS);
@@ -80,9 +79,6 @@ final class Server {
       boolean mutualAuth = properties.getBool(ServerProperty.TLS_MUTUAL_AUTH);
       serverSocket.setNeedClientAuth(mutualAuth);
 
-      logger.log(Level.INFO, "Started server on port: " + port);
-      System.out.print("Started server on port " + port + "\n");
-
       // Build DB and create shared properties class
       String databaseLocation = properties.getString(ServerProperty.DATABASE_LOC);
       ServerDatabaseDriver db = new ServerDatabaseDriver(databaseLocation);
@@ -91,6 +87,9 @@ final class Server {
       ServerProperties props = new ServerProperties(properties, ksHelper, db, logger, sslContext);
       if (properties.getBool(ServerProperty.PARAMS_RESET))
         System.out.println("Parameters have been generated.");
+
+      logger.log(Level.INFO, "Started server on port: " + port);
+      System.out.print("Started server on port " + port + "\n");
 
       // Client serving loop
       SSLSocket sslClient;

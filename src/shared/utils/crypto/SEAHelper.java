@@ -22,7 +22,7 @@ public final class SEAHelper {
 
     // Force removal of unnecessary padding for cipher types
     if (mode.equals("GCM") || mode.equals("CCM"))
-      spec = algorithm + "/" + mode + "NoPadding";
+      spec = algorithm + "/" + mode + "/NoPadding";
     else
       spec = algorithm + "/" + mode + "/" + padding;
 
