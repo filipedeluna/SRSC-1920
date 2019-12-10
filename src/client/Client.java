@@ -16,11 +16,16 @@ import shared.response.server.*;
 import shared.utils.crypto.KSHelper;
 import shared.utils.properties.CustomProperties;
 
+import javax.crypto.*;
+import javax.crypto.spec.DESKeySpec;
 import javax.crypto.spec.DHParameterSpec;
 import javax.net.ssl.*;
 import java.io.*;
 import java.security.*;
+import java.security.cert.CertificateException;
 import java.security.spec.InvalidKeySpecException;
+import java.security.spec.KeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -71,7 +76,8 @@ public class Client {
       ClientProperties cProps = new ClientProperties(properties, ksHelper, tsHelper, socket);
 
       // Request shared parameters and that initialize dh and aea helpers
-      requestParams(cProps);
+      ServerParameterMap spm = requestParams(cProps);
+
 
       // Command reader
       BufferedReader lineReader = new BufferedReader(new InputStreamReader(System.in));
@@ -264,7 +270,7 @@ public class Client {
 
     // Keys do not exist so save them to file
     cProps.ksHelper.saveDHKeyPair(username, DHKeyType.SEA, dhSeaKeypair);
-    cProps.ksHelper.saveDHKeyPair(username, DHKeyType.MAC, dhSeaKeypair);
+    cProps.ksHelper.saveDHKeyPair(username, DHKeyType.MAC, dhMacKeypair);
 
     // Add all security properties to the header
     byte[] seaDHPubKeyBytes = dhSeaKeypair.getPublic().getEncoded();
@@ -289,7 +295,8 @@ public class Client {
     cProps.sendRequest(requestData);
 
     // Get response and check nonce
-    CreateUserResponse resp = cProps.receiveRequestWithNonce(requestData, CreateUserResponse.class);
+    CreateUserResponse resp = cProps.receiveRequest(CreateUserResponse.class);
+
 
     // Get the user id and add user to cache
     int userId = resp.getUserId();
@@ -307,6 +314,7 @@ public class Client {
 
     System.out.println("User created with id: " + userId);
   }
+
 
   private static void listUsers(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
     // Add id if inserted and send the request
@@ -399,36 +407,150 @@ public class Client {
     System.out.println("Note: Read messages come with a prefixed \"_\".");
   }
 
-  private static void sendMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException {
+  private static void sendMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException, ClientException, PropertyException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
 
-    int clientId = Integer.parseInt(bf.readLine());
-    requestData.addProperty("source", clientId);
+    int clientId = Integer.parseInt(args[1]);
+    requestData.addProperty("source", Integer.parseInt(args[1]));
 
-    int destinationId = Integer.parseInt(bf.readLine());
+    int destinationId = Integer.parseInt(args[2]);
     requestData.addProperty("destination", destinationId);
-
+    System.out.println("Message:");
     String text = bf.readLine();
 
-    // TODO Create and save dh shared sea and mac keys
-    //if (!cProps.KSHelper.dhKeyPairExists(clientId, destinationId)) {
-    //  cProps.KSHelper.saveDHKeyPair(clientId, destinationId, socket);
-    // }
+    Cipher seacipher;
+    Cipher maccipher;
 
-    // load shared key
-    cProps.ksHelper.getKey(clientId + "-" + destinationId + "-shared");
+    // try to load shared key
+    try{
+      seacipher = loadKeyAndInitCipher(cProps, clientId, destinationId);
+      maccipher = loadKeyAndInitHmacCipher(cProps, clientId, destinationId);
+    }catch (InvalidKeyException  |UnrecoverableKeyException |KeyStoreException e){
+      //If user cant load the ciphers, menas he does not have them, so he must create the shared key first
 
+      //initatiates the keyagrees 1 for sea 1 for mac
+      KeyAgreement keyAgreesea = createSEAAgree(cProps);
+      KeyAgreement keaAgreemac = createMACAgree(cProps);
 
-    // 0 - VERIFICAR SE CHAVE JA TA NA KEYSTORE
-    // 1 - obter o nosso DH
-    // 2 - obter DH do outro ze (verificar se user ja esta na cache)
-    // 3 - fundir
-    // 4 - cortar chave para cifra (apos criar a instancia da cifra com seapec etc)
-    // 5 - guardar a chave na keystore (sea e mac)
-    // 6 - encriptar
-    // 5 - mac
-    // 6 - encode
-    // 7 mandar
+      //checks if destiny user is in cache if not gets the user
+      UserCacheEntry destinyuser = checkAndGetDestinyUser(cProps, destinationId);
+
+      seacipher = generateSeaSharedKey(cProps, clientId, keyAgreesea, destinyuser);
+      maccipher = generateMACSharedKey(cProps, clientId, keyAgreesea, destinyuser);
+    }
+
+    //Encrypts data
+    String encrypted = new String(seacipher.doFinal(text.getBytes()));
+    requestData.addProperty("text", encrypted);
+
+    //adds cipher iv
+    requestData.addProperty("cipherIV", new String(seacipher.getIV()));
+
+    //Produces integrity code
+    String macCode = new String(maccipher.doFinal(encrypted.getBytes()));
+    requestData.addProperty("senderSignature", macCode);
+
+    cProps.sendRequest(requestData);
+
+  }
+
+  private static Cipher generateMACSharedKey(ClientProperties cProps, int clientId, KeyAgreement keyAgreemac, UserCacheEntry destinyuser) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, PropertyException, KeyStoreException, IOException, CertificateException {
+    KeyFactory factory = KeyFactory.getInstance(cProps.dhHelper.getAlgorithm());
+    X509EncodedKeySpec encodedKeySpec = new X509EncodedKeySpec(destinyuser.getDhSeaPubKey());
+    PublicKey publicKey = factory.generatePublic(encodedKeySpec);
+    keyAgreemac.doPhase(publicKey, true);
+
+    //generate the shared key
+    byte[] generatedkeybytes = keyAgreemac.generateSecret();
+
+    //starts sea cipher can it only be DES?
+    Cipher cipher = Cipher.getInstance(cProps.cache.getUser(clientId).getMacSpec());
+    SecretKeyFactory skf = SecretKeyFactory.getInstance(cipher.getAlgorithm());
+    KeySpec keySpec = new DESKeySpec(generatedkeybytes);
+    SecretKey secretKey = skf.generateSecret(keySpec);
+
+    // add keys to keystore
+    KeyStore.SecretKeyEntry seaKeyEntry = new KeyStore.SecretKeyEntry(secretKey);
+    KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection(cProps.keyStorePassword());
+    cProps.ksHelper.getStore().setEntry(clientId + "-"+destinyuser +"-macshared", seaKeyEntry, protectionParam);
+    cProps.ksHelper.getStore().store(new FileOutputStream(cProps.KEYSTORE_LOC), cProps.keyStorePassword());
+
+    //init sea cipher
+    cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+    return cipher;
+
+  }
+
+  //TODO: Retirar daqui estes utils todos e meter na classe do crypt utils ou no cprops
+
+  private static KeyAgreement createMACAgree(ClientProperties cProps) throws NoSuchAlgorithmException, IllegalBlockSizeException, InvalidKeyException, InvalidKeySpecException, BadPaddingException, IOException {
+    KeyAgreement keyAgree = KeyAgreement.getInstance(cProps.dhHelper.getAlgorithm());
+    KeyPair myKeyPairforSEASpec = cProps.ksHelper.loadDHKeyPair("myusername", DHKeyType.MAC);
+    keyAgree.init(myKeyPairforSEASpec.getPrivate());
+    return keyAgree;
+  }
+
+  private static Cipher loadKeyAndInitHmacCipher(ClientProperties cProps, int clientId, int destinationId) throws PropertyException, UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException, NoSuchPaddingException, InvalidKeyException {
+    Key k = cProps.ksHelper.getStore().getKey(clientId + "-" + destinationId + "-macshared", cProps.keyStorePassword());
+    Cipher cipher = Cipher.getInstance(cProps.cache.getUser(clientId).getMacSpec());
+    cipher.init(Cipher.ENCRYPT_MODE, k);
+    return cipher;
+  }
+
+  private static Cipher loadKeyAndInitCipher(ClientProperties cProps, int clientId, int destinationId) throws KeyStoreException, NoSuchAlgorithmException, UnrecoverableKeyException, PropertyException, NoSuchPaddingException, InvalidKeyException {
+    Key k = cProps.ksHelper.getStore().getKey(clientId + "-" + destinationId + "-seashared", cProps.keyStorePassword());
+    Cipher cipher = Cipher.getInstance(cProps.cache.getUser(clientId).getSeaSpec());
+    cipher.init(Cipher.ENCRYPT_MODE, k);
+    return cipher;
+  }
+
+  private static UserCacheEntry checkAndGetDestinyUser(ClientProperties cProps, int destinationId) throws IOException, ClientException {
+    UserCacheEntry destinyuser;
+    if (cProps.cache.getUser(destinationId) != null) {
+      destinyuser = cProps.cache.getUser(destinationId);
+    } else {
+      JsonObject listrequestData = new JsonObject();
+      listrequestData.addProperty("type", "list");
+      listUsers(cProps, listrequestData, new String[]{String.valueOf(destinationId)});
+
+      //user now added to cache
+      destinyuser = cProps.cache.getUser(destinationId);
+    }
+    return destinyuser;
+  }
+
+  public static KeyAgreement createSEAAgree(ClientProperties cProps) throws NoSuchAlgorithmException, IOException, BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidKeySpecException {
+    KeyAgreement keyAgree = KeyAgreement.getInstance(cProps.dhHelper.getAlgorithm());
+    KeyPair myKeyPairforSEASpec = cProps.ksHelper.loadDHKeyPair("myusername", DHKeyType.SEA);
+    keyAgree.init(myKeyPairforSEASpec.getPrivate());
+    return keyAgree;
+  }
+
+  public static Cipher generateSeaSharedKey(ClientProperties cProps, int clientId, KeyAgreement keyAgree, UserCacheEntry destinyuser) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, KeyStoreException, PropertyException, IOException, CertificateException {
+    //add destiny user pub to agreement
+    KeyFactory factory = KeyFactory.getInstance(cProps.dhHelper.getAlgorithm());
+    X509EncodedKeySpec encodedKeySpec = new X509EncodedKeySpec(destinyuser.getDhSeaPubKey());
+    PublicKey publicKey = factory.generatePublic(encodedKeySpec);
+    keyAgree.doPhase(publicKey, true);
+
+    //generate the shared key
+    byte[] generatedkeybytes = keyAgree.generateSecret();
+
+    //starts sea cipher can it only be DES?
+    Cipher cipher = Cipher.getInstance(cProps.cache.getUser(clientId).getSeaSpec());
+    SecretKeyFactory skf = SecretKeyFactory.getInstance(cipher.getAlgorithm());
+    KeySpec keySpec = new DESKeySpec(generatedkeybytes);
+    SecretKey secretKey = skf.generateSecret(keySpec);
+
+    // add keys to keystore
+    KeyStore.SecretKeyEntry seaKeyEntry = new KeyStore.SecretKeyEntry(secretKey);
+    KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection(cProps.keyStorePassword());
+    cProps.ksHelper.getStore().setEntry(clientId + "-"+destinyuser +"-seashared", seaKeyEntry, protectionParam);
+    cProps.ksHelper.getStore().store(new FileOutputStream(cProps.KEYSTORE_LOC), cProps.keyStorePassword());
+
+    //init sea cipher
+    cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+    return cipher;
   }
 
   private static void receiveMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {

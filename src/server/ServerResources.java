@@ -62,8 +62,6 @@ final class ServerResources implements Runnable {
       JsonObject parsedRequest = parseRequest(input);
 
       handleRequest(parsedRequest);
-
-      client.close();
     } catch (Exception e) {
       handleException(e);
       Thread.currentThread().interrupt();
@@ -91,6 +89,7 @@ final class ServerResources implements Runnable {
 
       switch (request) {
         case CREATE:
+          System.out.println("duck");
           insertUser(requestData, nonce);
           break;
         case LIST:

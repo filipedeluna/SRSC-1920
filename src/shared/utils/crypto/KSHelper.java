@@ -43,12 +43,24 @@ public class KSHelper {
     if (!isTrustStore) {
       keyFactory = KeyFactory.getInstance("DH", "BC");
       seaHelper = new SEAHelper("AES", "GCM", "NoPadding");
-      seaKey = seaHelper.getKeyFromBytes(String.valueOf(keyStorePass).getBytes());
+      seaKey = seaHelper.getKeyFromBytes(seaHelper.trimKeyToAlg(String.valueOf(keyStorePass).getBytes()));
     }
   }
 
   public Key getKey(String keyName) throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
     return store.getKey(keyName, keyStorePass);
+  }
+
+  public boolean hasSEAsharedInKeystore(String alias) {
+    try {
+      store.getKey(alias, keyStorePass);
+      return true;
+    } catch (UnrecoverableKeyException ex) {
+      ex.printStackTrace();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    return false;
   }
 
   public void saveDHKeyPair(String username, DHKeyType type, KeyPair keyPair) throws BadPaddingException, InvalidKeyException, IllegalBlockSizeException, IOException {
@@ -74,7 +86,10 @@ public class KSHelper {
     // Write bytes to file
     Path filePath = getDHKeyPairPath(username, type);
     // Files.deleteIfExists(getDHKeyPairPath(uuid)); // TODO decide if we should use this
-    Files.write(filePath, fileBytesEncrypted);
+    File file = new File("src/client/crypt/" + username + "-" + type.getVal());
+    FileOutputStream fw = new FileOutputStream(file);
+    fw.write(fileBytesEncrypted);
+    fw.close();
   }
 
   public KeyPair loadDHKeyPair(String username, DHKeyType type) throws IOException, BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidKeySpecException {
@@ -150,6 +165,7 @@ public class KSHelper {
   */
 
   private Path getDHKeyPairPath(String uuid, DHKeyType type) {
-    return Paths.get(keyStoreLoc + "/keys/" + uuid + "-" + type.getVal());
+    return Paths.get("src/client/crypt/keys/" + uuid + "-" + type.getVal());
   }
+
 }
