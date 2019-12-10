@@ -11,14 +11,11 @@ import com.google.gson.stream.JsonReader;
 import shared.errors.properties.PropertyException;
 import shared.errors.request.InvalidFormatException;
 import shared.http.HTTPStatus;
-import shared.http.HTTPStatusPair;
 import shared.parameters.ServerParameterMap;
 import shared.parameters.ServerParameterType;
 import shared.response.ErrorResponse;
 import shared.response.GsonResponse;
-import shared.response.OKResponse;
 import shared.response.OkResponseWithNonce;
-import shared.response.server.LoginResponse;
 import shared.utils.GsonUtils;
 import shared.utils.SafeInputStreamReader;
 import shared.utils.crypto.*;
@@ -27,7 +24,6 @@ import shared.utils.properties.CustomProperties;
 import javax.net.ssl.SSLSocket;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.Reader;
 import java.lang.reflect.Type;
 import java.security.GeneralSecurityException;
 import java.security.KeyStoreException;
@@ -50,20 +46,20 @@ final class ClientProperties {
   KSHelper tshelper;
 
   // Comms
-  private final JsonReader input;
-  private final OutputStream output;
+  private JsonReader input;
+  private OutputStream output;
 
   private final CustomProperties props;
   private final HashHelper hashHelper;
   private final String seaSpec;
   private final String macSpec;
-  private final PublicKey serverPubKey;
+  private PublicKey serverPubKey;
   private final PublicKey clientPublicKey;
 
   private String pubKeyName;
   private ClientSession session;
 
-  ClientProperties(CustomProperties props, KSHelper ksHelper, KSHelper tsHelper, SSLSocket socket) throws PropertyException, GeneralSecurityException, IOException {
+  ClientProperties(CustomProperties props, KSHelper ksHelper, KSHelper tsHelper) throws PropertyException, GeneralSecurityException {
     this.props = props;
     this.ksHelper = ksHelper;
     this.tshelper = tsHelper;
@@ -72,11 +68,6 @@ final class ClientProperties {
     hashHelper = new HashHelper(props.getString(ClientProperty.UUID_HASH));
 
     // Set socket input and output and get server public key
-    input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), props.getInt(ClientProperty.BUFFER_SIZE_MB)));
-    output = socket.getOutputStream();
-    X509Certificate certificate = (X509Certificate) socket.getSession().getPeerCertificates()[0];
-    serverPubKey = certificate.getPublicKey();
-
     b64Helper = new B64Helper();
     rndHelper = new RNDHelper();
     GSON = GsonUtils.buildGsonInstance();
@@ -138,7 +129,7 @@ final class ClientProperties {
     return macSpec;
   }
 
-  public String generateUUID(String username) throws IOException {
+  public String generateUUID(String username) {
     byte[] hash = hashHelper.hash(username.getBytes(), clientPublicKey.getEncoded());
 
     return b64Helper.encode(hash);
@@ -150,9 +141,9 @@ final class ClientProperties {
 
   public <T> T receiveRequest(Type type) throws ClientException {
     JsonObject jsonObject;
+    GsonResponse response;
 
     // Check if retrieved object is a GsonResponse as expected
-    GsonResponse response;
     try {
       jsonObject = GsonUtils.parseRequest(input);
       response = GSON.fromJson(jsonObject, GsonResponse.class);
@@ -176,7 +167,7 @@ final class ClientProperties {
 
     // Return the request data as an OKResponse object
     try {
-      return  GSON.fromJson(jsonObject, type);
+      return GSON.fromJson(jsonObject, type);
     } catch (JsonSyntaxException e) {
       throw new ClientException("Failed to parse response object. Probably corrupted");
     }
@@ -199,6 +190,14 @@ final class ClientProperties {
     return session;
   }
 
+  public void connect(SSLSocket socket) throws IOException, PropertyException {
+    input = new JsonReader(new SafeInputStreamReader(socket.getInputStream(), this.props.getInt(ClientProperty.BUFFER_SIZE_MB)));
+    output = socket.getOutputStream();
+
+    X509Certificate certificate = (X509Certificate) socket.getSession().getPeerCertificates()[0];
+    serverPubKey = certificate.getPublicKey();
+  }
+
   public <T> T fromJson(JsonObject jsonObject, Type type) {
     return GSON.fromJson(jsonObject, type);
   }
@@ -206,4 +205,9 @@ final class ClientProperties {
   public void establishSession(ClientSession session) {
     this.session = session;
   }
+
+  /*
+    Utils
+  */
+
 }

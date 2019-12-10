@@ -8,7 +8,7 @@ public enum ClientRequest {
   NEW("new", 1),
   ALL("all", 1),
   SEND("send", 1),
-  RECEIVE("recv", 1),
+  RECV("recv", 1),
   STATUS("status", 1),
   HELP("help", 0),
   EXIT("exit", 0);

@@ -54,26 +54,18 @@ public class Client {
       KSHelper tsHelper = getTrustStore(properties);
 
       // Create SSL Socket
-      int serverPort = properties.getInt(ClientProperty.SERVER_PORT);
-      String serverAddress = properties.getString(ClientProperty.SERVER_ADDRESS);
       SSLContext sslContext = buildSSLContext(ksHelper, tsHelper);
       SSLSocketFactory factory = sslContext.getSocketFactory();
-      SSLSocket socket = (SSLSocket) factory.createSocket(serverAddress, serverPort);
-      socket.setSoTimeout(10 * 1000); // 10 seconds
-
-      // Set enabled protocols and cipher suites and start SSL socket handshake with server
-      String[] enabledProtocols = properties.getStringArr(ClientProperty.TLS_PROTOCOLS);
-      String[] enabledCipherSuites = properties.getStringArr(ClientProperty.TLS_CIPHERSUITES);
-      socket.setEnabledProtocols(enabledProtocols);
-      socket.setEnabledCipherSuites(enabledCipherSuites);
+      SSLSocket socket = createSocket(factory, properties);
 
       // Start handshake
       System.out.println("SSL setup finished.");
       socket.startHandshake();
       System.out.println("Handshake completed.");
 
-      // Create client properties
-      ClientProperties cProps = new ClientProperties(properties, ksHelper, tsHelper, socket);
+      // Create client properties and connect/input output
+      ClientProperties cProps = new ClientProperties(properties, ksHelper, tsHelper);
+      cProps.connect(socket);
 
       // Request shared parameters and that initialize dh and aea helpers
       ServerParameterMap spm = requestParams(cProps);
@@ -82,8 +74,16 @@ public class Client {
       // Command reader
       BufferedReader lineReader = new BufferedReader(new InputStreamReader(System.in));
 
+      // Close the socket
+      socket.close();
+
       while (true) {
         try {
+          // Restart connection for new request with new socket and connect i/o
+          socket = createSocket(factory, properties);
+          socket.startHandshake();
+          cProps.connect(socket);
+
           System.out.println();
           System.out.println("Enter command: ");
 
@@ -123,7 +123,7 @@ public class Client {
             case SEND:
               //missing message encryption
               sendMessages(cProps, requestData, cmdArgs);
-            case RECEIVE:
+            case RECV:
               // TODO missing message decryption
               //contem o receipt, receipt enviado dps de ler
               receiveMessages(cProps, requestData, cmdArgs);
@@ -142,6 +142,8 @@ public class Client {
               System.exit(0);
               break;
           }
+
+          socket.close();
         } catch (ClientException e) {
           System.err.println(e.getMessage());
         } catch (ClassCastException e) {
@@ -159,7 +161,6 @@ public class Client {
     // Get username, compute uuid and add to request
     String username = args[1].trim();
     String uuid = cProps.generateUUID(username);
-
     requestData.addProperty("uuid", uuid);
 
     // Get response and check nonce
@@ -713,5 +714,19 @@ public class Client {
     DateFormat df = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 
     return df.format(new Date());
+  }
+
+  private static SSLSocket createSocket(SSLSocketFactory sslSocketFactory, CustomProperties properties) throws PropertyException, IOException {
+    int serverPort = properties.getInt(ClientProperty.SERVER_PORT);
+    String serverAddress = properties.getString(ClientProperty.SERVER_ADDRESS);
+
+    SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket(serverAddress, serverPort);
+    socket.setSoTimeout(10 * 1000); // 10 seconds
+
+    // Set enabled protocols and cipher suites and start SSL socket handshake with server
+    socket.setEnabledProtocols(properties.getStringArr(ClientProperty.TLS_PROTOCOLS));
+    socket.setEnabledCipherSuites(properties.getStringArr(ClientProperty.TLS_CIPHERSUITES));
+
+    return socket;
   }
 }
