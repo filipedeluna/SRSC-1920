@@ -182,14 +182,10 @@ final class ServerResources implements Runnable {
     ArrayList<User> users = new ArrayList<>();
 
     // Detect if supposed to get 1 or multiple users
-    try {
-      if (userId >= 0)
-        users.add(props.DB.getUserById(userId));
-      else
-        users = props.DB.getAllUsers();
-    } catch (EntryNotFoundException e) {
-      throw new CustomRequestException("User id not found", HTTPStatus.NOT_FOUND);
-    }
+    if (userId >= 0)
+      users.add(props.DB.getUserById(userId));
+    else
+      users = props.DB.getAllUsers();
 
     // Send user list
     send(new ListUsersResponse(nonce, users));
@@ -387,11 +383,17 @@ final class ServerResources implements Runnable {
 
       props.logger.log(Level.SEVERE, exception.getMessage());
     }
+
+    try {
+      client.close();
+      Thread.currentThread().interrupt();
+    }
+    catch (Exception e) {
+      // Can't do anyting
+    }
   }
 
   private void send(GsonResponse response) throws IOException {
     output.write(response.json(props.GSON).getBytes(StandardCharsets.UTF_8));
   }
-
-
 }

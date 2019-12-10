@@ -36,7 +36,7 @@ public enum ClientRequest {
   }
 
   public boolean needsNonce() {
-    return this != HELP && this != EXIT && this != LOGIN;
+    return this != HELP && this != EXIT;
   }
 
   // Number of args not counting with args[0] (command)

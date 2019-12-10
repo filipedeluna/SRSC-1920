@@ -148,6 +148,7 @@ public class Client {
           socket.close();
         } catch (ClientException e) {
           System.err.println(e.getMessage());
+          e.printStackTrace();
         } catch (ClassCastException e) {
           System.err.println("Received an invalid format message.");
         }
@@ -159,21 +160,27 @@ public class Client {
     }
   }
 
-  private static void login(ClientProperties cProps, JsonObject requestData, String[] args) throws ClientException {
+  private static void login(ClientProperties cProps, JsonObject requestData, String[] args) throws ClientException, IOException {
     // Get username, compute uuid and add to request
     String username = args[1].trim();
     String uuid = cProps.generateUUID(username);
     requestData.addProperty("uuid", uuid);
+
+    cProps.sendRequest(requestData);
 
     // Get response and check nonce
     LoginResponse resp = cProps.receiveRequestWithNonce(requestData, LoginResponse.class);
 
     // Get user details from response and check data signature
     User user = resp.getUser();
+
+    if (user == null)
+      throw new ClientException("No user found with username " + username + ".");
+
     PublicKey userPubKey = verifyUserSecDataSignature(user, cProps);
 
     // Check if user dh keys exist
-    if (!cProps.ksHelper.dhKeyPairExists(username, DHKeyType.SEA) || !cProps.ksHelper.dhKeyPairExists(username, DHKeyType.SEA))
+    if (!cProps.ksHelper.dhKeyPairExists(username, DHKeyType.SEA) || !cProps.ksHelper.dhKeyPairExists(username, DHKeyType.MAC))
       throw new ClientException("User keys not found.");
 
     // Get user dh keys
@@ -183,6 +190,7 @@ public class Client {
       seaDhKeyPair = cProps.ksHelper.loadDHKeyPair(username, DHKeyType.SEA);
       macDhKeyPair = cProps.ksHelper.loadDHKeyPair(username, DHKeyType.MAC);
     } catch (Exception e) {
+      e.printStackTrace();
       throw new ClientException("User keys are corrupted.");
     }
 
@@ -272,8 +280,8 @@ public class Client {
       throw new ClientException("User mac key already exists.");
 
     // Keys do not exist so save them to file
-    cProps.ksHelper.saveDHKeyPair(username, DHKeyType.SEA, dhSeaKeypair);
-    cProps.ksHelper.saveDHKeyPair(username, DHKeyType.MAC, dhMacKeypair);
+    cProps.ksHelper.saveDHKeyPair(username, DHKeyType.SEA, dhSeaKeypair, cProps.dhHelper.getP(), cProps.dhHelper.getG());
+    cProps.ksHelper.saveDHKeyPair(username, DHKeyType.MAC, dhMacKeypair, cProps.dhHelper.getP(), cProps.dhHelper.getG());
 
     // Add all security properties to the header
     byte[] seaDHPubKeyBytes = dhSeaKeypair.getPublic().getEncoded();
@@ -344,16 +352,17 @@ public class Client {
       if (user == null)
         continue;
 
-      obtained.add(user.getId());
 
       try {
         verifyUserSecDataSignature(user, cProps);
         userPubKey = cProps.aeaHelper.pubKeyFromBytes(cProps.b64Helper.decode(user.getPubKey()));
+        obtained.add(user.getId());
       } catch (ClientException | InvalidKeySpecException e) {
         if (e instanceof ClientException)
           System.out.println("Failed to validate user with id " + user.getId());
         else
           System.out.println("User with id " + user.getId() + " has a corrupted public key.");
+
         failed.add(user.getId());
         continue;
       }
@@ -371,13 +380,13 @@ public class Client {
     }
 
     if (obtained.size() > 0)
-      System.out.println("Obtained user's with ids " + obtained.toString() + " info.");
+      System.out.println("Obtained and verified user's with ids " + obtained.toString() + " info.");
 
     if (failed.size() > 0)
-      System.out.println("Failed to verify user's with ids " + failed.toString() + " info.");
+      System.err.println("Failed to verify user's with ids " + failed.toString() + " info.");
 
     if (obtained.size() == 0 && failed.size() == 0)
-      System.out.println("No users found.");
+      System.err.println("No users found.");
 
   }
 
@@ -420,7 +429,7 @@ public class Client {
     System.out.println("Note: Read messages come with a prefixed \"_\".");
   }
 
-  private static void sendMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException, ClientException, PropertyException {
+  private static void sendMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException, ClientException, PropertyException, ClassNotFoundException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
 
     int clientId = Integer.parseInt(args[1]);
@@ -496,7 +505,7 @@ public class Client {
 
   //TODO: Retirar daqui estes utils todos e meter na classe do crypt utils ou no cprops
 
-  private static KeyAgreement createMACAgree(ClientProperties cProps) throws NoSuchAlgorithmException, IllegalBlockSizeException, InvalidKeyException, InvalidKeySpecException, BadPaddingException, IOException {
+  private static KeyAgreement createMACAgree(ClientProperties cProps) throws NoSuchAlgorithmException, IllegalBlockSizeException, InvalidKeyException, InvalidKeySpecException, BadPaddingException, IOException, InvalidAlgorithmParameterException, ClassNotFoundException {
     KeyAgreement keyAgree = KeyAgreement.getInstance(cProps.dhHelper.getAlgorithm());
     KeyPair myKeyPairforSEASpec = cProps.ksHelper.loadDHKeyPair("myusername", DHKeyType.MAC);
     keyAgree.init(myKeyPairforSEASpec.getPrivate());
@@ -532,7 +541,7 @@ public class Client {
     return destinyuser;
   }
 
-  public static KeyAgreement createSEAAgree(ClientProperties cProps) throws NoSuchAlgorithmException, IOException, BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidKeySpecException {
+  public static KeyAgreement createSEAAgree(ClientProperties cProps) throws NoSuchAlgorithmException, IOException, BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidKeySpecException, InvalidAlgorithmParameterException, ClassNotFoundException {
     KeyAgreement keyAgree = KeyAgreement.getInstance(cProps.dhHelper.getAlgorithm());
     KeyPair myKeyPairforSEASpec = cProps.ksHelper.loadDHKeyPair("myusername", DHKeyType.SEA);
     keyAgree.init(myKeyPairforSEASpec.getPrivate());
@@ -705,7 +714,7 @@ public class Client {
     }
 
     try {
-      cProps.aeaHelper.verifySignature(
+      boolean valid = cProps.aeaHelper.verifySignature(
           userPublicKey,
           Utils.joinByteArrays(
               cProps.b64Helper.decode(user.getDhSeaPubKey()),
@@ -715,6 +724,9 @@ public class Client {
           ),
           cProps.b64Helper.decode(user.getSecDataSignature())
       );
+
+      if (!valid)
+        throw new ClientException("User's signature does not match.");
     } catch (SignatureException | InvalidKeyException e) {
       throw new ClientException("Failed to verify user security data signature: " + e.getClass().getName() + ".");
     }

@@ -123,7 +123,7 @@ public final class ServerDatabaseDriver {
     }
   }
 
-  public User getUserById(int id) throws CriticalDatabaseException, EntryNotFoundException {
+  public User getUserById(int id) throws CriticalDatabaseException {
     try {
       String selectUser = "SELECT * FROM users WHERE user_id = ?;";
 
@@ -158,7 +158,8 @@ public final class ServerDatabaseDriver {
 
       ResultSet rs = ps.executeQuery();
 
-      rs.next();
+      if (!rs.next())
+        return null;
 
       return new User(
           rs.getInt("user_id"),
@@ -170,9 +171,6 @@ public final class ServerDatabaseDriver {
           rs.getString("sec_data_signature")
       );
     } catch (SQLException e) {
-      if (e.getErrorCode() == ERR_NOT_FOUND)
-        throw new EntryNotFoundException();
-
       throw new CriticalDatabaseException(e);
     }
   }

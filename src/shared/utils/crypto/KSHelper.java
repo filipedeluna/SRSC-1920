@@ -1,16 +1,17 @@
 package shared.utils.crypto;
 
 import client.crypt.DHKeyType;
-import client.props.ClientProperty;
 import shared.errors.crypto.InvalidPublicKeyException;
-import shared.errors.properties.PropertyException;
+import shared.utils.Utils;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.DHPublicKeySpec;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.*;
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -20,6 +21,7 @@ import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
 
 public class KSHelper {
   private SEAHelper seaHelper;
@@ -63,62 +65,49 @@ public class KSHelper {
     return false;
   }
 
-  public void saveDHKeyPair(String username, DHKeyType type, KeyPair keyPair) throws BadPaddingException, InvalidKeyException, IllegalBlockSizeException, IOException {
-    // Decode keypair
-    byte[] privKeyEncoded = keyPair.getPrivate().getEncoded();
-    byte[] pubKeyEncoded = keyPair.getPublic().getEncoded();
+  public void saveDHKeyPair(String username, DHKeyType type, KeyPair keyPair, BigInteger p, BigInteger g) throws BadPaddingException, InvalidKeyException, IllegalBlockSizeException, IOException, InvalidAlgorithmParameterException {
+    // Generate IV and decode private key, public and the params
+    byte[] iv = seaHelper.generateIV();
 
     // Write as file to byte stream
     ByteArrayOutputStream byteOutput = new ByteArrayOutputStream();
     ObjectOutputStream objectOutput = new ObjectOutputStream(byteOutput);
 
-    objectOutput.writeInt(privKeyEncoded.length);
-    objectOutput.write(privKeyEncoded);
-    objectOutput.writeInt(pubKeyEncoded.length);
-    objectOutput.write(pubKeyEncoded);
+    objectOutput.writeObject(keyPair);
+
     objectOutput.flush();
 
     // Get whole bytestream and encrypt with GCM to preserve integrity
-    byte[] fileBytes = byteOutput.toByteArray();
-    byte[] fileBytesEncrypted = seaHelper.encrypt(fileBytes, seaKey);
+    byte[] fileBytesEncrypted = seaHelper.encrypt(byteOutput.toByteArray(), seaKey, iv);
     objectOutput.close();
+
+    fileBytesEncrypted = Utils.joinByteArrays(iv, fileBytesEncrypted);
 
     // Write bytes to file
     Path filePath = getDHKeyPairPath(username, type);
     // Files.deleteIfExists(getDHKeyPairPath(uuid)); // TODO decide if we should use this
-    File file = new File("src/client/crypt/" + username + "-" + type.getVal());
-    FileOutputStream fw = new FileOutputStream(file);
-    fw.write(fileBytesEncrypted);
-    fw.close();
+    Files.write(filePath, fileBytesEncrypted);
   }
 
-  public KeyPair loadDHKeyPair(String username, DHKeyType type) throws IOException, BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidKeySpecException {
+  public KeyPair loadDHKeyPair(String username, DHKeyType type) throws IOException, BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidKeySpecException, InvalidAlgorithmParameterException, ClassNotFoundException {
     // Read encrypted bytes from file
     byte[] fileBytesEncrypted = Files.readAllBytes(getDHKeyPairPath(username, type));
-    byte[] fileBytes = seaHelper.decrypt(fileBytesEncrypted, seaKey);
+    // Get the iv
+    byte[] iv = Arrays.copyOfRange(fileBytesEncrypted, 0, seaHelper.ivSize());
+    fileBytesEncrypted = Arrays.copyOfRange(fileBytesEncrypted, seaHelper.ivSize(), fileBytesEncrypted.length);
+    byte[] fileBytes = seaHelper.decrypt(fileBytesEncrypted, seaKey, iv);
 
-    // Read objects from the input stream
-    ObjectInputStream objectInput = new ObjectInputStream(new ByteArrayInputStream((fileBytesEncrypted)));
+    // Read keypair from the input stream
+    ObjectInputStream objectInput = new ObjectInputStream(new ByteArrayInputStream((fileBytes)));
 
-    int privKeyLength = objectInput.readInt();
-    byte[] privKeyEncryptedBytes = new byte[privKeyLength];
-    objectInput.read(privKeyEncryptedBytes, 0, privKeyLength);
-
-    int pubKeyLength = objectInput.readInt();
-    byte[] pubKeyEncryptedBytes = new byte[pubKeyLength];
-    objectInput.read(pubKeyEncryptedBytes, 0, pubKeyLength);
-
+    KeyPair keyPair = (KeyPair) objectInput.readObject();
     objectInput.close();
 
-    // Generate the DH keys and return the keypair
-    PrivateKey privateKey = keyFactory.generatePrivate(new PKCS8EncodedKeySpec(privKeyEncryptedBytes));
-    PublicKey publicKey = keyFactory.generatePublic(new X509EncodedKeySpec(pubKeyEncryptedBytes));
-
-    return new KeyPair(publicKey, privateKey);
+    return keyPair;
   }
 
-  public boolean dhKeyPairExists(String uuid, DHKeyType type) {
-    return Files.exists(getDHKeyPairPath(uuid, type));
+  public boolean dhKeyPairExists(String username, DHKeyType type) {
+    return Files.exists(getDHKeyPairPath(username, type)) || !Files.notExists(getDHKeyPairPath(username, type));
   }
 
   public X509Certificate getCertificate(String alias) throws KeyStoreException {
@@ -164,8 +153,8 @@ public class KSHelper {
     UTILS
   */
 
-  private Path getDHKeyPairPath(String uuid, DHKeyType type) {
-    return Paths.get("src/client/crypt/keys/" + uuid + "-" + type.getVal());
+  private Path getDHKeyPairPath(String username, DHKeyType type) {
+    return Paths.get("src/client/crypt/keys/" + username + "-" + type.getVal());
   }
 
 }

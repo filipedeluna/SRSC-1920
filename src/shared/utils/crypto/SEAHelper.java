@@ -67,7 +67,7 @@ public final class SEAHelper {
   }
 
   public byte[] generateIV() {
-    return random.getBytes(cipher.getBlockSize(), true);
+    return random.getBytes(cipher.getBlockSize(), false);
   }
 
   public SecretKey generateKey() {
@@ -82,5 +82,9 @@ public final class SEAHelper {
 
   public String getSpec() {
     return spec;
+  }
+
+  public int ivSize() {
+    return cipher.getBlockSize();
   }
 }
