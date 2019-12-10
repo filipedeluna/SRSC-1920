@@ -1,5 +1,7 @@
 package shared.utils.crypto;
 
+import shared.utils.crypto.util.KeySizeFinder;
+
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
@@ -34,12 +36,16 @@ public final class MacHelper {
   }
 
   public SecretKey getKeyFromBytes(byte[] keyBytes) {
-    return new SecretKeySpec(keyBytes, 0, mac.getMacLength(), mac.getAlgorithm());
+    return new SecretKeySpec(keyBytes, mac.getAlgorithm());
   }
 
   public SecretKey generateKey() {
     keyGen.init(mac.getMacLength(), new SecureRandom());
 
     return keyGen.generateKey();
+  }
+
+  public int getMaxKeySize() throws NoSuchAlgorithmException {
+    return KeySizeFinder.findMaxMac(mac.getAlgorithm());
   }
 }

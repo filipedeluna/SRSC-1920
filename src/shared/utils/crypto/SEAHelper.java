@@ -1,5 +1,7 @@
 package shared.utils.crypto;
 
+import shared.utils.crypto.util.KeySizeFinder;
+
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -82,6 +84,10 @@ public final class SEAHelper {
 
   public String getSpec() {
     return spec;
+  }
+
+  public int getMaxKeySize() throws NoSuchAlgorithmException, NoSuchPaddingException {
+    return KeySizeFinder.findMaxSea(cipher.getAlgorithm());
   }
 
   public int ivSize() {

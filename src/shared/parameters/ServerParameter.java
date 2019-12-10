@@ -1,6 +1,6 @@
 package shared.parameters;
 
-public enum ServerParameterType {
+public enum ServerParameter {
   // Add parameters here
 
   // AEA
@@ -21,7 +21,7 @@ public enum ServerParameterType {
 
   private final String val;
 
-  ServerParameterType(String val) {
+  ServerParameter(String val) {
     this.val = val;
   }
 

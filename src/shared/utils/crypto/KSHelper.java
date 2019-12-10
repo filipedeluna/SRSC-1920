@@ -1,26 +1,24 @@
 package shared.utils.crypto;
 
-import client.crypt.DHKeyType;
 import shared.errors.crypto.InvalidPublicKeyException;
 import shared.utils.Utils;
+import shared.utils.crypto.util.DHKeyType;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.DHPublicKeySpec;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.*;
-import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.*;
+import java.security.KeyStore.ProtectionParameter;
+import java.security.KeyStore.SecretKeyEntry;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 
 public class KSHelper {
@@ -65,7 +63,7 @@ public class KSHelper {
     return false;
   }
 
-  public void saveDHKeyPair(String username, DHKeyType type, KeyPair keyPair, BigInteger p, BigInteger g) throws BadPaddingException, InvalidKeyException, IllegalBlockSizeException, IOException, InvalidAlgorithmParameterException {
+  public void saveDHKeyPair(String username, DHKeyType type, KeyPair keyPair) throws BadPaddingException, InvalidKeyException, IllegalBlockSizeException, IOException, InvalidAlgorithmParameterException {
     // Generate IV and decode private key, public and the params
     byte[] iv = seaHelper.generateIV();
 
@@ -89,7 +87,7 @@ public class KSHelper {
     Files.write(filePath, fileBytesEncrypted);
   }
 
-  public KeyPair loadDHKeyPair(String username, DHKeyType type) throws IOException, BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidKeySpecException, InvalidAlgorithmParameterException, ClassNotFoundException {
+  public KeyPair loadDHKeyPair(String username, DHKeyType type) throws IOException, BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidAlgorithmParameterException, ClassNotFoundException {
     // Read encrypted bytes from file
     byte[] fileBytesEncrypted = Files.readAllBytes(getDHKeyPairPath(username, type));
     // Get the iv
@@ -104,6 +102,20 @@ public class KSHelper {
     objectInput.close();
 
     return keyPair;
+  }
+
+  public void saveSharedKey(int clientId, int destinationId, DHKeyType type, SecretKey key, char[] pass) throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
+    SecretKeyEntry seaKeyEntry = new SecretKeyEntry(key);
+    ProtectionParameter protectionParam = new KeyStore.PasswordProtection(pass);
+    String keyName = clientId + "-" + destinationId + "-" + type.getVal() + "shared";
+
+    store.deleteEntry(keyName);
+    store.setEntry(keyName, seaKeyEntry, protectionParam);
+    store.store(new FileOutputStream(keyStoreLoc), pass);
+  }
+
+  public Key getSharedKey(int clientId, int destinationId, DHKeyType type, char[] pass) throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
+    return store.getKey(clientId + "-" + destinationId + "-" + type.getVal() + "shared", pass);
   }
 
   public boolean dhKeyPairExists(String username, DHKeyType type) {

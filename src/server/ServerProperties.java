@@ -5,7 +5,7 @@ import server.crypt.PKICommsManager;
 import server.db.ServerDatabaseDriver;
 import shared.errors.db.FailedToInsertException;
 import shared.parameters.ServerParameterMap;
-import shared.parameters.ServerParameterType;
+import shared.parameters.ServerParameter;
 import server.props.ServerProperty;
 import shared.errors.db.CriticalDatabaseException;
 import shared.errors.db.DatabaseException;
@@ -29,8 +29,6 @@ final class ServerProperties {
   KSHelper ksHelper;
 
   ServerDatabaseDriver DB;
-
-  private DHHelper dhHelper;
 
   private String pubKeyName;
   private int pubKeySize;
@@ -67,15 +65,11 @@ final class ServerProperties {
     // Get pub key and assign it
     pubKeyName = properties.getString(ServerProperty.PUB_KEY_NAME);
 
-    // Initialize DH params and helper
-    String dhKeyAlg = properties.getString(ServerProperty.DH_KEY_ALG);
-    String dhKeyHashAlg = properties.getString(ServerProperty.DH_KEY_HASH_ALG);
-    int dhKeySize = properties.getInt(ServerProperty.DH_KEY_SIZE);
-    dhHelper = new DHHelper(dhKeyAlg, dhKeyHashAlg, dhKeySize);
+
 
     // check if supposed to reset server params and reset them if so
     if (properties.getBool(ServerProperty.PARAMS_RESET))
-      resetParams();
+      resetParams(properties);
 
     // Configure PKI Comms manager if pki enabled
     PKI_ENABLED = properties.getBool(ServerProperty.USE_PKI);
@@ -87,7 +81,7 @@ final class ServerProperties {
     return (PrivateKey) ksHelper.getKey(pubKeyName);
   }
 
-  private void resetParams() throws GeneralSecurityException, DatabaseException, CriticalDatabaseException {
+  private void resetParams(CustomProperties props) throws GeneralSecurityException, DatabaseException, CriticalDatabaseException, PropertyException {
     // Delete all params
     DB.deleteAllParameters();
 
@@ -95,22 +89,27 @@ final class ServerProperties {
     ServerParameterMap params = new ServerParameterMap();
 
     // Insert AEA parameters
-    insertParameter(params, ServerParameterType.PUB_KEY_ALG, aeaHelper.getKeyAlg());
-    insertParameter(params, ServerParameterType.CERT_SIG_ALG, aeaHelper.getCertAlg());
+    insertParameter(params, ServerParameter.PUB_KEY_ALG, aeaHelper.getKeyAlg());
+    insertParameter(params, ServerParameter.CERT_SIG_ALG, aeaHelper.getCertAlg());
 
     // Generate DH Spec and insert DH parameters
-    DHParameterSpec spec = dhHelper.genParams();
-    insertParameter(params, ServerParameterType.DH_ALG, dhHelper.getAlgorithm());
-    insertParameter(params, ServerParameterType.DH_P, spec.getP().toString()); // Big Int
-    insertParameter(params, ServerParameterType.DH_G, spec.getG().toString()); // Big Int
-    insertParameter(params, ServerParameterType.DH_KEYSIZE, String.valueOf(dhHelper.getKeySize())); // int
-    insertParameter(params, ServerParameterType.DH_HASH_ALG, dhHelper.getHashAlgorithm());
+    // Initialize DH params, generate DH Spec and insert DH parameters
+    int dhKeySize = props.getInt(ServerProperty.DH_KEY_SIZE);
+    String dhAlg = props.getString(ServerProperty.DH_KEY_ALG);
+    DHHelper dhHelper = new DHHelper(dhAlg, dhKeySize);
+    DHParameterSpec dhSpec = dhHelper.generateParams();
+
+    insertParameter(params, ServerParameter.DH_ALG, dhAlg);
+    insertParameter(params, ServerParameter.DH_P, dhSpec.getP().toString()); // Big Int
+    insertParameter(params, ServerParameter.DH_G, dhSpec.getG().toString()); // Big Int
+    insertParameter(params, ServerParameter.DH_KEYSIZE, String.valueOf(dhKeySize)); // int
+    insertParameter(params, ServerParameter.DH_HASH_ALG,  props.getString(ServerProperty.DH_KEY_HASH_ALG));
 
     // Join all parameters, sign them, encode them and insert them in DB
     byte[] paramBytes = params.getAllParametersBytes();
     byte[] paramSigBytes = aeaHelper.sign(privateKey(), paramBytes);
 
-    insertParameter(params, ServerParameterType.PARAM_SIG, b64Helper.encode(paramSigBytes));
+    insertParameter(params, ServerParameter.PARAM_SIG, b64Helper.encode(paramSigBytes));
   }
 
   public int getBufferSizeInMB() {
@@ -124,7 +123,7 @@ final class ServerProperties {
   /*
       Utils
     */
-  private void insertParameter(ServerParameterMap params, ServerParameterType type, String value) throws CriticalDatabaseException, FailedToInsertException {
+  private void insertParameter(ServerParameterMap params, ServerParameter type, String value) throws CriticalDatabaseException, FailedToInsertException {
     params.put(type, value);
     DB.insertParameter(type, value);
   }

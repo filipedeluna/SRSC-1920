@@ -9,4 +9,8 @@ public final class SendMessageResponse extends OkResponseWithNonce {
     super(nonce);
     this.messageId = messageId;
   }
+
+  public int getMessageId() {
+    return messageId;
+  }
 }

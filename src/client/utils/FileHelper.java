@@ -1,6 +1,7 @@
 package client.utils;
 
 import shared.Pair;
+import shared.utils.Utils;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -11,8 +12,11 @@ import java.util.ArrayList;
 public final class FileHelper {
   private String destinationFolder;
 
-  public FileHelper(String destinationFolder) {
+  public FileHelper(String destinationFolder) throws IOException {
     this.destinationFolder = destinationFolder;
+
+    if (!Files.isDirectory(Paths.get(destinationFolder)))
+      Files.createDirectory(Paths.get(destinationFolder));
   }
 
   public ArrayList<ValidFile> getFiles(String... paths) throws IOException {
@@ -41,6 +45,15 @@ public final class FileHelper {
     return Files.readAllBytes(Paths.get(validFile.getPath()));
   }
 
+  public byte[] readAllFiles(ArrayList<ValidFile> validFiles) throws IOException {
+    byte[] data = new byte[0];
+
+    for (ValidFile validFile : validFiles)
+      Utils.joinByteArrays(data, readFile(validFile));
+
+    return data;
+  }
+
   public synchronized void writeFile(String fileName, byte[] data) throws IOException {
     Path filePath = Paths.get(destinationFolder + "/" + fileName);
 
@@ -56,18 +69,19 @@ public final class FileHelper {
     Files.write(filePath, data);
   }
 
-  public String getFileSpec(ValidFile... validFiles) {
+  public String getFileSpec(ArrayList<ValidFile> validFiles) {
     StringBuilder stringBuilder = new StringBuilder();
 
     // Build spec for all files
-    for (int i = 0; i < validFiles.length; i++) {
-      ValidFile validFile = validFiles[i];
+    int counter = 0;
+    for (ValidFile validFile : validFiles) {
+      counter++;
 
       stringBuilder.append(validFile.getName());
       stringBuilder.append(" ");
       stringBuilder.append(validFile.length());
 
-      if (i < validFiles.length - 1)
+      if (counter < validFiles.size())
         stringBuilder.append(", ");
     }
 

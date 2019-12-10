@@ -10,11 +10,11 @@ public final class ServerParameterMap extends LinkedHashMap<String, String> {
     super();
   }
 
-  public void put(ServerParameterType type, String value) {
+  public void put(ServerParameter type, String value) {
     put(type.dbName(), value);
   }
 
-  public String getParameterValue(ServerParameterType type) {
+  public String getParameter(ServerParameter type) {
     return get(type.dbName());
   }
 
@@ -23,7 +23,7 @@ public final class ServerParameterMap extends LinkedHashMap<String, String> {
 
     for (Entry<String, String> entry : entrySet()) {
       // Make sure we're not getting the bytes from the signature
-      if (entry.getKey().equals(ServerParameterType.PARAM_SIG.dbName()))
+      if (entry.getKey().equals(ServerParameter.PARAM_SIG.dbName()))
         continue;
 
       resultArray = Utils.joinByteArrays(resultArray, entry.getValue().getBytes());

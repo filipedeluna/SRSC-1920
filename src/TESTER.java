@@ -1,24 +1,21 @@
-import shared.utils.Utils;
+import shared.utils.crypto.util.KeySizeFinder;
 
-import javax.rmi.CORBA.Util;
+import java.security.Provider;
+import java.security.Security;
 
 public class TESTER {
 
-  public static void main(String[] args) {
-    byte[] arr1 = new byte[]{1};
-    byte[] arr2 = new byte[]{2};
-    byte[] arr3 = new byte[]{3};
-    byte[] arr4 = new byte[]{4};
-    byte[] arr5 = new byte[]{5};
+  public static void main(String[] args) throws Exception {
+    System.out.println(KeySizeFinder.findMaxSea("AES/CBC"));
 
-    System.out.println(
-        Utils.joinByteArrays(
-            arr1,
-            arr2,
-            arr3,
-            arr4,
-            arr5
-        ).length
-    );
+
+    Provider provider = Security.getProvider("BC");
+
+   // for (Provider.Service service : provider.getServices()) {
+      //System.out.println(service.getType() + " " +  service.getAlgorithm());
+    //}
+
+
+    ;
   }
 }

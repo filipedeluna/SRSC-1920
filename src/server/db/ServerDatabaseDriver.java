@@ -7,7 +7,7 @@ import shared.wrappers.User;
 import shared.Pair;
 import shared.errors.db.*;
 import shared.parameters.ServerParameterMap;
-import shared.parameters.ServerParameterType;
+import shared.parameters.ServerParameter;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -402,7 +402,7 @@ public final class ServerDatabaseDriver {
   /*
     Server Parameters
   */
-  public void insertParameter(ServerParameterType parameter, String value) throws CriticalDatabaseException, FailedToInsertException {
+  public void insertParameter(ServerParameter parameter, String value) throws CriticalDatabaseException, FailedToInsertException {
     try {
       // Does not exist so we create it
       String statement = "INSERT INTO server_params (name, value) VALUES (?, ?);";

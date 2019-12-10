@@ -1,17 +1,20 @@
 package client;
 
 import client.cache.UserCacheEntry;
-import client.crypt.DHKeyType;
 import client.errors.ClientException;
 import client.props.ClientProperty;
 import client.utils.ClientRequest;
+import client.utils.ValidFile;
 import com.google.gson.JsonObject;
 import shared.parameters.ServerParameterMap;
 import shared.utils.Utils;
+import shared.utils.crypto.MacHelper;
+import shared.utils.crypto.SEAHelper;
+import shared.utils.crypto.util.DHKeyType;
 import shared.wrappers.Message;
 import shared.wrappers.User;
 import shared.errors.properties.PropertyException;
-import shared.parameters.ServerParameterType;
+import shared.parameters.ServerParameter;
 import shared.response.server.*;
 import shared.utils.crypto.KSHelper;
 import shared.utils.properties.CustomProperties;
@@ -21,6 +24,7 @@ import javax.crypto.spec.DESKeySpec;
 import javax.crypto.spec.DHParameterSpec;
 import javax.net.ssl.*;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.spec.InvalidKeySpecException;
@@ -29,6 +33,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 
 public class Client {
@@ -53,36 +58,30 @@ public class Client {
       KSHelper ksHelper = getKeyStore(properties);
       KSHelper tsHelper = getTrustStore(properties);
 
-      // Create SSL Socket
+      // Create SSL Socket and register Client properties
       SSLContext sslContext = buildSSLContext(ksHelper, tsHelper);
       SSLSocketFactory factory = sslContext.getSocketFactory();
-      SSLSocket socket = createSocket(factory, properties);
+      ClientProperties cProps = new ClientProperties(properties, ksHelper, tsHelper, factory);
 
       // Start handshake
       System.out.println("SSL setup finished.");
-      socket.startHandshake();
       System.out.println("Handshake completed.");
 
-      // Create client properties and connect/input output
-      ClientProperties cProps = new ClientProperties(properties, ksHelper, tsHelper);
-      cProps.connect(socket);
+      cProps.startConnection();
 
       // Request shared parameters and that initialize dh and aea helpers
-      ServerParameterMap spm = requestParams(cProps);
-
+      requestParams(cProps);
 
       // Command reader
       BufferedReader lineReader = new BufferedReader(new InputStreamReader(System.in));
 
       // Close the socket
-      socket.close();
+      cProps.closeConnection();
 
       while (true) {
         try {
           // Restart connection for new request with new socket and connect i/o
-          socket = createSocket(factory, properties);
-          socket.startHandshake();
-          cProps.connect(socket);
+          cProps.startConnection();
 
           System.out.println();
           System.out.println("Enter command: ");
@@ -113,7 +112,7 @@ public class Client {
               createUser(cProps, requestData, cmdArgs);
               break;
             case LIST:
-              listUsers(cProps, requestData, cmdArgs);
+              listUsers(cProps, requestData, cmdArgs, false);
               break;
             case NEW:
               listNewMessages(cProps, requestData, cmdArgs);
@@ -122,7 +121,6 @@ public class Client {
               listAllMessages(cProps, requestData, cmdArgs);
               break;
             case SEND:
-              //missing message encryption
               sendMessages(cProps, requestData, cmdArgs);
               break;
             case RECV:
@@ -145,7 +143,7 @@ public class Client {
               break;
           }
 
-          socket.close();
+          cProps.closeConnection();
         } catch (ClientException e) {
           System.err.println(e.getMessage());
           e.printStackTrace();
@@ -160,7 +158,7 @@ public class Client {
     }
   }
 
-  private static void login(ClientProperties cProps, JsonObject requestData, String[] args) throws ClientException, IOException {
+  private static void login(ClientProperties cProps, JsonObject requestData, String[] args) throws ClientException, IOException, GeneralSecurityException {
     // Get username, compute uuid and add to request
     String username = args[1].trim();
     String uuid = cProps.generateUUID(username);
@@ -196,6 +194,7 @@ public class Client {
 
     // Create session and establish it
     ClientSession session = new ClientSession(
+        username,
         user.getId(),
         user.getSeaSpec(),
         user.getMacSpec(),
@@ -218,14 +217,14 @@ public class Client {
     // Also associate uuid to cache
     cProps.cache.addUUID(uuid, user.getId());
 
-    cProps.establishSession(session);
+    cProps.establishSession(session); // TODO LOOKEI HERE
 
     System.out.println("User " + username + " successfully logged in.");
   }
 
   // TODO OOOOOOOOOOOOOOOOO VERIFY THE NONCES EVERYWHERE
 
-  private static ServerParameterMap requestParams(ClientProperties cProps) throws GeneralSecurityException, IOException, ClientException {
+  private static void requestParams(ClientProperties cProps) throws GeneralSecurityException, IOException, ClientException {
     JsonObject requestData = new JsonObject();
 
     // Create request parameters and send request
@@ -238,18 +237,10 @@ public class Client {
     ParametersResponse resp = cProps.receiveRequest(ParametersResponse.class);
 
     // Create parameters map class from received JSON
-    ServerParameterMap paramsMap = ((ParametersResponse) resp).getParameters();
-
-    // Initialize AEA and DH Helper with the server parameters
-    try {
-      cProps.initAEAHelper(paramsMap);
-      cProps.initDHHelper(paramsMap);
-    } catch (Exception e) {
-      throw new ClientException("The server parameters received are corrupted.");
-    }
+    ServerParameterMap paramsMap = resp.getParameters();
 
     // Verify parameters signature
-    byte[] signatureDecoded = cProps.b64Helper.decode(paramsMap.getParameterValue(ServerParameterType.PARAM_SIG));
+    byte[] signatureDecoded = cProps.b64Helper.decode(paramsMap.getParameter(ServerParameter.PARAM_SIG));
     byte[] paramsBytes = paramsMap.getAllParametersBytes();
 
     boolean sigValid = cProps.aeaHelper.verifySignature(cProps.getServerPublicKey(), paramsBytes, signatureDecoded);
@@ -257,7 +248,12 @@ public class Client {
     if (!sigValid)
       throw new ClientException("The server parameters signature is not valid.");
 
-    return paramsMap;
+    // Initialize AEA and DH Helper with the server parameters
+    try {
+      cProps.loadServerParams(paramsMap);
+    } catch (Exception e) {
+      throw new ClientException("The server parameters received are corrupted.");
+    }
   }
 
   private static void createUser(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException, ClientException {
@@ -269,8 +265,8 @@ public class Client {
 
     // Generate Parameter Spec and create dh keypairs for mac and sea
     DHParameterSpec dhSpec = new DHParameterSpec(cProps.dhHelper.getP(), cProps.dhHelper.getG());
-    KeyPair dhSeaKeypair = cProps.dhHelper.genKeyPair(dhSpec);
-    KeyPair dhMacKeypair = cProps.dhHelper.genKeyPair(dhSpec);
+    KeyPair dhSeaKeypair = cProps.dhHelper.generateKeyPair(dhSpec);
+    KeyPair dhMacKeypair = cProps.dhHelper.generateKeyPair(dhSpec);
 
     // Check user keys exist
     if (cProps.ksHelper.dhKeyPairExists(username, DHKeyType.SEA))
@@ -280,8 +276,8 @@ public class Client {
       throw new ClientException("User mac key already exists.");
 
     // Keys do not exist so save them to file
-    cProps.ksHelper.saveDHKeyPair(username, DHKeyType.SEA, dhSeaKeypair, cProps.dhHelper.getP(), cProps.dhHelper.getG());
-    cProps.ksHelper.saveDHKeyPair(username, DHKeyType.MAC, dhMacKeypair, cProps.dhHelper.getP(), cProps.dhHelper.getG());
+    cProps.ksHelper.saveDHKeyPair(username, DHKeyType.SEA, dhSeaKeypair);
+    cProps.ksHelper.saveDHKeyPair(username, DHKeyType.MAC, dhMacKeypair);
 
     // Add all security properties to the header
     byte[] seaDHPubKeyBytes = dhSeaKeypair.getPublic().getEncoded();
@@ -308,7 +304,6 @@ public class Client {
     // Get response and check nonce
     CreateUserResponse resp = cProps.receiveRequest(CreateUserResponse.class);
 
-
     // Get the user id and add user to cache
     int userId = resp.getUserId();
 
@@ -326,8 +321,7 @@ public class Client {
     System.out.println("User created with id: " + userId);
   }
 
-
-  private static void listUsers(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
+  private static void listUsers(ClientProperties cProps, JsonObject requestData, String[] args, boolean silent) throws IOException, ClientException {
     // Add id if inserted and send the request
     try {
       if (args.length == 2)
@@ -351,7 +345,6 @@ public class Client {
     for (User user : users) {
       if (user == null)
         continue;
-
 
       try {
         verifyUserSecDataSignature(user, cProps);
@@ -379,15 +372,17 @@ public class Client {
       );
     }
 
-    if (obtained.size() > 0)
-      System.out.println("Obtained and verified user's with ids " + obtained.toString() + " info.");
+    // Print results
+    if (!silent) {
+      if (obtained.size() > 0)
+        System.out.println("Obtained and verified user's with ids " + obtained.toString() + " info.");
 
-    if (failed.size() > 0)
-      System.err.println("Failed to verify user's with ids " + failed.toString() + " info.");
+      if (failed.size() > 0)
+        System.err.println("Failed to verify user's with ids " + failed.toString() + " info.");
 
-    if (obtained.size() == 0 && failed.size() == 0)
-      System.err.println("No users found.");
-
+      if (obtained.size() == 0 && failed.size() == 0)
+        System.err.println("No users found.");
+    }
   }
 
   private static void listNewMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
@@ -430,53 +425,148 @@ public class Client {
   }
 
   private static void sendMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException, ClientException, PropertyException, ClassNotFoundException {
-    BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
+    // Get client and destination id
+    int clientId = cProps.session.getId();
+    int destinationId = Integer.parseInt(args[1]);
+    requestData.addProperty("senderId", cProps.session.getId());
+    requestData.addProperty("receiverId", Integer.parseInt(args[1]));
 
-    int clientId = Integer.parseInt(args[1]);
-    requestData.addProperty("source", Integer.parseInt(args[1]));
+    // Validate message parameters
+    String message = args[2];
+    String fileSpec = "";
+    ArrayList<ValidFile> validFiles = null;
 
-    int destinationId = Integer.parseInt(args[2]);
-    requestData.addProperty("destination", destinationId);
-    System.out.println("Message:");
-    String text = bf.readLine();
-
-    Cipher seacipher;
-    Cipher maccipher;
-
-    // try to load shared key
-    try {
-      seacipher = loadKeyAndInitCipher(cProps, clientId, destinationId);
-      maccipher = loadKeyAndInitHmacCipher(cProps, clientId, destinationId);
-    } catch (InvalidKeyException | UnrecoverableKeyException | KeyStoreException e) {
-      //If user cant load the ciphers, menas he does not have them, so he must create the shared key first
-
-      //initatiates the keyagrees 1 for sea 1 for mac
-      KeyAgreement keyAgreesea = createSEAAgree(cProps);
-      KeyAgreement keaAgreemac = createMACAgree(cProps);
-
-      //checks if destiny user is in cache if not gets the user
-      UserCacheEntry destinyuser = checkAndGetDestinyUser(cProps, destinationId);
-
-      seacipher = generateSeaSharedKey(cProps, clientId, keyAgreesea, destinyuser);
-      maccipher = generateMACSharedKey(cProps, clientId, keyAgreesea, destinyuser);
+    // Get files to send
+    if (args.length > 3) {
+      validFiles = cProps.fileHelper.getFiles(Arrays.copyOfRange(args, 3, args.length));
+      fileSpec = cProps.fileHelper.getFileSpec(validFiles);
     }
 
-    //Encrypts data
-    String encrypted = new String(seacipher.doFinal(text.getBytes()));
-    requestData.addProperty("text", encrypted);
+    // Check user is logged in (in session and cache)
+    UserCacheEntry client = cProps.cache.getUser(clientId);
+    if (client == null)
+      throw new ClientException("User is not logged in.");
 
-    //adds cipher iv
-    requestData.addProperty("cipherIV", new String(seacipher.getIV()));
+    UserCacheEntry destinationUser = cProps.cache.getUser(destinationId);
 
-    //Produces integrity code
-    String macCode = new String(maccipher.doFinal(encrypted.getBytes()));
-    requestData.addProperty("senderSignature", macCode);
+    // If user is not in cache, we will have to request the server to get him
+    if (destinationUser == null) {
+      System.out.println("User not found in cache. fetching from server...");
+      // We'll start by building the request
+      JsonObject requestDataToGetUser = new JsonObject();
+      requestDataToGetUser.addProperty("type", "list");
+      requestDataToGetUser.addProperty("nonce", cProps.rndHelper.getNonce());
 
+      // Create "fake" args and do request, user will be added to cache
+      String[] fakeArgs = new String[]{"", String.valueOf(destinationId)};
+      listUsers(cProps, requestDataToGetUser, fakeArgs, true);
+
+      // Restart socket connection
+      cProps.closeConnection();
+      cProps.startConnection();
+
+      // TODO AGGRESSIVE MODEEEEE??? - get all users instead of just this one every time we miss one?????
+      // Check if user is now in cache
+      destinationUser = cProps.cache.getUser(destinationId);
+
+      // If user not in cache either he doesn't exist or we couldn't get him
+      if (destinationUser == null)
+        throw new ClientException("Couldn't get user from server.");
+    }
+
+    // Get shared keys
+    Key sharedSeaKey = cProps.ksHelper.getSharedKey(clientId, destinationId, DHKeyType.SEA, cProps.keyStorePassword());
+    Key sharedMacKey = cProps.ksHelper.getSharedKey(clientId, destinationId, DHKeyType.MAC, cProps.keyStorePassword());
+
+    // If shared keys don't exist, generate them
+    if (sharedSeaKey == null || sharedMacKey == null) {
+      cProps.generateDHSharedKeys(destinationId);
+
+      // Get them again
+      sharedSeaKey = cProps.ksHelper.getSharedKey(clientId, destinationId, DHKeyType.SEA, cProps.keyStorePassword());
+      sharedMacKey = cProps.ksHelper.getSharedKey(clientId, destinationId, DHKeyType.MAC, cProps.keyStorePassword());
+    }
+
+    // Get client ciphers from the current session
+    MacHelper macHelper = cProps.session.macHelper;
+    SEAHelper seaHelper = cProps.session.seaHelper;
+
+    // Start encrypting message contents
+    byte[] tempCipherIVBytes;
+    byte[] cipherIVBytes = new byte[0];
+    byte[] encryptedMessageBytes;
+    byte[] encryptedFileSpecBytes = new byte[0];
+    byte[] encryptedFilesBytes = new byte[0];
+
+    // Encrypt and add message text
+    // We will use 3 different IVs due to possible vulnerabilities with certain ciphers/modes (GCM)
+    if (seaHelper.cipherModeUsesIV()) {
+      tempCipherIVBytes = seaHelper.generateIV();
+      cipherIVBytes = Utils.joinByteArrays(cipherIVBytes, tempCipherIVBytes);
+
+      encryptedMessageBytes = seaHelper.encrypt(message.getBytes(StandardCharsets.UTF_8), sharedSeaKey, tempCipherIVBytes);
+    } else {
+      encryptedMessageBytes = seaHelper.encrypt(message.getBytes(StandardCharsets.UTF_8), sharedSeaKey);
+    }
+    requestData.addProperty("text", cProps.b64Helper.encode(encryptedMessageBytes));
+
+    // Encrypt and add file info
+    if (!fileSpec.equals("")) {
+      if (seaHelper.cipherModeUsesIV()) {
+        tempCipherIVBytes = seaHelper.generateIV();
+        cipherIVBytes = Utils.joinByteArrays(cipherIVBytes, tempCipherIVBytes);
+
+        encryptedFileSpecBytes = seaHelper.encrypt(fileSpec.getBytes(StandardCharsets.UTF_8), sharedSeaKey, tempCipherIVBytes);
+      } else
+        encryptedFileSpecBytes = seaHelper.encrypt(fileSpec.getBytes(StandardCharsets.UTF_8), sharedSeaKey);
+      requestData.addProperty("attachmentData", cProps.b64Helper.encode(encryptedFileSpecBytes));
+    } else
+      requestData.addProperty("attachmentData", "");
+
+    // Encrypt and add all files bytes
+    if (validFiles != null) {
+      byte[] filesBytes = cProps.fileHelper.readAllFiles(validFiles);
+
+      if (seaHelper.cipherModeUsesIV()) {
+        tempCipherIVBytes = seaHelper.generateIV();
+        cipherIVBytes = Utils.joinByteArrays(cipherIVBytes, tempCipherIVBytes);
+
+        encryptedFilesBytes = seaHelper.encrypt(filesBytes, sharedSeaKey, tempCipherIVBytes);
+      } else
+        encryptedFilesBytes = seaHelper.encrypt(filesBytes, sharedSeaKey);
+      requestData.addProperty("attachments", cProps.b64Helper.encode(encryptedFilesBytes));
+    } else
+      requestData.addProperty("attachments", "");
+
+
+    // Add Cipher IVs to request
+    if (cipherIVBytes.length != 0)
+      requestData.addProperty("cipherIV", cProps.b64Helper.encode(cipherIVBytes));
+    else
+      requestData.addProperty("cipherIV", "");
+
+    // Join all data for user mac signature and add it to the request
+    byte[] messageData = Utils.joinByteArrays(
+        encryptedMessageBytes,
+        encryptedFileSpecBytes,
+        encryptedFilesBytes,
+        cipherIVBytes
+    );
+
+    byte[] authenticatedMessageData = macHelper.macHash(messageData, sharedMacKey);
+    requestData.addProperty("senderSignature", cProps.b64Helper.encode(authenticatedMessageData));
+
+    // Send request
     cProps.sendRequest(requestData);
 
+    SendMessageResponse resp = cProps.receiveRequestWithNonce(requestData, SendMessageResponse.class);
+
+    System.out.println("Successfully sent message to user " + destinationId + " with id " + resp.getMessageId());
   }
 
-  private static Cipher generateMACSharedKey(ClientProperties cProps, int clientId, KeyAgreement keyAgreemac, UserCacheEntry destinyuser) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, PropertyException, KeyStoreException, IOException, CertificateException {
+  private static Cipher generateMACSharedKey(ClientProperties cProps, int clientId, KeyAgreement
+      keyAgreemac, UserCacheEntry destinyuser) throws
+      NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, PropertyException, KeyStoreException, IOException, CertificateException {
     KeyFactory factory = KeyFactory.getInstance(cProps.dhHelper.getAlgorithm());
     X509EncodedKeySpec encodedKeySpec = new X509EncodedKeySpec(destinyuser.getDhSeaPubKey());
     PublicKey publicKey = factory.generatePublic(encodedKeySpec);
@@ -505,77 +595,9 @@ public class Client {
 
   //TODO: Retirar daqui estes utils todos e meter na classe do crypt utils ou no cprops
 
-  private static KeyAgreement createMACAgree(ClientProperties cProps) throws NoSuchAlgorithmException, IllegalBlockSizeException, InvalidKeyException, InvalidKeySpecException, BadPaddingException, IOException, InvalidAlgorithmParameterException, ClassNotFoundException {
-    KeyAgreement keyAgree = KeyAgreement.getInstance(cProps.dhHelper.getAlgorithm());
-    KeyPair myKeyPairforSEASpec = cProps.ksHelper.loadDHKeyPair("myusername", DHKeyType.MAC);
-    keyAgree.init(myKeyPairforSEASpec.getPrivate());
-    return keyAgree;
-  }
 
-  private static Cipher loadKeyAndInitHmacCipher(ClientProperties cProps, int clientId, int destinationId) throws PropertyException, UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException, NoSuchPaddingException, InvalidKeyException {
-    Key k = cProps.ksHelper.getStore().getKey(clientId + "-" + destinationId + "-macshared", cProps.keyStorePassword());
-    Cipher cipher = Cipher.getInstance(cProps.cache.getUser(clientId).getMacSpec());
-    cipher.init(Cipher.ENCRYPT_MODE, k);
-    return cipher;
-  }
-
-  private static Cipher loadKeyAndInitCipher(ClientProperties cProps, int clientId, int destinationId) throws KeyStoreException, NoSuchAlgorithmException, UnrecoverableKeyException, PropertyException, NoSuchPaddingException, InvalidKeyException {
-    Key k = cProps.ksHelper.getStore().getKey(clientId + "-" + destinationId + "-seashared", cProps.keyStorePassword());
-    Cipher cipher = Cipher.getInstance(cProps.cache.getUser(clientId).getSeaSpec());
-    cipher.init(Cipher.ENCRYPT_MODE, k);
-    return cipher;
-  }
-
-  private static UserCacheEntry checkAndGetDestinyUser(ClientProperties cProps, int destinationId) throws IOException, ClientException {
-    UserCacheEntry destinyuser;
-    if (cProps.cache.getUser(destinationId) != null) {
-      destinyuser = cProps.cache.getUser(destinationId);
-    } else {
-      JsonObject listrequestData = new JsonObject();
-      listrequestData.addProperty("type", "list");
-      listUsers(cProps, listrequestData, new String[]{String.valueOf(destinationId)});
-
-      //user now added to cache
-      destinyuser = cProps.cache.getUser(destinationId);
-    }
-    return destinyuser;
-  }
-
-  public static KeyAgreement createSEAAgree(ClientProperties cProps) throws NoSuchAlgorithmException, IOException, BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidKeySpecException, InvalidAlgorithmParameterException, ClassNotFoundException {
-    KeyAgreement keyAgree = KeyAgreement.getInstance(cProps.dhHelper.getAlgorithm());
-    KeyPair myKeyPairforSEASpec = cProps.ksHelper.loadDHKeyPair("myusername", DHKeyType.SEA);
-    keyAgree.init(myKeyPairforSEASpec.getPrivate());
-    return keyAgree;
-  }
-
-  public static Cipher generateSeaSharedKey(ClientProperties cProps, int clientId, KeyAgreement keyAgree, UserCacheEntry destinyuser) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, KeyStoreException, PropertyException, IOException, CertificateException {
-    //add destiny user pub to agreement
-    KeyFactory factory = KeyFactory.getInstance(cProps.dhHelper.getAlgorithm());
-    X509EncodedKeySpec encodedKeySpec = new X509EncodedKeySpec(destinyuser.getDhSeaPubKey());
-    PublicKey publicKey = factory.generatePublic(encodedKeySpec);
-    keyAgree.doPhase(publicKey, true);
-
-    //generate the shared key
-    byte[] generatedkeybytes = keyAgree.generateSecret();
-
-    //starts sea cipher can it only be DES?
-    Cipher cipher = Cipher.getInstance(cProps.cache.getUser(clientId).getSeaSpec());
-    SecretKeyFactory skf = SecretKeyFactory.getInstance(cipher.getAlgorithm());
-    KeySpec keySpec = new DESKeySpec(generatedkeybytes);
-    SecretKey secretKey = skf.generateSecret(keySpec);
-
-    // add keys to keystore
-    KeyStore.SecretKeyEntry seaKeyEntry = new KeyStore.SecretKeyEntry(secretKey);
-    KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection(cProps.keyStorePassword());
-    cProps.ksHelper.getStore().setEntry(clientId + "-" + destinyuser + "-seashared", seaKeyEntry, protectionParam);
-    cProps.ksHelper.getStore().store(new FileOutputStream(cProps.KEYSTORE_LOC), cProps.keyStorePassword());
-
-    //init sea cipher
-    cipher.init(Cipher.ENCRYPT_MODE, secretKey);
-    return cipher;
-  }
-
-  private static void receiveMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
+  private static void receiveMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws
+      IOException, ClientException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
     int messageid = Integer.parseInt(bf.readLine());
     requestData.addProperty("userId", messageid);
@@ -599,7 +621,8 @@ public class Client {
     //SEND RECEIPT WITH CONTENT SIGNATURE
   }
 
-  private static void status(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
+  private static void status(ClientProperties cProps, JsonObject requestData, String[] args) throws
+      IOException, ClientException {
     BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
 
     int messageid = Integer.parseInt(bf.readLine());
@@ -656,7 +679,8 @@ public class Client {
   }
 */
 
-  private static KSHelper getKeyStore(CustomProperties properties) throws PropertyException, GeneralSecurityException, IOException {
+  private static KSHelper getKeyStore(CustomProperties properties) throws
+      PropertyException, GeneralSecurityException, IOException {
     String keyStoreLoc = properties.getString(ClientProperty.KEYSTORE_LOC);
     String keyStorePass = properties.getString(ClientProperty.KEYSTORE_PASS);
     String keyStoreType = properties.getString(ClientProperty.KEYSTORE_TYPE);
@@ -664,7 +688,8 @@ public class Client {
     return new KSHelper(keyStoreLoc, keyStoreType, keyStorePass.toCharArray(), false);
   }
 
-  private static KSHelper getTrustStore(CustomProperties properties) throws PropertyException, IOException, GeneralSecurityException {
+  private static KSHelper getTrustStore(CustomProperties properties) throws
+      PropertyException, IOException, GeneralSecurityException {
     String trustStoreLoc = properties.getString(ClientProperty.TRUSTSTORE_LOC);
     String trustStorePass = properties.getString(ClientProperty.TRUSTSTORE_PASS);
     String trustStoreType = properties.getString(ClientProperty.TRUSTSTORE_TYPE);
@@ -740,17 +765,5 @@ public class Client {
     return df.format(new Date());
   }
 
-  private static SSLSocket createSocket(SSLSocketFactory sslSocketFactory, CustomProperties properties) throws PropertyException, IOException {
-    int serverPort = properties.getInt(ClientProperty.SERVER_PORT);
-    String serverAddress = properties.getString(ClientProperty.SERVER_ADDRESS);
 
-    SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket(serverAddress, serverPort);
-    socket.setSoTimeout(10 * 1000); // 10 seconds
-
-    // Set enabled protocols and cipher suites and start SSL socket handshake with server
-    socket.setEnabledProtocols(properties.getStringArr(ClientProperty.TLS_PROTOCOLS));
-    socket.setEnabledCipherSuites(properties.getStringArr(ClientProperty.TLS_CIPHERSUITES));
-
-    return socket;
-  }
 }

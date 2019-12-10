@@ -142,10 +142,12 @@ public final class ClientCacheController {
   }
 
   private void addUserAccess(int userId) {
-    userCacheAccesses.put(userId, userCacheAccesses.get(userId) + 1);
+    if (userCache.containsKey(userId))
+      userCacheAccesses.put(userId, userCacheAccesses.get(userId) + 1);
   }
 
   private void addMessageAccess(int messageId) {
-    messageCacheAccesses.put(messageId, messageCacheAccesses.get(messageId) + 1);
+    if (userCache.containsKey(messageId))
+      messageCacheAccesses.put(messageId, messageCacheAccesses.get(messageId) + 1);
   }
 }

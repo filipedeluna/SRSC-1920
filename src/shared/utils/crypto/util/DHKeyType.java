@@ -1,4 +1,4 @@
-package client.crypt;
+package shared.utils.crypto.util;
 
 public enum DHKeyType {
   SEA("sea"),
