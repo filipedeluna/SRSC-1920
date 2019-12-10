@@ -111,6 +111,7 @@ public class Client {
           switch (request) {
             case CREATE:
               createUser(cProps, requestData, cmdArgs);
+              break;
             case LIST:
               listUsers(cProps, requestData, cmdArgs);
               break;
@@ -123,6 +124,7 @@ public class Client {
             case SEND:
               //missing message encryption
               sendMessages(cProps, requestData, cmdArgs);
+              break;
             case RECV:
               // TODO missing message decryption
               //contem o receipt, receipt enviado dps de ler
@@ -157,7 +159,7 @@ public class Client {
     }
   }
 
-  private static void login(ClientProperties cProps, JsonObject requestData, String[] args) throws ClientException, IOException {
+  private static void login(ClientProperties cProps, JsonObject requestData, String[] args) throws ClientException {
     // Get username, compute uuid and add to request
     String username = args[1].trim();
     String uuid = cProps.generateUUID(username);
@@ -339,6 +341,11 @@ public class Client {
 
     PublicKey userPubKey;
     for (User user : users) {
+      if (user == null)
+        continue;
+
+      obtained.add(user.getId());
+
       try {
         verifyUserSecDataSignature(user, cProps);
         userPubKey = cProps.aeaHelper.pubKeyFromBytes(cProps.b64Helper.decode(user.getPubKey()));
@@ -361,12 +368,17 @@ public class Client {
               user.getMacSpec()
           )
       );
-
-      obtained.add(user.getId());
-
-      System.out.println("Obtained users with ids (" + obtained.toString() + ") info.");
-      System.out.println("Failed to obtain user's with ids (" + failed.toString() + ") info.");
     }
+
+    if (obtained.size() > 0)
+      System.out.println("Obtained user's with ids " + obtained.toString() + " info.");
+
+    if (failed.size() > 0)
+      System.out.println("Failed to verify user's with ids " + failed.toString() + " info.");
+
+    if (obtained.size() == 0 && failed.size() == 0)
+      System.out.println("No users found.");
+
   }
 
   private static void listNewMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
@@ -423,10 +435,10 @@ public class Client {
     Cipher maccipher;
 
     // try to load shared key
-    try{
+    try {
       seacipher = loadKeyAndInitCipher(cProps, clientId, destinationId);
       maccipher = loadKeyAndInitHmacCipher(cProps, clientId, destinationId);
-    }catch (InvalidKeyException  |UnrecoverableKeyException |KeyStoreException e){
+    } catch (InvalidKeyException | UnrecoverableKeyException | KeyStoreException e) {
       //If user cant load the ciphers, menas he does not have them, so he must create the shared key first
 
       //initatiates the keyagrees 1 for sea 1 for mac
@@ -473,7 +485,7 @@ public class Client {
     // add keys to keystore
     KeyStore.SecretKeyEntry seaKeyEntry = new KeyStore.SecretKeyEntry(secretKey);
     KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection(cProps.keyStorePassword());
-    cProps.ksHelper.getStore().setEntry(clientId + "-"+destinyuser +"-macshared", seaKeyEntry, protectionParam);
+    cProps.ksHelper.getStore().setEntry(clientId + "-" + destinyuser + "-macshared", seaKeyEntry, protectionParam);
     cProps.ksHelper.getStore().store(new FileOutputStream(cProps.KEYSTORE_LOC), cProps.keyStorePassword());
 
     //init sea cipher
@@ -546,7 +558,7 @@ public class Client {
     // add keys to keystore
     KeyStore.SecretKeyEntry seaKeyEntry = new KeyStore.SecretKeyEntry(secretKey);
     KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection(cProps.keyStorePassword());
-    cProps.ksHelper.getStore().setEntry(clientId + "-"+destinyuser +"-seashared", seaKeyEntry, protectionParam);
+    cProps.ksHelper.getStore().setEntry(clientId + "-" + destinyuser + "-seashared", seaKeyEntry, protectionParam);
     cProps.ksHelper.getStore().store(new FileOutputStream(cProps.KEYSTORE_LOC), cProps.keyStorePassword());
 
     //init sea cipher

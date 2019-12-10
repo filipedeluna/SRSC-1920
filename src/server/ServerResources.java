@@ -181,14 +181,9 @@ final class ServerResources implements Runnable {
 
     ArrayList<User> users = new ArrayList<>();
 
-    if (userId < 0)
-      users.add(props.DB.getUserById(userId));
-    else
-      users = props.DB.getAllUsers();
-
     // Detect if supposed to get 1 or multiple users
     try {
-      if (userId > 0)
+      if (userId >= 0)
         users.add(props.DB.getUserById(userId));
       else
         users = props.DB.getAllUsers();

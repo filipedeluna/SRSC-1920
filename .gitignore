@@ -3,3 +3,7 @@ target
 out
 server_log*
 pki_log*
+src/client/crypt/*-sea
+src/client/crypt/*-mac
+src/server/db/db.sqlite
+

@@ -41,7 +41,7 @@ public enum ClientRequest {
 
   // Number of args not counting with args[0] (command)
   public boolean checkArgs(int argSize) {
-    if (this == LIST && (argSize < 1 || argSize == 2))
+    if (this == LIST && (argSize < 2))
       return true;
 
     if (this == SEND && argSize >= 2)

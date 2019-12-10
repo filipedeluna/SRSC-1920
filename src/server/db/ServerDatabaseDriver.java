@@ -98,7 +98,7 @@ public final class ServerDatabaseDriver {
   public int insertUser(User user) throws CriticalDatabaseException, DuplicateEntryException {
     try {
       // Insert user
-      String insertQuery = "INSERT INTO users (uuid, pub_key, dh_sea_pub_key, dh_mac_pub_key, sea_spec, mac_spec, sec_data_signature) VALUES (?, ?, ?, ?, ?);";
+      String insertQuery = "INSERT INTO users (uuid, pub_key, dh_sea_pub_key, dh_mac_pub_key, sea_spec, mac_spec, sec_data_signature) VALUES (?, ?, ?, ?, ?, ?, ?);";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
       ps.setString(1, user.getUuid());
@@ -114,7 +114,7 @@ public final class ServerDatabaseDriver {
 
       ResultSet rs = ps.getGeneratedKeys();
 
-      return rs.getInt("user_id");
+      return rs.getInt(1);
     } catch (SQLException e) {
       if (e.getErrorCode() == ERR_UNIQUE_CONSTRAINT)
         throw new DuplicateEntryException();
@@ -132,9 +132,11 @@ public final class ServerDatabaseDriver {
 
       ResultSet rs = ps.executeQuery();
 
-      rs.next();
+      if (!rs.next())
+        return null;
 
       return new User(
+          rs.getInt("user_id"),
           rs.getString("pub_key"),
           rs.getString("dh_sea_pub_key"),
           rs.getString("dh_mac_pub_key"),
@@ -143,9 +145,6 @@ public final class ServerDatabaseDriver {
           rs.getString("sec_data_signature")
       );
     } catch (SQLException e) {
-      if (e.getErrorCode() == ERR_NOT_FOUND)
-        throw new EntryNotFoundException();
-
       throw new CriticalDatabaseException(e);
     }
   }
@@ -191,6 +190,7 @@ public final class ServerDatabaseDriver {
 
       while (rs.next()) {
         users.add(new User(
+            rs.getInt("user_id"),
             rs.getString("pub_key"),
             rs.getString("dh_sea_pub_key"),
             rs.getString("dh_mac_pub_key"),
