@@ -63,6 +63,8 @@ final class ServerResources implements Runnable {
 
       handleRequest(parsedRequest);
 
+      input.close();
+      output.close();
       client.close();
     } catch (Exception e) {
       handleException(e);
