@@ -243,17 +243,16 @@ public class Client {
     byte[] signatureDecoded = cProps.b64Helper.decode(paramsMap.getParameter(ServerParameter.PARAM_SIG));
     byte[] paramsBytes = paramsMap.getAllParametersBytes();
 
-    boolean sigValid = cProps.aeaHelper.verifySignature(cProps.getServerPublicKey(), paramsBytes, signatureDecoded);
-
-    if (!sigValid)
-      throw new ClientException("The server parameters signature is not valid.");
-
-    // Initialize AEA and DH Helper with the server parameters
     try {
       cProps.loadServerParams(paramsMap);
     } catch (Exception e) {
       throw new ClientException("The server parameters received are corrupted.");
     }
+
+    boolean sigValid = cProps.aeaHelper.verifySignature(cProps.getServerPublicKey(), paramsBytes, signatureDecoded);
+
+    if (!sigValid)
+      throw new ClientException("The server parameters signature is not valid.");
   }
 
   private static void createUser(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException, ClientException {

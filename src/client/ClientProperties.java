@@ -265,6 +265,12 @@ final class ClientProperties {
     int seaKeySize = session.seaHelper.getMaxKeySize();
     int macKeySize = session.macHelper.getMaxKeySize();
 
+    //limit max key size
+    if (seaKeySize > 64)
+      seaKeySize = 64;
+    if (macKeySize > 64)
+      macKeySize = 64;
+
     byte[] sharedSeaKey = dhHelper.genSharedKey(sessionPrivSeaDHKey, destinationDHPubSeaKey, seaKeySize);
     byte[] sharedMacKey = dhHelper.genSharedKey(sessionPrivMacDHKey, destinationDHPubMacKey, macKeySize);
 

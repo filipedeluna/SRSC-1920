@@ -287,7 +287,7 @@ public final class ServerDatabaseDriver {
 
       ResultSet rs = ps.getGeneratedKeys();
 
-      return rs.getInt("message_id");
+      return rs.getInt(1);
     } catch (SQLException e) {
       if (e.getErrorCode() == ERR_FOREIGN_KEY_CONSTRAINT)
         throw new FailedToInsertException();
