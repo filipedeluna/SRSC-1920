@@ -8,14 +8,14 @@ public final class Message implements Serializable {
   private int receiverId;
   private String text;
   private String attachmentData;
-  private byte[] attachments;
+  private String attachments;
   private String cipherIV;
   private String senderSignature;
 
   public Message() {
   }
 
-  public Message(int senderId, int receiverId, String text, String attachmentData, byte[] attachments, String cipherIV, String senderSignature) {
+  public Message(int senderId, int receiverId, String text, String attachmentData, String attachments, String cipherIV, String senderSignature) {
     this.senderId = senderId;
     this.receiverId = receiverId;
     this.text = text;
@@ -25,7 +25,7 @@ public final class Message implements Serializable {
     this.senderSignature = senderSignature;
   }
 
-  public Message(int senderId, String text, String attachmentData, byte[] attachments, String cipherIV, String senderSignature) {
+  public Message(int senderId, String text, String attachmentData, String attachments, String cipherIV, String senderSignature) {
     this.senderId = senderId;
     this.text = text;
     this.attachmentData = attachmentData;
@@ -54,7 +54,7 @@ public final class Message implements Serializable {
     return attachmentData;
   }
 
-  public byte[] getAttachments() {
+  public String getAttachments() {
     return attachments;
   }
 

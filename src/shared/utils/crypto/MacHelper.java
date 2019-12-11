@@ -14,7 +14,7 @@ public final class MacHelper {
   private Mac mac;
   private KeyGenerator keyGen;
 
-  public MacHelper(String algorithm) throws GeneralSecurityException {
+  public MacHelper(String algorithm) throws NoSuchProviderException, NoSuchAlgorithmException {
     mac = Mac.getInstance(algorithm, PROVIDER);
     keyGen = KeyGenerator.getInstance(algorithm, PROVIDER);
   }

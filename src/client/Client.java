@@ -1,17 +1,20 @@
 package client;
 
+import client.cache.MessageCacheEntry;
 import client.cache.UserCacheEntry;
 import client.errors.ClientException;
 import client.props.ClientProperty;
 import client.utils.ClientRequest;
 import client.utils.ValidFile;
 import com.google.gson.JsonObject;
+import shared.Pair;
 import shared.parameters.ServerParameterMap;
 import shared.utils.Utils;
 import shared.utils.crypto.MacHelper;
 import shared.utils.crypto.SEAHelper;
 import shared.utils.crypto.util.DHKeyType;
 import shared.wrappers.Message;
+import shared.wrappers.Receipt;
 import shared.wrappers.User;
 import shared.errors.properties.PropertyException;
 import shared.parameters.ServerParameter;
@@ -126,7 +129,7 @@ public class Client {
             case RECV:
               // TODO missing message decryption
               //contem o receipt, receipt enviado dps de ler
-              receiveMessages(cProps, requestData, cmdArgs);
+              receiveMessage(cProps, requestData, cmdArgs);
               break;
             case STATUS:
               status(cProps, requestData, cmdArgs);
@@ -424,8 +427,11 @@ public class Client {
   }
 
   private static void sendMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException, ClientException, PropertyException, ClassNotFoundException {
+    // Check user is logged in (in session and cache)
+    if (cProps.session == null)
+      throw new ClientException("User is not logged in.");
+
     // Get client and destination id
-    int clientId = cProps.session.getId();
     int destinationId = Integer.parseInt(args[1]);
     requestData.addProperty("senderId", cProps.session.getId());
     requestData.addProperty("receiverId", Integer.parseInt(args[1]));
@@ -441,50 +447,20 @@ public class Client {
       fileSpec = cProps.fileHelper.getFileSpec(validFiles);
     }
 
-    // Check user is logged in (in session and cache)
-    UserCacheEntry client = cProps.cache.getUser(clientId);
-    if (client == null)
-      throw new ClientException("User is not logged in.");
-
     UserCacheEntry destinationUser = cProps.cache.getUser(destinationId);
 
     // If user is not in cache, we will have to request the server to get him
-    if (destinationUser == null) {
-      System.out.println("User not found in cache. fetching from server...");
-      // We'll start by building the request
-      JsonObject requestDataToGetUser = new JsonObject();
-      requestDataToGetUser.addProperty("type", "list");
-      requestDataToGetUser.addProperty("nonce", cProps.rndHelper.getNonce());
+    if (destinationUser == null)
+      destinationUser = fetchUser(cProps, destinationId);
 
-      // Create "fake" args and do request, user will be added to cache
-      String[] fakeArgs = new String[]{"", String.valueOf(destinationId)};
-      listUsers(cProps, requestDataToGetUser, fakeArgs, true);
-
-      // Restart socket connection
-      cProps.closeConnection();
-      cProps.startConnection();
-
-      // TODO AGGRESSIVE MODEEEEE??? - get all users instead of just this one every time we miss one?????
-      // Check if user is now in cache
-      destinationUser = cProps.cache.getUser(destinationId);
-
-      // If user not in cache either he doesn't exist or we couldn't get him
-      if (destinationUser == null)
-        throw new ClientException("Couldn't get user from server.");
-    }
+    // Check if we have user now
+    if (destinationUser == null)
+      throw new ClientException("Couldn't get message receiver from server.");
 
     // Get shared keys
-    Key sharedSeaKey = cProps.ksHelper.getSharedKey(clientId, destinationId, DHKeyType.SEA, cProps.keyStorePassword());
-    Key sharedMacKey = cProps.ksHelper.getSharedKey(clientId, destinationId, DHKeyType.MAC, cProps.keyStorePassword());
-
-    // If shared keys don't exist, generate them
-    if (sharedSeaKey == null || sharedMacKey == null) {
-      cProps.generateDHSharedKeys(destinationId);
-
-      // Get them again
-      sharedSeaKey = cProps.ksHelper.getSharedKey(clientId, destinationId, DHKeyType.SEA, cProps.keyStorePassword());
-      sharedMacKey = cProps.ksHelper.getSharedKey(clientId, destinationId, DHKeyType.MAC, cProps.keyStorePassword());
-    }
+    Pair<Key, Key> sharedKeys = cProps.getSharedKeys(destinationId);
+    Key sharedSeaKey = sharedKeys.getA();
+    Key sharedMacKey = sharedKeys.getB();
 
     // Get client ciphers from the current session
     MacHelper macHelper = cProps.session.macHelper;
@@ -589,46 +565,160 @@ public class Client {
     //init sea cipher
     cipher.init(Cipher.ENCRYPT_MODE, secretKey);
     return cipher;
-
   }
 
-  //TODO: Retirar daqui estes utils todos e meter na classe do crypt utils ou no cprops
+  private static void receiveMessage(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException, GeneralSecurityException, PropertyException, ClassNotFoundException {
+    // Check user is logged in (in session and cache)
+    if (cProps.session == null)
+      throw new ClientException("User is not logged in.");
 
 
-  private static void receiveMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws
-      IOException, ClientException {
-    BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
-    int messageid = Integer.parseInt(bf.readLine());
-    requestData.addProperty("userId", messageid);
+    // Get message id to fetch from server and add to the request
+    int messageId = Integer.parseInt(args[1]);
+    requestData.addProperty("userId", messageId);
     cProps.sendRequest(requestData);
 
+    // Get message object from the server response
     ReceiveMessageResponse resp = cProps.receiveRequestWithNonce(requestData, ReceiveMessageResponse.class);
+    Message message = resp.getMessage();
 
-    Message m = resp.getMessage();
-    //substituido depois pela chave publica para verificar assinatura
-    String integrity = m.getSenderSignature();
-    String text = m.getText();
-    int sentFrom = m.getSenderId();
-    int mid = m.getId();
+    // Get message sender
+    int senderId = message.getSenderId();
+    UserCacheEntry messageSender = cProps.cache.getUser(senderId);
 
-    //verificacao de assinatura
+    // Verify if we have required user to verify signatures
+    if (messageSender == null)
+      messageSender = fetchUser(cProps, senderId);
 
-    //mostrar ao utilizador a mensagem
-    System.out.printf("Message sent from %d with ID %d\n", sentFrom, mid);
-    System.out.println(text);
+    // Check if we have user now
+    if (messageSender == null)
+      throw new ClientException("Couldn't get message sender from server.");
 
-    //SEND RECEIPT WITH CONTENT SIGNATURE
+    // Create ciphers with other users params
+    MacHelper macHelper;
+    SEAHelper seaHelper;
+
+    try {
+      macHelper = new MacHelper(messageSender.getMacSpec());
+
+      String[] seaSpec = messageSender.getSeaSpec().split("/");
+      if (seaSpec.length != 3)
+        throw new ClientException("User has an invalid key spec.");
+
+      String seaAlg = seaSpec[0];
+      String seaMode = seaSpec[1];
+      String seaPadding = seaSpec[2];
+      seaHelper = new SEAHelper(seaAlg, seaMode, seaPadding);
+
+    } catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+      throw new ClientException("User has an invalid key spec.");
+    }
+
+    // Get shared key pairs
+    Pair<Key, Key> sharedKeys = cProps.getSharedKeys(senderId);
+    Key sharedSeaKey = sharedKeys.getA();
+    Key sharedMacKey = sharedKeys.getB();
+
+    // Validate message contents by verifying mac
+    byte[] encryptedText = cProps.b64Helper.decode(message.getText());
+    byte[] encryptedFileSpec = cProps.b64Helper.decode(message.getAttachmentData());
+    byte[] encryptedFiles = cProps.b64Helper.decode(message.getAttachments());
+    byte[] iv = cProps.b64Helper.decode(message.getIV());
+    byte[] signature = cProps.b64Helper.decode(message.getSenderSignature());
+
+    byte[] contents = Utils.joinByteArrays(
+        encryptedText,
+        encryptedFileSpec,
+        encryptedFiles,
+        iv
+    );
+
+    if (!macHelper.verifyMacHash(contents, signature, sharedMacKey))
+      throw new ClientException("Message has an invalid signature");
+
+    // Decrypt message contents
+    if (seaHelper.cipherModeUsesIV() && iv.length != 3 * seaHelper.ivSize())
+      throw new ClientException("Message iv is corrupted");
+
+    int ivSize = seaHelper.ivSize();
+
+    byte[] decryptedText;
+    if (seaHelper.cipherModeUsesIV())
+      decryptedText = seaHelper.decrypt(encryptedText, sharedSeaKey, Arrays.copyOfRange(iv, 0, ivSize));
+    else
+      decryptedText = seaHelper.decrypt(encryptedText, sharedSeaKey);
+
+    String text = new String(decryptedText, StandardCharsets.UTF_8);
+
+    byte[] decryptedFileSpec;
+    if (seaHelper.cipherModeUsesIV())
+      decryptedFileSpec = seaHelper.decrypt(encryptedFileSpec, sharedSeaKey, Arrays.copyOfRange(iv, ivSize, ivSize * 2));
+    else
+      decryptedFileSpec = seaHelper.decrypt(encryptedFileSpec, sharedSeaKey);
+
+    String fileSpec = new String(decryptedFileSpec, StandardCharsets.UTF_8);
+
+    byte[] decryptedFiles;
+    if (seaHelper.cipherModeUsesIV())
+      decryptedFiles = seaHelper.decrypt(encryptedFiles, sharedSeaKey, Arrays.copyOfRange(iv, ivSize * 2, ivSize * 3));
+    else
+      decryptedFiles = seaHelper.decrypt(encryptedFiles, sharedSeaKey);
+
+    // Parse filespec to start writing files
+    ArrayList<Pair<String, Integer>> fileSpecPairs = cProps.fileHelper.parseFileSpec(fileSpec);
+
+    byte[] fileBytes;
+    for (Pair<String, Integer> fileSpecPair : fileSpecPairs) {
+      try {
+        fileBytes = Arrays.copyOfRange(decryptedFiles, 0, fileSpecPair.getB());
+        decryptedFiles = Arrays.copyOfRange(decryptedFiles, fileBytes.length, decryptedFiles.length);
+
+        cProps.fileHelper.writeFile(fileSpecPair.getA(), fileBytes);
+
+        System.out.println("Wrote file: " + fileSpecPair.getA());
+      } catch (IOException e) {
+        System.err.println("Failed to write file: " + fileSpecPair.getA());
+      }
+    }
+
+    // Add message to cache
+    cProps.cache.addMessage(
+        message.getId(),
+        new MessageCacheEntry(
+            message.getSenderId(),
+            encryptedText,
+            encryptedFileSpec,
+            encryptedFiles,
+            iv
+        )
+    );
+    System.out.println("Message text: " + text);
+    System.out.println("Successfully received message with id: " + messageId);
   }
 
-  private static void status(ClientProperties cProps, JsonObject requestData, String[] args) throws
-      IOException, ClientException {
-    BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
+  private static void status(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
+    // Check user is logged in (in session and cache)
+    if (cProps.session == null)
+      throw new ClientException("User is not logged in.");
 
-    int messageid = Integer.parseInt(bf.readLine());
-    requestData.addProperty("userId", messageid);
+    // Send message id to obtain response
+    int messageId = Integer.parseInt(args[0]);
+    requestData.addProperty("messageId", messageId);
     cProps.sendRequest(requestData);
 
+    // Get response object and extract messages an receipts
     MessageReceiptsResponse resp = cProps.receiveRequestWithNonce(requestData, MessageReceiptsResponse.class);
+    Message message = resp.getMessage();
+    ArrayList<Receipt> receipts = resp.getReceipts();
+
+    UserCacheEntry messageSender = cProps.cache.getUser(message.getSenderId());
+
+
+    System.out.println("\n" +
+        "    The server will reply with an object containing the sent message and a vector of receipt objects, each\n" +
+        "    containing the receipt data (when it was received by the server), the identification of the receipt sender\n" +
+        "    and the receipt itself:\n" +
+        "    ");
 
     /*
     System.out.println("Showing status for message: " + lmr.getMessage().getId());
@@ -762,6 +852,25 @@ public class Client {
     DateFormat df = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 
     return df.format(new Date());
+  }
+
+  private static UserCacheEntry fetchUser(ClientProperties cProps, int userId) throws IOException, ClientException {
+    System.out.println("User not found in cache. fetching from server...");
+    // We'll start by building the request
+    JsonObject requestDataToGetUser = new JsonObject();
+    requestDataToGetUser.addProperty("type", "list");
+    requestDataToGetUser.addProperty("nonce", cProps.rndHelper.getNonce());
+
+    // Create "fake" args and do request, user will be added to cache
+    String[] fakeArgs = new String[]{"", String.valueOf(userId)};
+    listUsers(cProps, requestDataToGetUser, fakeArgs, true);
+
+    // Restart socket connection
+    cProps.closeConnection();
+    cProps.startConnection();
+
+    // TODO AGGRESSIVE MODEEEEE??? - get all users instead of just this one every time we miss one?????
+    return cProps.cache.getUser(userId);
   }
 
 
