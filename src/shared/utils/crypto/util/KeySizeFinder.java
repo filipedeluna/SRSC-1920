@@ -6,56 +6,52 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.NoSuchAlgorithmException;
-import java.security.Provider;
+import java.security.NoSuchProviderException;
 import java.security.Provider.Service;
 import java.security.Security;
 
 public abstract class KeySizeFinder {
   private static final String PROVIDER = "BC";
 
-  public static int findMaxSea(String algorithm) throws NoSuchPaddingException, NoSuchAlgorithmException {
-    Provider provider = Security.getProvider(PROVIDER);
-    int maxKeySize = 0;
-
-    for (Service service : provider.getServices()) {
+  public static int findMaxSea(String algorithm) throws NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException {
+    for (Service service : Security.getProvider(PROVIDER).getServices()) {
       if (!service.getAlgorithm().equalsIgnoreCase(algorithm))
         continue;
 
-      Cipher cipher = Cipher.getInstance(algorithm, provider);
+      Cipher cipher = Cipher.getInstance(algorithm, PROVIDER);
+      int maxKeySize = 0;
 
-      for (int keySize = Byte.SIZE; keySize <= 512; keySize += Byte.SIZE) {
+      for (int keySize = 1; keySize <= 64; keySize++) {
         try {
-          SecretKey key = new SecretKeySpec(new byte[keySize / Byte.SIZE], algorithm);
+          SecretKey key = new SecretKeySpec(new byte[keySize], algorithm);
           cipher.init(Cipher.ENCRYPT_MODE, key);
-          maxKeySize = keySize;
-        } catch (Exception e) {
-        }
-      }
 
+          maxKeySize = keySize;
+        } catch (Exception ignored) { }
+      }
+      return maxKeySize;
     }
-    return maxKeySize;
+    throw new NoSuchAlgorithmException("Failed to find algorithm size.");
   }
 
-  public static int findMaxMac(String algorithm) throws NoSuchAlgorithmException {
-    Provider provider = Security.getProvider(PROVIDER);
-    int maxKeySize = 0;
-
-    for (Service service : provider.getServices()) {
+  public static int findMaxMac(String algorithm) throws NoSuchAlgorithmException, NoSuchProviderException {
+    for (Service service : Security.getProvider(PROVIDER).getServices()) {
       if (!service.getAlgorithm().equalsIgnoreCase(algorithm))
         continue;
 
-      Mac cipher = Mac.getInstance(algorithm, provider);
+      Mac cipher = Mac.getInstance(algorithm, PROVIDER);
+      int maxKeySize = 0;
 
-      for (int keySize = Byte.SIZE; keySize <= 9999; keySize += Byte.SIZE) {
+      for (int keySize = 1; keySize <= 64; keySize++) {
         try {
-          SecretKey key = new SecretKeySpec(new byte[keySize / Byte.SIZE], algorithm);
+          SecretKey key = new SecretKeySpec(new byte[keySize], algorithm);
           cipher.init(key);
-          maxKeySize = keySize;
-        } catch (Exception e) {
-        }
-      }
 
+          maxKeySize = keySize;
+        } catch (Exception ignored) { }
+      }
+      return maxKeySize;
     }
-    return maxKeySize;
+    throw new NoSuchAlgorithmException("Failed to find algorithm size.");
   }
 }

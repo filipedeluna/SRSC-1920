@@ -428,8 +428,11 @@ public class Client {
   }
 
   private static void sendMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException, ClientException, PropertyException, ClassNotFoundException {
+    // Check user is logged in (in session and cache)
+    if (cProps.session == null)
+      throw new ClientException("User is not logged in.");
+
     // Get client and destination id
-    int clientId = cProps.session.getId();
     int destinationId = Integer.parseInt(args[1]);
     requestData.addProperty("senderId", cProps.session.getId());
     requestData.addProperty("receiverId", Integer.parseInt(args[1]));
@@ -444,11 +447,6 @@ public class Client {
       validFiles = cProps.fileHelper.getFiles(Arrays.copyOfRange(args, 3, args.length));
       fileSpec = cProps.fileHelper.getFileSpec(validFiles);
     }
-
-    // Check user is logged in (in session and cache)
-    UserCacheEntry client = cProps.cache.getUser(clientId);
-    if (client == null)
-      throw new ClientException("User is not logged in.");
 
     UserCacheEntry destinationUser = cProps.cache.getUser(destinationId);
 
@@ -571,6 +569,11 @@ public class Client {
   }
 
   private static void receiveMessage(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException, GeneralSecurityException, PropertyException, ClassNotFoundException {
+    // Check user is logged in (in session and cache)
+    if (cProps.session == null)
+      throw new ClientException("User is not logged in.");
+
+
     // Get message id to fetch from server and add to the request
     int messageId = Integer.parseInt(args[1]);
     requestData.addProperty("userId", messageId);
@@ -695,6 +698,10 @@ public class Client {
   }
 
   private static void status(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
+    // Check user is logged in (in session and cache)
+    if (cProps.session == null)
+      throw new ClientException("User is not logged in.");
+
     // Send message id to obtain response
     int messageId = Integer.parseInt(args[0]);
     requestData.addProperty("messageId", messageId);
