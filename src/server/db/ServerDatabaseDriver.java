@@ -15,7 +15,6 @@ import java.util.ArrayList;
 
 public final class ServerDatabaseDriver {
   private static final int ERR_UNIQUE_CONSTRAINT = 19;
-  private static final int ERR_NOT_FOUND = 12;
   private static final int ERR_FOREIGN_KEY_CONSTRAINT = 787;
 
   private Connection connection;
@@ -127,7 +126,7 @@ public final class ServerDatabaseDriver {
     }
   }
 
-  public User getUserById(int id) throws CriticalDatabaseException {
+  public User getUserById(int id) throws CriticalDatabaseException, EntryNotFoundException {
     try {
       String selectUser = "SELECT * FROM users WHERE user_id = ?;";
 
@@ -137,7 +136,7 @@ public final class ServerDatabaseDriver {
       ResultSet rs = ps.executeQuery();
 
       if (!rs.next())
-        return null;
+        throw new EntryNotFoundException();
 
       return new User(
           rs.getInt("user_id"),
@@ -163,7 +162,7 @@ public final class ServerDatabaseDriver {
       ResultSet rs = ps.executeQuery();
 
       if (!rs.next())
-        return null;
+        throw new EntryNotFoundException();
 
       return new User(
           rs.getInt("user_id"),
