@@ -572,10 +572,9 @@ public class Client {
     if (cProps.session == null)
       throw new ClientException("User is not logged in.");
 
-
     // Get message id to fetch from server and add to the request
     int messageId = Integer.parseInt(args[1]);
-    requestData.addProperty("userId", messageId);
+    requestData.addProperty("messageId", messageId);
     cProps.sendRequest(requestData);
 
     // Get message object from the server response
@@ -761,8 +760,6 @@ public class Client {
     KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection(cProps.keyStorePassword());
     keyStore.setEntry(sourceId + "-" + destinationId + "-shared", sharedkeyentry, protectionParam);
     keyStore.store(new FileOutputStream(new File(cProps.KEYSTORE_LOC)), cProps.keyStorePassword());
-
-    // TODO save pair in keystore
     //  cProps.KSHelper.save(sourceId + "-" + destinationId + "-shared", );
 
   }

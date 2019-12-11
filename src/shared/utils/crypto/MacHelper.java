@@ -45,7 +45,7 @@ public final class MacHelper {
     return keyGen.generateKey();
   }
 
-  public int getMaxKeySize() throws NoSuchAlgorithmException {
+  public int getMaxKeySize() throws NoSuchAlgorithmException, NoSuchProviderException {
     return KeySizeFinder.findMaxMac(mac.getAlgorithm());
   }
 }

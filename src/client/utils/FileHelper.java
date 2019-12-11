@@ -49,7 +49,7 @@ public final class FileHelper {
     byte[] data = new byte[0];
 
     for (ValidFile validFile : validFiles)
-      Utils.joinByteArrays(data, readFile(validFile));
+      data = Utils.joinByteArrays(data, readFile(validFile));
 
     return data;
   }
@@ -58,8 +58,8 @@ public final class FileHelper {
     Path filePath = Paths.get(destinationFolder + "/" + fileName);
 
     // Check destination valid
-    if (Files.isDirectory(filePath) || !Files.isWritable(filePath))
-      throw new IOException("Invalid destination for file: " + filePath.toString());
+    //if (Files.isWritable(filePath))
+      //throw new IOException("Invalid destination for file: " + filePath.toString());
 
     // Delete previous file
     if (Files.exists(filePath))
@@ -98,7 +98,7 @@ public final class FileHelper {
     int fileSize;
 
     for (String specPair : specPairs) {
-      splitSpecPair = specPair.split(" ");
+      splitSpecPair = specPair.trim().split(" ");
 
       fileName = splitSpecPair[0];
 
@@ -123,12 +123,12 @@ public final class FileHelper {
     // Get name and extension and check they are valid
     String[] trimmedName = fileName.split("\\.");
 
-    if (trimmedName.length != 2)
-      return false;
+    if (trimmedName.length == 1)
+      return trimmedName[0].length() > 0;
 
-    if (trimmedName[0].length() == 0 || trimmedName[1].length() == 0)
-      return false;
+    if (trimmedName.length == 2)
+      return trimmedName[0].length() > 0 && trimmedName[1].length() > 0;
 
-    return true;
+    return false;
   }
 }

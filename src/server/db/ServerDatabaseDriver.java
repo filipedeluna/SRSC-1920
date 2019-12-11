@@ -27,6 +27,8 @@ public final class ServerDatabaseDriver {
 
     // Create tables they do not exist
     createTables();
+
+    b64Helper = new B64Helper();
   }
 
   private Connection connect(String path) throws CriticalDatabaseException {
@@ -307,7 +309,8 @@ public final class ServerDatabaseDriver {
 
       ResultSet rs = ps.executeQuery();
 
-      rs.next();
+      if (!rs.next())
+        throw new EntryNotFoundException();
 
       return new Message(
           rs.getInt("sender_id"),
@@ -318,9 +321,6 @@ public final class ServerDatabaseDriver {
           rs.getString("sender_signature")
       );
     } catch (SQLException e) {
-      if (e.getErrorCode() == ERR_NOT_FOUND)
-        throw new EntryNotFoundException();
-
       throw new CriticalDatabaseException(e);
     }
   }

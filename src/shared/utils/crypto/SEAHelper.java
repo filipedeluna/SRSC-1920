@@ -86,7 +86,7 @@ public final class SEAHelper {
     return spec;
   }
 
-  public int getMaxKeySize() throws NoSuchAlgorithmException, NoSuchPaddingException {
+  public int getMaxKeySize() throws NoSuchAlgorithmException, NoSuchPaddingException, NoSuchProviderException {
     String alg = cipher.getAlgorithm().split("/")[0];
     return KeySizeFinder.findMaxSea(alg);
   }
