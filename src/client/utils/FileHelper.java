@@ -98,7 +98,7 @@ public final class FileHelper {
     int fileSize;
 
     for (String specPair : specPairs) {
-      splitSpecPair = specPair.split(" ");
+      splitSpecPair = specPair.trim().split(" ");
 
       fileName = splitSpecPair[0];
 
@@ -123,12 +123,12 @@ public final class FileHelper {
     // Get name and extension and check they are valid
     String[] trimmedName = fileName.split("\\.");
 
-    if (trimmedName.length != 2)
-      return false;
+    if (trimmedName.length == 1)
+      return trimmedName[0].length() > 0;
 
-    if (trimmedName[0].length() == 0 || trimmedName[1].length() == 0)
-      return false;
+    if (trimmedName.length == 2)
+      return trimmedName[0].length() > 0 && trimmedName[1].length() > 0;
 
-    return true;
+    return false;
   }
 }

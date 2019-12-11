@@ -269,7 +269,7 @@ final class ClientProperties {
     dhHelper = new ClientDHHelper(dhAlg, dhHashAlg, dhKeySize, dhP, dhG);
   }
 
-  Pair<Key, Key> getSharedKeys(int destinationId) throws PropertyException, UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException, IOException, CertificateException, InvalidKeyException, InvalidAlgorithmParameterException, NoSuchPaddingException, BadPaddingException, InvalidKeySpecException, IllegalBlockSizeException, ClassNotFoundException {
+  Pair<Key, Key> getSharedKeys(int destinationId) throws PropertyException, UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException, IOException, CertificateException, InvalidKeyException, InvalidAlgorithmParameterException, NoSuchPaddingException, BadPaddingException, InvalidKeySpecException, IllegalBlockSizeException, ClassNotFoundException, NoSuchProviderException {
     // Get shared keys
     Key sharedSeaKey = ksHelper.getSharedKey(session.getId(), destinationId, DHKeyType.SEA, keyStorePassword());
     Key sharedMacKey = ksHelper.getSharedKey(session.getId(), destinationId, DHKeyType.MAC, keyStorePassword());
@@ -291,7 +291,7 @@ final class ClientProperties {
   */
 
   // TODO Catch some easy to understand exceptions all around... throwing 300 types isnt good
-  private void generateDHSharedKeys(int destinationId) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, KeyStoreException, IOException, CertificateException, IllegalBlockSizeException, ClassNotFoundException, InvalidAlgorithmParameterException, BadPaddingException, PropertyException {
+  private void generateDHSharedKeys(int destinationId) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, KeyStoreException, IOException, CertificateException, IllegalBlockSizeException, ClassNotFoundException, InvalidAlgorithmParameterException, BadPaddingException, PropertyException, NoSuchProviderException {
     // Get destination user's public keys
     UserCacheEntry destinationUser = cache.getUser(destinationId);
     PublicKey destinationDHPubSeaKey = dhHelper.generatePublicKey(new X509EncodedKeySpec(destinationUser.getDhSeaPubKey()));
