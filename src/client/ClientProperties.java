@@ -10,6 +10,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.stream.JsonReader;
+import shared.Pair;
 import shared.errors.properties.PropertyException;
 import shared.errors.request.InvalidFormatException;
 import shared.http.HTTPStatus;
@@ -251,8 +252,46 @@ final class ClientProperties {
     serverPubKey = certificate.getPublicKey();
   }
 
+  void loadServerParams(ServerParameterMap map) throws GeneralSecurityException {
+
+    // Load all the parameters and assign them
+    dhAlg = map.getParameter(ServerParameter.DH_ALG);
+    dhHashAlg = map.getParameter(ServerParameter.DH_HASH_ALG);
+    dhP = new BigInteger(map.getParameter(ServerParameter.DH_P));
+    dhG = new BigInteger(map.getParameter(ServerParameter.DH_G));
+    dhKeySize = Integer.parseInt(map.getParameter(ServerParameter.DH_KEYSIZE));
+
+    pubKeyAlg = map.getParameter(ServerParameter.PUB_KEY_ALG);
+    certSignAlg = map.getParameter(ServerParameter.CERT_SIG_ALG);
+
+    // Create helpers from received params
+    aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg);
+    dhHelper = new ClientDHHelper(dhAlg, dhHashAlg, dhKeySize, dhP, dhG);
+  }
+
+  Pair<Key, Key> getSharedKeys(int destinationId) throws PropertyException, UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException, IOException, CertificateException, InvalidKeyException, InvalidAlgorithmParameterException, NoSuchPaddingException, BadPaddingException, InvalidKeySpecException, IllegalBlockSizeException, ClassNotFoundException {
+    // Get shared keys
+    Key sharedSeaKey = ksHelper.getSharedKey(session.getId(), destinationId, DHKeyType.SEA, keyStorePassword());
+    Key sharedMacKey = ksHelper.getSharedKey(session.getId(), destinationId, DHKeyType.MAC, keyStorePassword());
+
+    // If shared keys don't exist, generate them
+    if (sharedSeaKey == null || sharedMacKey == null) {
+      generateDHSharedKeys(destinationId);
+
+      // Get them again
+      sharedSeaKey = ksHelper.getSharedKey(session.getId(), destinationId, DHKeyType.SEA, keyStorePassword());
+      sharedMacKey = ksHelper.getSharedKey(session.getId(), destinationId, DHKeyType.MAC, keyStorePassword());
+    }
+
+    return new Pair<>(sharedSeaKey, sharedMacKey);
+  }
+
+  /*
+    Utils
+  */
+
   // TODO Catch some easy to understand exceptions all around... throwing 300 types isnt good
-  public void generateDHSharedKeys(int destinationId) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, KeyStoreException, IOException, CertificateException, IllegalBlockSizeException, ClassNotFoundException, InvalidAlgorithmParameterException, BadPaddingException, PropertyException {
+  private void generateDHSharedKeys(int destinationId) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, KeyStoreException, IOException, CertificateException, IllegalBlockSizeException, ClassNotFoundException, InvalidAlgorithmParameterException, BadPaddingException, PropertyException {
     // Get destination user's public keys
     UserCacheEntry destinationUser = cache.getUser(destinationId);
     PublicKey destinationDHPubSeaKey = dhHelper.generatePublicKey(new X509EncodedKeySpec(destinationUser.getDhSeaPubKey()));
@@ -276,25 +315,4 @@ final class ClientProperties {
     ksHelper.saveSharedKey(session.getId(), destinationId, DHKeyType.SEA, sharedSeaKeySpec, keyStorePassword());
     ksHelper.saveSharedKey(session.getId(), destinationId, DHKeyType.MAC, sharedMacKeySpec, keyStorePassword());
   }
-
-  public void loadServerParams(ServerParameterMap map) throws GeneralSecurityException {
-
-    // Load all the parameters and assign them
-    dhAlg = map.getParameter(ServerParameter.DH_ALG);
-    dhHashAlg = map.getParameter(ServerParameter.DH_HASH_ALG);
-    dhP = new BigInteger(map.getParameter(ServerParameter.DH_P));
-    dhG = new BigInteger(map.getParameter(ServerParameter.DH_G));
-    dhKeySize = Integer.parseInt(map.getParameter(ServerParameter.DH_KEYSIZE));
-
-    pubKeyAlg = map.getParameter(ServerParameter.PUB_KEY_ALG);
-    certSignAlg = map.getParameter(ServerParameter.CERT_SIG_ALG);
-
-    // Create helpers from received params
-    aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg);
-    dhHelper = new ClientDHHelper(dhAlg, dhHashAlg, dhKeySize, dhP, dhG);
-  }
-
-  /*
-    Utils
-  */
 }

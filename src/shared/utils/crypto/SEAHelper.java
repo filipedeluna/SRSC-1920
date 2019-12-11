@@ -18,7 +18,7 @@ public final class SEAHelper {
 
   private final RNDHelper random;
 
-  public SEAHelper(String algorithm, String mode, String padding) throws GeneralSecurityException {
+  public SEAHelper(String algorithm, String mode, String padding) throws NoSuchProviderException, NoSuchAlgorithmException, NoSuchPaddingException {
     this.random = new RNDHelper();
     this.mode = mode;
 

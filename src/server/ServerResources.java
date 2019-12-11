@@ -224,13 +224,13 @@ final class ServerResources implements Runnable {
     // Get message (encrypted and encoded) parts and respective mac hash of them
     String text = GsonUtils.getString(requestData, "text");
 
-    byte[] attachments = new byte[0];
+    String attachments = "";
     String attachmentData = "";
 
     // Check if attachment was sent
     try {
       attachmentData = GsonUtils.getString(requestData, "attachmentData");
-      attachments = props.b64Helper.decode(GsonUtils.getString(requestData, "attachments"));
+      attachments = GsonUtils.getString(requestData, "attachments");
     } catch (MissingValueException e) {
       // Message has no attachments
     }

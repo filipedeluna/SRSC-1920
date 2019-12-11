@@ -1,6 +1,7 @@
 package server.db;
 
 import org.sqlite.JDBC;
+import shared.utils.crypto.B64Helper;
 import shared.wrappers.Message;
 import shared.wrappers.Receipt;
 import shared.wrappers.User;
@@ -18,6 +19,7 @@ public final class ServerDatabaseDriver {
   private static final int ERR_FOREIGN_KEY_CONSTRAINT = 787;
 
   private Connection connection;
+  private B64Helper b64Helper;
 
   public ServerDatabaseDriver(String dbPath) throws CriticalDatabaseException {
     // Connect to file
@@ -279,7 +281,7 @@ public final class ServerDatabaseDriver {
       ps.setInt(2, msg.getReceiverId());
       ps.setString(3, msg.getText());
       ps.setString(4, msg.getAttachmentData());
-      ps.setBytes(5, msg.getAttachments());
+      ps.setBytes(5, b64Helper.decode(msg.getAttachments()));
       ps.setString(6, msg.getIV());
       ps.setString(7, msg.getSenderSignature());
 
@@ -311,7 +313,7 @@ public final class ServerDatabaseDriver {
           rs.getInt("sender_id"),
           rs.getString("text"),
           rs.getString("attachment_data"),
-          rs.getBytes("attachments"),
+          b64Helper.encode(rs.getBytes("attachments")),
           rs.getString("cipher_iv"),
           rs.getString("sender_signature")
       );
@@ -387,6 +389,7 @@ public final class ServerDatabaseDriver {
       while (rs.next()) {
         receipts.add(new Receipt(
                 rs.getInt("message_id"),
+                rs.getInt("sender_id"),
                 rs.getString("date"),
                 rs.getString("receiver_signature")
             )
