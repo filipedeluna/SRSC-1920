@@ -7,8 +7,8 @@ import java.security.spec.InvalidParameterSpecException;
 public class DHHelper {
   protected static final String PROVIDER = "BC";
   private AlgorithmParameterGenerator algParamsGenerator;
-  protected int keySize;
-  protected String dhAlg;
+  private int keySize;
+  private String dhAlg;
 
   public DHHelper(String dhAlg, int keySize) throws GeneralSecurityException {
     // This generator cannot be BC because BC is broken

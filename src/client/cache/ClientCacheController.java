@@ -1,27 +1,25 @@
 package client.cache;
 
-import shared.wrappers.User;
-
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 
 public final class ClientCacheController {
   private static final int MAX_UUID_ASSOCS = 15;
-  private long maxSize;
-  private long currentSize;
+  private final long maxSize;
+  private final long currentSize;
 
   // Entries are id - Object
-  private HashMap<Integer, MessageCacheEntry> messageCache;
-  private HashMap<Integer, UserCacheEntry> userCache;
+  private final HashMap<Integer, MessageCacheEntry> messageCache;
+  private final HashMap<Integer, UserCacheEntry> userCache;
 
   // Entries are id - uses, this why we can get an idea of what isnt being accessed
   // And prioritize what matters
-  private HashMap<Integer, Integer> messageCacheAccesses;
-  private HashMap<Integer, Integer> userCacheAccesses;
+  private final HashMap<Integer, Integer> messageCacheAccesses;
+  private final HashMap<Integer, Integer> userCacheAccesses;
 
   // Associate known uuids to ids
-  private LinkedHashMap<String, Integer> uuidAssociations;
+  private final LinkedHashMap<String, Integer> uuidAssociations;
 
   // Very basic cache implementation that doesn't allow the
   // memory to get completely full of entries

@@ -2,7 +2,6 @@ package shared.utils.crypto;
 
 import shared.utils.Utils;
 
-import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 

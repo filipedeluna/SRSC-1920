@@ -22,7 +22,6 @@ import org.bouncycastle.asn1.x509.Extension;
 import javax.crypto.*;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSocket;
-import javax.security.cert.CertificateEncodingException;
 import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -53,7 +52,7 @@ public final class AEAHelper {
   private Signature signature;
 
   // Public Keys ----------------------------------------------------------------------------------------
-  public AEAHelper(String keyAlg, String certSignAlg) throws GeneralSecurityException {
+  public AEAHelper(String keyAlg, String certSignAlg) throws NoSuchPaddingException, NoSuchAlgorithmException, NoSuchProviderException, CertificateException {
     random = new RNDHelper();
     cipher = Cipher.getInstance(keyAlg, PROVIDER);
     keyFactory = KeyFactory.getInstance(keyAlg, PROVIDER);
@@ -158,20 +157,6 @@ public final class AEAHelper {
     }
   }
 
-  public X509Certificate convertJavaxCert(javax.security.cert.X509Certificate javaxCert) throws CertificateEncodingException, CertificateException {
-    return (X509Certificate) certFactory.generateCertificate(new ByteArrayInputStream(javaxCert.getEncoded()));
-  }
-
-  public X509Certificate[] convertJavaxCerts(javax.security.cert.X509Certificate[] javaxCerts) throws CertificateEncodingException, CertificateException {
-    X509Certificate[] newCerts = new X509Certificate[javaxCerts.length];
-
-    for (int i = 0; i < javaxCerts.length; i++) {
-      newCerts[i] = convertJavaxCert(javaxCerts[i]);
-    }
-
-    return newCerts;
-  }
-
   public X509Certificate getCertFromSession(SSLSocket socket) throws SSLPeerUnverifiedException {
     return (X509Certificate) socket.getSession().getPeerCertificates()[0];
   }
@@ -191,7 +176,7 @@ public final class AEAHelper {
     // Build new cert
     X509v3CertificateBuilder certificateBuilder = new JcaX509v3CertificateBuilder(
         caCert,
-        BigInteger.valueOf(random.getLong(true)),
+        BigInteger.valueOf(random.getLong(false)),
         new Date(now),
         new Date(now + ONE_DAY * validityDays),
         csr.getSubject(),

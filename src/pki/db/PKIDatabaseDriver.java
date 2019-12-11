@@ -69,6 +69,7 @@ public final class PKIDatabaseDriver {
       ps.setString(2, certHash);
 
       ResultSet rs = ps.executeQuery();
+
       return rs.next();
     } catch (SQLException e) {
       throw new CriticalDatabaseException(e);

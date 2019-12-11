@@ -7,15 +7,15 @@ import client.props.ClientProperty;
 import client.utils.ClientRequest;
 import client.utils.ValidFile;
 import com.google.gson.JsonObject;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import shared.Pair;
 import shared.errors.properties.PropertyException;
 import shared.parameters.ServerParameter;
 import shared.parameters.ServerParameterMap;
+import shared.response.pki.SignResponse;
 import shared.response.server.*;
 import shared.utils.Utils;
-import shared.utils.crypto.KSHelper;
-import shared.utils.crypto.MacHelper;
-import shared.utils.crypto.SEAHelper;
+import shared.utils.crypto.*;
 import shared.utils.crypto.util.DHKeyType;
 import shared.utils.properties.CustomProperties;
 import shared.wrappers.Message;
@@ -27,11 +27,10 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.DHParameterSpec;
 import javax.net.ssl.*;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
+import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -39,7 +38,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 
-public class Client {
+class Client {
   private static final String PROPS_PATH = "src/client/props/client.properties";
   private static final boolean DEBUG_MODE = true;
 
@@ -66,9 +65,12 @@ public class Client {
       SSLSocketFactory factory = sslContext.getSocketFactory();
       ClientProperties cProps = new ClientProperties(properties, ksHelper, tsHelper, factory);
 
-      // Start handshake
-      System.out.println("SSL setup finished.");
-      System.out.println("Handshake completed.");
+      // Connect to PKI to obtain cert
+      if (properties.getBool(ClientProperty.USE_PKI)) {
+        cProps.startConnection(true);
+        connectToPki(cProps, properties);
+        System.exit(0);
+      }
 
       cProps.startConnection();
 
@@ -222,8 +224,6 @@ public class Client {
 
     System.out.println("User " + username + " successfully logged in.");
   }
-
-  // TODO OOOOOOOOOOOOOOOOO VERIFY THE NONCES EVERYWHERE
 
   private static void requestParams(ClientProperties cProps) throws GeneralSecurityException, IOException, ClientException {
     JsonObject requestData = new JsonObject();
@@ -872,6 +872,56 @@ public class Client {
     return userPublicKey;
   }
 
+  // This method lets the user register in the PKI
+  private static void connectToPki(ClientProperties cProps, CustomProperties props) throws GeneralSecurityException, PropertyException, IOException, ClientException {
+    // Load PKI params to connect to PKI. K
+    String pkiKeyAlg = props.getString(ClientProperty.PKI_KEY_ALG);
+    String pkiCertAlg = props.getString(ClientProperty.PKI_CERT_ALG);
+    int keySize = props.getInt(ClientProperty.PKI_PUBKEY_SIZE);
+    String pubKeyName = props.getString(ClientProperty.PUB_KEY_NAME);
+
+    AEAHelper aeaHelper = new AEAHelper(pkiKeyAlg, pkiCertAlg);
+
+    // Generate keypair and certificate from it
+    KeyPair keyPair = aeaHelper.genKeyPair(keySize);
+    PKCS10CertificationRequest csr = aeaHelper.generateCSR(pubKeyName, keyPair);
+
+    // Start building request to sign user key pair
+    JsonObject requestData = new JsonObject();
+    B64Helper b64Helper = new B64Helper();
+
+    requestData.addProperty("type", "sign");
+    requestData.addProperty("token", "123asd");
+    requestData.addProperty("certificationRequest", b64Helper.encode(csr.getEncoded()));
+
+    // Send request and obtain response
+    cProps.sendRequest(requestData);
+
+    SignResponse resp = cProps.receiveRequest(SignResponse.class);
+
+    KeyStore keyStore = cProps.ksHelper.getStore();
+
+    // Get certificate and save it in the keystore
+    String certificateEncoded = resp.getCertificate();
+    byte[] certBytes = b64Helper.decode(certificateEncoded);
+
+    X509Certificate cert = aeaHelper.getCertFromBytes(certBytes);
+    X509Certificate[] chain = new X509Certificate[] { cert };
+
+    KeyStore.PrivateKeyEntry keyEntry = new KeyStore.PrivateKeyEntry(keyPair.getPrivate(), chain);
+    KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection("123asd".toCharArray());
+    String keyName = props.getString(ClientProperty.NEW_KEY_NAME);
+
+    keyStore.deleteEntry(keyName);
+    keyStore.setEntry(keyName, keyEntry, protectionParam);
+    keyStore.store(new FileOutputStream(props.getString(ClientProperty.KEYSTORE_LOC)), "123asd".toCharArray());
+
+    System.out.println("Keypair successfully generated and signed by the pki.");
+  }
+
+  /*
+    UTILS
+  */
   private static String getCurrentDate() {
     DateFormat df = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 

@@ -19,7 +19,7 @@ final class PKIServerProperties {
   AEAHelper aeaHelper;
   B64Helper b64Helper;
   Gson GSON;
-  KSHelper ksHelper;
+  final KSHelper ksHelper;
   final Logger logger;
 
   PKIDatabaseDriver DB;
@@ -29,7 +29,6 @@ final class PKIServerProperties {
   int CERT_VALIDITY;
 
   private String pubKeyName;
-  private String ksPassword;
   private String token;
   private int pubKeySize;
 
@@ -42,12 +41,6 @@ final class PKIServerProperties {
     GSON = GsonUtils.buildGsonInstance();
 
     token = props.getString(PKIProperty.TOKEN_VALUE);
-
-    // Get providers
-    String provider = props.getString(PKIProperty.PROVIDER);
-
-    // Get and set password for keystore
-    ksPassword = props.getString(PKIProperty.KEYSTORE_PASS);
 
     // Initialize hash helper
     hashHelper = new HashHelper(props.getString(PKIProperty.HASH_ALG));

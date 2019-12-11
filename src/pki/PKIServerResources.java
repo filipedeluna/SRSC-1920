@@ -121,7 +121,7 @@ final class PKIServerResources implements Runnable {
     }
 
     // Get cert SN and hash
-    byte[] certBytes = props.aeaHelper.getCertBytes(signedCert);
+    byte[] certBytes = signedCert.getEncoded();
     String certHashEncoded = props.hashHelper.hashAndEncode(certBytes);
     String certSN = props.aeaHelper.getCertSN(signedCert);
 
@@ -133,7 +133,7 @@ final class PKIServerResources implements Runnable {
     }
 
     // encode signed certificate
-    byte[] signedCertBytes = props.aeaHelper.getCertBytes(signedCert);
+    byte[] signedCertBytes = signedCert.getEncoded();
     String signedCertEncoded = props.b64Helper.encode(signedCertBytes);
 
     // Create payload and send response
@@ -191,6 +191,7 @@ final class PKIServerResources implements Runnable {
 
     try {
       props.DB.revoke(serialNumber);
+      props.logger.log(Level.FINE, "Certificate " + serialNumber + " revoked");
     } catch (DatabaseException e) {
       throw new CustomRequestException("Certificate not found.", HTTPStatus.NOT_FOUND);
     }

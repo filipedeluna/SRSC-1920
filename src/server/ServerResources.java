@@ -305,7 +305,6 @@ final class ServerResources implements Runnable {
     // Get intended message id
     int messageId = GsonUtils.getInt(requestData, "messageId");
 
-    // TODO Why send the message here? We have a dedicated route....
     try {
       // Get the message and its respective receipts
       ArrayList<Receipt> receipts = props.DB.getReceipts(messageId);

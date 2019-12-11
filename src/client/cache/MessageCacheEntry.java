@@ -1,11 +1,11 @@
 package client.cache;
 
 public class MessageCacheEntry extends CacheEntry {
-  private int senderId;
-  private byte[] text;
-  private byte[] attachmentData;
-  private byte[] attachments;
-  private byte[] cipherIV;
+  private final int senderId;
+  private final byte[] text;
+  private final byte[] attachmentData;
+  private final byte[] attachments;
+  private final byte[] cipherIV;
 
   // All the entries are still encrypted but already decoded
   public MessageCacheEntry(int senderId, byte[] text, byte[] attachmentData, byte[] attachments, byte[] cipherIV) {

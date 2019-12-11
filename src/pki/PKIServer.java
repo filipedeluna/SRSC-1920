@@ -61,16 +61,13 @@ final class PKIServer {
           false
       );
 
-      // Get TLS Provider and cert format
-      String providerTLS = props.getString(PKIProperty.PROVIDER_TLS);
-
       // Initiate KMF
       KeyManagerFactory keyManagerFactory = ksHelper.getKeyManagerFactory();
 
       // Create SSL Socket and initialize server
       int port = props.getInt(PKIProperty.PORT);
 
-      SSLContext sslContext = SSLContext.getInstance("TLS", providerTLS);
+      SSLContext sslContext = SSLContext.getInstance("TLS");
       sslContext.init(keyManagerFactory.getKeyManagers(), null, new SecureRandom());
 
       SSLServerSocketFactory ssf = sslContext.getServerSocketFactory();

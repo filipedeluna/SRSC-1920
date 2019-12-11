@@ -10,7 +10,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 
 public final class FileHelper {
-  private String destinationFolder;
+  private final String destinationFolder;
 
   public FileHelper(String destinationFolder) throws IOException {
     this.destinationFolder = destinationFolder;
@@ -41,7 +41,7 @@ public final class FileHelper {
     return file;
   }
 
-  public byte[] readFile(ValidFile validFile) throws IOException {
+  private byte[] readFile(ValidFile validFile) throws IOException {
     return Files.readAllBytes(Paths.get(validFile.getPath()));
   }
 

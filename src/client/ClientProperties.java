@@ -41,16 +41,15 @@ import java.security.spec.X509EncodedKeySpec;
 final class ClientProperties {
   final B64Helper b64Helper;
   final RNDHelper rndHelper;
-  final Gson GSON;
+  private final Gson GSON;
   final ClientCacheController cache;
 
-  final String KEYSTORE_LOC;
+  private final String KEYSTORE_LOC;
 
   AEAHelper aeaHelper;
-  PublicKey PUB_KEY;
   ClientDHHelper dhHelper;
-  KSHelper ksHelper;
-  KSHelper tshelper;
+  final KSHelper ksHelper;
+  private final KSHelper tshelper;
   FileHelper fileHelper;
 
   // Comms
@@ -62,19 +61,23 @@ final class ClientProperties {
   private final String seaSpec;
   private final String macSpec;
   private PublicKey serverPubKey;
-  private final PublicKey clientPublicKey;
+  private PublicKey clientPublicKey;
+  private String clientPublicKeyName;
 
-  private String pubKeyName;
   ClientSession session;
 
   // SSL params
-  private SSLSocketFactory sslSocketFactory;
+  private final SSLSocketFactory sslSocketFactory;
   private int serverPort;
   private String serverAddress;
   private String[] tlsProtocols;
   private String[] tlsCiphersuites;
   private SSLSocket sslSocket;
   private int bufferSize;
+
+  // PKI
+  private final String pkiAddress;
+  private final int pkiPort;
 
   ClientProperties(CustomProperties props, KSHelper ksHelper, KSHelper tsHelper, SSLSocketFactory sslSocketFactory) throws PropertyException, GeneralSecurityException, IOException {
     this.props = props;
@@ -88,10 +91,6 @@ final class ClientProperties {
     tlsProtocols = props.getStringArr(ClientProperty.TLS_PROTOCOLS);
     tlsCiphersuites = props.getStringArr(ClientProperty.TLS_CIPHERSUITES);
     bufferSize = props.getInt(ClientProperty.BUFFER_SIZE_MB);
-
-    // Get public key and cert
-    pubKeyName = props.getString(ClientProperty.PUB_KEY_NAME);
-    PUB_KEY = ksHelper.getCertificate(pubKeyName).getPublicKey();
 
     // Set up file helper
     fileHelper = new FileHelper(props.getString(ClientProperty.OUTPUT_FOLDER));
@@ -111,11 +110,19 @@ final class ClientProperties {
     seaSpec = props.getString(ClientProperty.SEA_SPEC);
     macSpec = props.getString(ClientProperty.MAC_SPEC);
     KEYSTORE_LOC = props.getString(ClientProperty.KEYSTORE_LOC);
-    clientPublicKey = ksHelper.getPublicKey(props.getString(ClientProperty.PUB_KEY_NAME));
+
+    // Can't get a public key if we haven't generated one yet
+    if (props.getBool(ClientProperty.USE_PKI)) {
+      clientPublicKeyName = props.getString(ClientProperty.PUB_KEY_NAME);
+      clientPublicKey = ksHelper.getPublicKey(props.getString(ClientProperty.PUB_KEY_NAME));
+    }
+    // Load PKI params
+    pkiAddress = props.getString(ClientProperty.PKI_ADDRESS);
+    pkiPort = props.getInt(ClientProperty.PKI_PORT);
   }
 
   PrivateKey getPrivateKey() throws GeneralSecurityException {
-    return (PrivateKey) ksHelper.getKey(pubKeyName);
+    return (PrivateKey) ksHelper.getKey(clientPublicKeyName);
   }
 
   PublicKey getServerPublicKey() {
@@ -123,10 +130,10 @@ final class ClientProperties {
   }
 
   PublicKey getClientPublicKey() throws KeyStoreException {
-    return ksHelper.getPublicKey(pubKeyName);
+    return ksHelper.getPublicKey(clientPublicKeyName);
   }
 
-  char[] keyStorePassword() throws PropertyException {
+  private char[] keyStorePassword() throws PropertyException {
     return props.getString(ClientProperty.KEYSTORE_PASS).toCharArray();
   }
 
@@ -211,6 +218,10 @@ final class ClientProperties {
   }
 
   void startConnection() throws IOException {
+    startConnection(false);
+  }
+
+  void startConnection(boolean pki) throws IOException {
     // check if previous connection was still on
     if (sslSocket != null) {
       input.close();
@@ -219,7 +230,11 @@ final class ClientProperties {
     }
 
     // Create socket
-    sslSocket = (SSLSocket) sslSocketFactory.createSocket(serverAddress, serverPort);
+    if (pki)
+      sslSocket = (SSLSocket) sslSocketFactory.createSocket(pkiAddress, pkiPort);
+    else
+      sslSocket = (SSLSocket) sslSocketFactory.createSocket(serverAddress, serverPort);
+
     sslSocket.setSoTimeout(10 * 1000); // 10 seconds
 
     // Set enabled protocols and cipher suites and start SSL socket handshake with server

@@ -26,13 +26,12 @@ final class ServerProperties {
   B64Helper b64Helper;
   Gson GSON;
   Logger logger;
-  KSHelper ksHelper;
+  private final KSHelper ksHelper;
 
   ServerDatabaseDriver DB;
 
   private String pubKeyName;
   private int pubKeySize;
-  private String ksPassword;
 
   private int bufferSizeInMB;
 
@@ -52,9 +51,6 @@ final class ServerProperties {
     GSON = GsonUtils.buildGsonInstance();
     DB = db;
     this.logger = logger;
-
-    // Get and set password for keystore
-    ksPassword = properties.getString(ServerProperty.KEYSTORE_PASS);
 
     // Initialize AEA params
     String pubKeyAlg = properties.getString(ServerProperty.PUB_KEY_ALG);

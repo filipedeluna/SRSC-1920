@@ -11,7 +11,7 @@ public enum ClientProperty implements ICustomProperty {
   CACHE_SIZE("cache_size", CustomPropertyType.INT),
 
   // Network
-  PKI_ADDRESS("pki_address", CustomPropertyType.BOOL),
+  PKI_ADDRESS("pki_address", CustomPropertyType.STRING),
   PKI_PORT("pki_port", CustomPropertyType.INT),
   SERVER_ADDRESS("server_address", CustomPropertyType.STRING),
   SERVER_PORT("server_port", CustomPropertyType.INT),
@@ -32,12 +32,16 @@ public enum ClientProperty implements ICustomProperty {
   TRUSTSTORE_PASS("truststore_pass", CustomPropertyType.STRING),
 
   // PKI
+  USE_PKI("use_pki", CustomPropertyType.BOOL),
+  PKI_CERT_ALG("pki_cert_sign_alg", CustomPropertyType.STRING),
+  PKI_PUBKEY_SIZE("pki_pubkey_size", CustomPropertyType.INT),
+  PKI_KEY_ALG("pki_pubkey_algorithm", CustomPropertyType.STRING),
   NEW_KEY_NAME("new_key_name", CustomPropertyType.STRING);
 
   /////////////////////////////////////////////////
 
-  private String val;
-  private CustomPropertyType type;
+  private final String val;
+  private final CustomPropertyType type;
 
   ClientProperty(String val, CustomPropertyType type) {
     this.val = val;

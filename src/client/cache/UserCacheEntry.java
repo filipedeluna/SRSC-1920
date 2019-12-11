@@ -3,11 +3,11 @@ package client.cache;
 import java.security.PublicKey;
 
 public class UserCacheEntry extends CacheEntry {
-  private PublicKey pubKey;
-  private byte[] dhSeaPubKey;
-  private byte[] dhMacPubKey;
-  private String seaSpec;
-  private String macSpec;
+  private final PublicKey pubKey;
+  private final byte[] dhSeaPubKey;
+  private final byte[] dhMacPubKey;
+  private final String seaSpec;
+  private final String macSpec;
 
   public UserCacheEntry(PublicKey pubKey, byte[] dhSeaPubKey, byte[] dhMacPubKey, String seaSpec, String macSpec) {
     this.pubKey = pubKey;

@@ -6,18 +6,18 @@ import shared.utils.crypto.SEAHelper;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 
-public class ClientSession {
-  private int id;
-  private String uuid;
-  private String seaSpec;
-  private String macSpec;
-  private KeyPair dhSeaKeyPair;
-  private KeyPair dhMacKeyPair;
+class ClientSession {
+  private final int id;
+  private final String uuid;
+  private final String seaSpec;
+  private final String macSpec;
+  private final KeyPair dhSeaKeyPair;
+  private final KeyPair dhMacKeyPair;
 
   MacHelper macHelper;
   SEAHelper seaHelper;
 
-  public ClientSession(String uuid, int id, String seaSpec, String macSpec, KeyPair dhSeaKeyPair, KeyPair dhMacKeyPair) throws GeneralSecurityException {
+  ClientSession(String uuid, int id, String seaSpec, String macSpec, KeyPair dhSeaKeyPair, KeyPair dhMacKeyPair) throws GeneralSecurityException {
     this.uuid = uuid;
     this.id = id;
     this.seaSpec = seaSpec;

@@ -25,9 +25,8 @@ public class KSHelper {
   private SEAHelper seaHelper;
   private KeyStore store;
 
-  private KeyFactory keyFactory;
-  private String keyStoreLoc;
-  private char[] keyStorePass;
+  private final String keyStoreLoc;
+  private final char[] keyStorePass;
   private SecretKey seaKey;
 
   public KSHelper(String keyStoreLoc, String keyStoreType, char[] keyStorePass, boolean isTrustStore) throws IOException, GeneralSecurityException {
@@ -39,9 +38,8 @@ public class KSHelper {
     store = KeyStore.getInstance(keyStoreType);
     store.load(stream, keyStorePass);
 
-    // Create sea Helper for storing keypairs, use GCM to guarantee integrity
+    // use GCM to guarantee integrity when encrypting dh generated shared keys
     if (!isTrustStore) {
-      keyFactory = KeyFactory.getInstance("DH", "BC");
       seaHelper = new SEAHelper("AES", "GCM", "NoPadding");
       seaKey = seaHelper.getKeyFromBytes(seaHelper.trimKeyToAlg(String.valueOf(keyStorePass).getBytes()));
     }
@@ -49,18 +47,6 @@ public class KSHelper {
 
   public Key getKey(String keyName) throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
     return store.getKey(keyName, keyStorePass);
-  }
-
-  public boolean hasSEAsharedInKeystore(String alias) {
-    try {
-      store.getKey(alias, keyStorePass);
-      return true;
-    } catch (UnrecoverableKeyException ex) {
-      ex.printStackTrace();
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-    return false;
   }
 
   public void saveDHKeyPair(String username, DHKeyType type, KeyPair keyPair) throws BadPaddingException, InvalidKeyException, IllegalBlockSizeException, IOException, InvalidAlgorithmParameterException {
@@ -83,7 +69,7 @@ public class KSHelper {
 
     // Write bytes to file
     Path filePath = getDHKeyPairPath(username, type);
-    // Files.deleteIfExists(getDHKeyPairPath(uuid)); // TODO decide if we should use this
+    Files.deleteIfExists(filePath);
     Files.write(filePath, fileBytesEncrypted);
   }
 

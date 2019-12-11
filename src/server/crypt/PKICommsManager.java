@@ -7,8 +7,10 @@ import com.google.gson.stream.JsonReader;
 import server.props.ServerProperty;
 import server.request.ValidateCertificateRequest;
 import shared.errors.properties.PropertyException;
+import shared.errors.request.CustomRequestException;
 import shared.errors.request.InvalidFormatException;
 import shared.errors.request.RequestException;
+import shared.http.HTTPStatus;
 import shared.utils.GsonUtils;
 import shared.utils.crypto.AEAHelper;
 import shared.utils.crypto.B64Helper;
@@ -22,7 +24,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.logging.Level;
@@ -37,7 +38,6 @@ public final class PKICommsManager {
 
   private final Gson gson;
   private final B64Helper b64Helper;
-  private AEAHelper aeaHelper;
 
   private String[] enabledProtocols;
   private String[] enabledCipherSuites;
@@ -55,7 +55,6 @@ public final class PKICommsManager {
     this.logger = logger;
     this.b64Helper = new B64Helper();
     this.gson = GsonUtils.buildGsonInstance();
-    this.aeaHelper = aeaHelper;
 
     checkedClients = new HashMap<>();
     debug = properties.getBool(ServerProperty.DEBUG);
@@ -83,13 +82,13 @@ public final class PKICommsManager {
     return sslSocket;
   }
 
-  public void checkClientCertificateRevoked(X509Certificate clientCert, SSLSocket socket) throws GeneralSecurityException {
+  public void checkClientCertificateRevoked(X509Certificate clientCert, SSLSocket socket) throws GeneralSecurityException, CustomRequestException {
     // No need to check if in cache and valid
     if (certInCache(clientCert))
       return;
 
     // Get cert encode and send request
-    byte[] certBytes = aeaHelper.getCertBytes(clientCert);
+    byte[] certBytes = clientCert.getEncoded();
     String certEncoded = b64Helper.encode(certBytes);
     String certSN = clientCert.getSerialNumber().toString();
 
@@ -113,7 +112,7 @@ public final class PKICommsManager {
 
       if (!valid) {
         logger.log(Level.WARNING, "Refused certificate " + certSN);
-        throw new CertificateException("Certificate is not valid - Revoked or never emitted.");
+        throw new CustomRequestException("Certificate is not valid - Revoked or never emitted.", HTTPStatus.UNAUTHORIZED);
       }
 
       // Add to cache if valid
@@ -124,7 +123,7 @@ public final class PKICommsManager {
 
       logger.log(Level.WARNING, "Failed to verify certificate " + certSN + ": " + e.getMessage());
 
-      throw new CertificateException("Failed to verify Certificate.");
+      throw new CustomRequestException("Failed to verify Certificate.", HTTPStatus.UNAUTHORIZED);
     }
   }
 
