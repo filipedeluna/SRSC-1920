@@ -8,31 +8,31 @@ import client.utils.ClientRequest;
 import client.utils.ValidFile;
 import com.google.gson.JsonObject;
 import shared.Pair;
+import shared.errors.properties.PropertyException;
+import shared.parameters.ServerParameter;
 import shared.parameters.ServerParameterMap;
+import shared.response.server.*;
 import shared.utils.Utils;
+import shared.utils.crypto.KSHelper;
 import shared.utils.crypto.MacHelper;
 import shared.utils.crypto.SEAHelper;
 import shared.utils.crypto.util.DHKeyType;
+import shared.utils.properties.CustomProperties;
 import shared.wrappers.Message;
 import shared.wrappers.Receipt;
 import shared.wrappers.User;
-import shared.errors.properties.PropertyException;
-import shared.parameters.ServerParameter;
-import shared.response.server.*;
-import shared.utils.crypto.KSHelper;
-import shared.utils.properties.CustomProperties;
 
-import javax.crypto.*;
-import javax.crypto.spec.DESKeySpec;
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.DHParameterSpec;
 import javax.net.ssl.*;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
-import java.security.cert.CertificateException;
 import java.security.spec.InvalidKeySpecException;
-import java.security.spec.KeySpec;
-import java.security.spec.X509EncodedKeySpec;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -127,8 +127,6 @@ public class Client {
               sendMessages(cProps, requestData, cmdArgs);
               break;
             case RECV:
-              // TODO missing message decryption
-              //contem o receipt, receipt enviado dps de ler
               receiveMessage(cProps, requestData, cmdArgs);
               break;
             case STATUS:
@@ -220,7 +218,7 @@ public class Client {
     // Also associate uuid to cache
     cProps.cache.addUUID(uuid, user.getId());
 
-    cProps.establishSession(session); // TODO LOOKEI HERE
+    cProps.establishSession(session);
 
     System.out.println("User " + username + " successfully logged in.");
   }
@@ -246,17 +244,16 @@ public class Client {
     byte[] signatureDecoded = cProps.b64Helper.decode(paramsMap.getParameter(ServerParameter.PARAM_SIG));
     byte[] paramsBytes = paramsMap.getAllParametersBytes();
 
-    boolean sigValid = cProps.aeaHelper.verifySignature(cProps.getServerPublicKey(), paramsBytes, signatureDecoded);
-
-    if (!sigValid)
-      throw new ClientException("The server parameters signature is not valid.");
-
-    // Initialize AEA and DH Helper with the server parameters
     try {
       cProps.loadServerParams(paramsMap);
     } catch (Exception e) {
       throw new ClientException("The server parameters received are corrupted.");
     }
+
+    boolean sigValid = cProps.aeaHelper.verifySignature(cProps.getServerPublicKey(), paramsBytes, signatureDecoded);
+
+    if (!sigValid)
+      throw new ClientException("The server parameters signature is not valid.");
   }
 
   private static void createUser(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException, ClientException {
@@ -427,7 +424,7 @@ public class Client {
     System.out.println("Note: Read messages come with a prefixed \"_\".");
   }
 
-  private static void sendMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException, ClientException, PropertyException, ClassNotFoundException {
+  private static void sendMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, GeneralSecurityException, ClientException, PropertyException {
     // Check user is logged in (in session and cache)
     if (cProps.session == null)
       throw new ClientException("User is not logged in.");
@@ -540,51 +537,30 @@ public class Client {
     System.out.println("Successfully sent message to user " + destinationId + " with id " + resp.getMessageId());
   }
 
-  private static Cipher generateMACSharedKey(ClientProperties cProps, int clientId, KeyAgreement
-      keyAgreemac, UserCacheEntry destinyuser) throws
-      NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, PropertyException, KeyStoreException, IOException, CertificateException {
-    KeyFactory factory = KeyFactory.getInstance(cProps.dhHelper.getAlgorithm());
-    X509EncodedKeySpec encodedKeySpec = new X509EncodedKeySpec(destinyuser.getDhSeaPubKey());
-    PublicKey publicKey = factory.generatePublic(encodedKeySpec);
-    keyAgreemac.doPhase(publicKey, true);
-
-    //generate the shared key
-    byte[] generatedkeybytes = keyAgreemac.generateSecret();
-
-    //starts sea cipher can it only be DES?
-    Cipher cipher = Cipher.getInstance(cProps.cache.getUser(clientId).getMacSpec());
-    SecretKeyFactory skf = SecretKeyFactory.getInstance(cipher.getAlgorithm());
-    KeySpec keySpec = new DESKeySpec(generatedkeybytes);
-    SecretKey secretKey = skf.generateSecret(keySpec);
-
-    // add keys to keystore
-    KeyStore.SecretKeyEntry seaKeyEntry = new KeyStore.SecretKeyEntry(secretKey);
-    KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection(cProps.keyStorePassword());
-    cProps.ksHelper.getStore().setEntry(clientId + "-" + destinyuser + "-macshared", seaKeyEntry, protectionParam);
-    cProps.ksHelper.getStore().store(new FileOutputStream(cProps.KEYSTORE_LOC), cProps.keyStorePassword());
-
-    //init sea cipher
-    cipher.init(Cipher.ENCRYPT_MODE, secretKey);
-    return cipher;
-  }
-
-  private static void receiveMessage(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException, GeneralSecurityException, PropertyException, ClassNotFoundException {
+  private static void receiveMessage(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException, GeneralSecurityException, PropertyException {
     // Check user is logged in (in session and cache)
     if (cProps.session == null)
       throw new ClientException("User is not logged in.");
 
-
-    // Get message id to fetch from server and add to the request
+    // Get message id and check if it is in cache
     int messageId = Integer.parseInt(args[1]);
-    requestData.addProperty("userId", messageId);
-    cProps.sendRequest(requestData);
+    MessageCacheEntry messageCacheEntry = cProps.cache.getMessage(messageId);
 
-    // Get message object from the server response
-    ReceiveMessageResponse resp = cProps.receiveRequestWithNonce(requestData, ReceiveMessageResponse.class);
-    Message message = resp.getMessage();
+    int senderId;
+    Message message = null;
+    if (messageCacheEntry == null) {
+      // Get message object from the server response
+      requestData.addProperty("messageId", messageId);
+      cProps.sendRequest(requestData);
+      ReceiveMessageResponse resp = cProps.receiveRequestWithNonce(requestData, ReceiveMessageResponse.class);
+      message = resp.getMessage();
+
+      // Get message sender
+      senderId = message.getSenderId();
+    } else
+      senderId = messageCacheEntry.getSenderId();
 
     // Get message sender
-    int senderId = message.getSenderId();
     UserCacheEntry messageSender = cProps.cache.getUser(senderId);
 
     // Verify if we have required user to verify signatures
@@ -596,24 +572,9 @@ public class Client {
       throw new ClientException("Couldn't get message sender from server.");
 
     // Create ciphers with other users params
-    MacHelper macHelper;
-    SEAHelper seaHelper;
-
-    try {
-      macHelper = new MacHelper(messageSender.getMacSpec());
-
-      String[] seaSpec = messageSender.getSeaSpec().split("/");
-      if (seaSpec.length != 3)
-        throw new ClientException("User has an invalid key spec.");
-
-      String seaAlg = seaSpec[0];
-      String seaMode = seaSpec[1];
-      String seaPadding = seaSpec[2];
-      seaHelper = new SEAHelper(seaAlg, seaMode, seaPadding);
-
-    } catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
-      throw new ClientException("User has an invalid key spec.");
-    }
+    Pair<SEAHelper, MacHelper> sharedHelpers = getSharedHelpers(messageSender.getSeaSpec(), messageSender.getMacSpec());
+    SEAHelper seaHelper = sharedHelpers.getA();
+    MacHelper macHelper = sharedHelpers.getB();
 
     // Get shared key pairs
     Pair<Key, Key> sharedKeys = cProps.getSharedKeys(senderId);
@@ -621,54 +582,60 @@ public class Client {
     Key sharedMacKey = sharedKeys.getB();
 
     // Validate message contents by verifying mac
-    byte[] encryptedText = cProps.b64Helper.decode(message.getText());
-    byte[] encryptedFileSpec = cProps.b64Helper.decode(message.getAttachmentData());
-    byte[] encryptedFiles = cProps.b64Helper.decode(message.getAttachments());
-    byte[] iv = cProps.b64Helper.decode(message.getIV());
-    byte[] signature = cProps.b64Helper.decode(message.getSenderSignature());
+    byte[] encryptedText;
+    byte[] encryptedFileSpec;
+    byte[] encryptedFiles;
+    byte[] iv;
+    byte[] signature;
 
-    byte[] contents = Utils.joinByteArrays(
-        encryptedText,
-        encryptedFileSpec,
-        encryptedFiles,
-        iv
-    );
+    if (messageCacheEntry == null) {
+      System.out.println("Message not found in cache. Fetching...");
 
-    if (!macHelper.verifyMacHash(contents, signature, sharedMacKey))
-      throw new ClientException("Message has an invalid signature");
+      encryptedText = cProps.b64Helper.decode(message.getText());
+      encryptedFileSpec = cProps.b64Helper.decode(message.getAttachmentData());
+      encryptedFiles = cProps.b64Helper.decode(message.getAttachments());
+      iv = cProps.b64Helper.decode(message.getIV());
+      signature = cProps.b64Helper.decode(message.getSenderSignature());
 
-    // Decrypt message contents
+      byte[] contents = Utils.joinByteArrays(
+          encryptedText,
+          encryptedFileSpec,
+          encryptedFiles,
+          iv
+      );
+
+      if (!macHelper.verifyMacHash(contents, signature, sharedMacKey))
+        throw new ClientException("Message has an invalid signature");
+    } else {
+      encryptedText = messageCacheEntry.getText();
+      encryptedFileSpec = messageCacheEntry.getAttachmentData();
+      encryptedFiles = messageCacheEntry.getAttachments();
+      iv = messageCacheEntry.getCipherIV();
+    }
+
+    // Decrypt message parts
     if (seaHelper.cipherModeUsesIV() && iv.length != 3 * seaHelper.ivSize())
       throw new ClientException("Message iv is corrupted");
 
-    int ivSize = seaHelper.ivSize();
-
-    byte[] decryptedText;
-    if (seaHelper.cipherModeUsesIV())
-      decryptedText = seaHelper.decrypt(encryptedText, sharedSeaKey, Arrays.copyOfRange(iv, 0, ivSize));
-    else
-      decryptedText = seaHelper.decrypt(encryptedText, sharedSeaKey);
-
-    String text = new String(decryptedText, StandardCharsets.UTF_8);
-
-    byte[] decryptedFileSpec;
-    if (seaHelper.cipherModeUsesIV())
-      decryptedFileSpec = seaHelper.decrypt(encryptedFileSpec, sharedSeaKey, Arrays.copyOfRange(iv, ivSize, ivSize * 2));
-    else
-      decryptedFileSpec = seaHelper.decrypt(encryptedFileSpec, sharedSeaKey);
-
-    String fileSpec = new String(decryptedFileSpec, StandardCharsets.UTF_8);
-
+    String text;
+    String fileSpec;
     byte[] decryptedFiles;
-    if (seaHelper.cipherModeUsesIV())
-      decryptedFiles = seaHelper.decrypt(encryptedFiles, sharedSeaKey, Arrays.copyOfRange(iv, ivSize * 2, ivSize * 3));
-    else
-      decryptedFiles = seaHelper.decrypt(encryptedFiles, sharedSeaKey);
+    try {
+      text = decryptMessageText(encryptedText, sharedSeaKey, iv, seaHelper);
+      fileSpec = decryptMessageFileSpec(encryptedFileSpec, sharedSeaKey, iv, seaHelper);
+      decryptedFiles = decryptMessageFiles(encryptedFiles, sharedSeaKey, iv, seaHelper);
+    } catch (BadPaddingException | IllegalBlockSizeException | InvalidAlgorithmParameterException e) {
+      throw new ClientException("Sea key is invalid or corrupted.");
+    }
 
     // Parse filespec to start writing files
     ArrayList<Pair<String, Integer>> fileSpecPairs = cProps.fileHelper.parseFileSpec(fileSpec);
 
     byte[] fileBytes;
+    if (!fileSpecPairs.isEmpty() && decryptedFiles.length == 0)
+      throw new ClientException("Message attachments are corrupted.");
+
+    // Write decrypted files to system
     for (Pair<String, Integer> fileSpecPair : fileSpecPairs) {
       try {
         fileBytes = Arrays.copyOfRange(decryptedFiles, 0, fileSpecPair.getB());
@@ -683,21 +650,48 @@ public class Client {
     }
 
     // Add message to cache
-    cProps.cache.addMessage(
-        message.getId(),
-        new MessageCacheEntry(
-            message.getSenderId(),
-            encryptedText,
-            encryptedFileSpec,
-            encryptedFiles,
-            iv
-        )
-    );
+    if (messageCacheEntry == null) {
+      cProps.cache.addMessage(
+          message.getId(),
+          new MessageCacheEntry(
+              message.getSenderId(),
+              encryptedText,
+              encryptedFileSpec,
+              encryptedFiles,
+              iv
+          )
+      );
+    }
+
     System.out.println("Message text: " + text);
     System.out.println("Successfully received message with id: " + messageId);
+
+    // Prepare to send receipt by resetting connection and building header
+    cProps.startConnection();
+
+    requestData.addProperty("type", "receipt");
+    requestData.addProperty("messageId", messageId);
+
+    // Get current date
+    String currentDate = getCurrentDate();
+
+    // Sign decrypted data with mac and add to request
+    byte[] decryptedContents = Utils.joinByteArrays(
+        text.getBytes(StandardCharsets.UTF_8),
+        fileSpec.getBytes(StandardCharsets.UTF_8),
+        decryptedFiles,
+        currentDate.getBytes(StandardCharsets.UTF_8)
+    );
+
+    byte[] signedDecryptedContents = macHelper.macHash(decryptedContents, sharedMacKey);
+    requestData.addProperty("receiverSignature", cProps.b64Helper.encode(signedDecryptedContents));
+
+    requestData.addProperty("date", currentDate);
+
+    System.out.println("Successfully sent receipt of message with id: " + messageId);
   }
 
-  private static void status(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
+  private static void status(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException, NoSuchAlgorithmException, PropertyException, InvalidKeyException {
     // Check user is logged in (in session and cache)
     if (cProps.session == null)
       throw new ClientException("User is not logged in.");
@@ -707,67 +701,96 @@ public class Client {
     requestData.addProperty("messageId", messageId);
     cProps.sendRequest(requestData);
 
-    // Get response object and extract messages an receipts
+    // Get response object and extract messages and receipts
     MessageReceiptsResponse resp = cProps.receiveRequestWithNonce(requestData, MessageReceiptsResponse.class);
-    Message message = resp.getMessage();
     ArrayList<Receipt> receipts = resp.getReceipts();
+    Message message = resp.getMessage();
 
-    UserCacheEntry messageSender = cProps.cache.getUser(message.getSenderId());
+    // Check session user is message sender
+    if (message.getSenderId() != cProps.session.getId())
+      throw new ClientException("Message was not sent by user. Can't verify receipts.");
 
+    // Check user already exists in cache. Fetch him otherwise
+    UserCacheEntry receiptSender = cProps.cache.getUser(message.getSenderId());
 
-    System.out.println("\n" +
-        "    The server will reply with an object containing the sent message and a vector of receipt objects, each\n" +
-        "    containing the receipt data (when it was received by the server), the identification of the receipt sender\n" +
-        "    and the receipt itself:\n" +
-        "    ");
+    if (receiptSender == null)
+      receiptSender = fetchUser(cProps, message.getSenderId());
 
-    /*
-    System.out.println("Showing status for message: " + lmr.getMessage().getId());
-    for (Receipt r : lmr.getReceipts()) {
-      System.out.println("Date: " + r.getDate());
-      System.out.println("Signature: " + r.getReceiverSignature());
+    if (receiptSender == null)
+      throw new ClientException("Failed to fetch receipt sender from server.");
+
+    // Create ciphers with other users params
+    Pair<SEAHelper, MacHelper> sharedHelpers = getSharedHelpers(receiptSender.getSeaSpec(), receiptSender.getMacSpec());
+    SEAHelper seaHelper = sharedHelpers.getA();
+    MacHelper macHelper = sharedHelpers.getB();
+
+    // Get shared key pairs
+    Pair<Key, Key> sharedKeys = cProps.getSharedKeys(message.getSenderId());
+    Key sharedSeaKey = sharedKeys.getA();
+    Key sharedMacKey = sharedKeys.getB();
+
+    // Validate message contents by verifying mac, check if it has been tampered with
+    byte[] encryptedText = cProps.b64Helper.decode(message.getText());
+    byte[] encryptedFileSpec = cProps.b64Helper.decode(message.getAttachmentData());
+    byte[] encryptedFiles = cProps.b64Helper.decode(message.getAttachments());
+    byte[] iv = cProps.b64Helper.decode(message.getIV());
+    byte[] signature = cProps.b64Helper.decode(message.getSenderSignature());
+
+    byte[] contents = Utils.joinByteArrays(
+        encryptedText,
+        encryptedFileSpec,
+        encryptedFiles,
+        iv
+    );
+
+    if (!macHelper.verifyMacHash(contents, signature, sharedMacKey))
+      throw new ClientException("Message has an invalid signature. It has been tampered with.");
+
+    // Decrypt message parts
+    if (seaHelper.cipherModeUsesIV() && iv.length != 3 * seaHelper.ivSize())
+      throw new ClientException("Message iv is corrupted");
+
+    String text;
+    String fileSpec;
+    byte[] decryptedFiles;
+    try {
+      text = decryptMessageText(encryptedText, sharedSeaKey, iv, seaHelper);
+      fileSpec = decryptMessageFileSpec(encryptedFileSpec, sharedSeaKey, iv, seaHelper);
+      decryptedFiles = decryptMessageFiles(encryptedFiles, sharedSeaKey, iv, seaHelper);
+    } catch (BadPaddingException | IllegalBlockSizeException | InvalidAlgorithmParameterException e) {
+      throw new ClientException("Sea key is invalid or corrupted.");
     }
-  */
+
+    // Get decryptedData macHash
+    byte[] decryptedContents = Utils.joinByteArrays(
+        text.getBytes(StandardCharsets.UTF_8),
+        fileSpec.getBytes(StandardCharsets.UTF_8),
+        decryptedFiles
+    );
+
+    // Check receipt validity 1 by 1
+    int counterValid = 0;
+    int counterInvalid = 0;
+    byte[] verificationData;
+    byte[] receiptSignature;
+    for (Receipt receipt : receipts) {
+      verificationData = Utils.joinByteArrays(
+          decryptedContents,
+          receipt.getDate().getBytes(StandardCharsets.UTF_8)
+      );
+
+      receiptSignature = cProps.b64Helper.decode(receipt.getReceiverSignature());
+      if (macHelper.verifyMacHash(verificationData, receiptSignature, sharedMacKey))
+        counterValid++;
+      else
+        counterInvalid++;
+    }
+
+    // Print results
+    System.out.println("Showing status for message: " + messageId + " receipts:");
+    System.out.println("Valid Receipts: " + counterValid);
+    System.out.println("Invalid/Forged Receipts: : " + counterInvalid);
   }
-
-/*
-  private static void getUsers(KeyStore keyStore, int sourceId, int destinationId, SSLSocket socket, ClientProperties cProps) throws IOException, InvalidFormatException, GeneralSecurityException, PropertyException {
-    JsonObject requestData = new JsonObject();
-    requestData.addProperty("type", "dhvaluereq");
-    requestData.addProperty("nonce", cProps.rndHelper.getString(16, true));
-    requestData.addProperty("destiny_uuid", destinationId);
-
-    socket.getOutputStream().write(cProps.GSON.toJson(requestData).getBytes());
-
-    JsonObject jsonObject = cProps.receiveRequest();
-    RequestDestinyDHvalue req = cProps.GSON.fromJson(jsonObject, RequestDestinyDHvalue.class);
-    X509Certificate certificate = (X509Certificate) socket.getSession().getPeerCertificates()[0];
-    //validar assinatura
-    PublicKey publicKeyserv = certificate.getPublicKey();
-    cProps.aeaHelper.verifySignature(publicKeyserv, req.getDhdentinyvalue().getBytes(), req.getSecdata().getBytes());
-
-    KeyFactory keyFactory = KeyFactory.getInstance("DiffieHellman");
-    PublicKey publicKey = keyFactory.generatePublic(new X509EncodedKeySpec(req.getDhdentinyvalue().getBytes()));
-
-    //generate shared key between src - dst
-    KeyAgreement keyAgree = KeyAgreement.getInstance("DiffieHellman");
-    PrivateKey pk = (PrivateKey) keyStore.getKey(sourceId + "-priv", cProps.keyStorePassword());
-    keyAgree.init(pk);
-    keyAgree.doPhase(publicKey, true);
-    byte[] sharedKeyBytes = keyAgree.generateSecret();
-
-    //gravar na keystore
-    PrivateKey shared = keyFactory.generatePrivate(new PKCS8EncodedKeySpec(sharedKeyBytes));
-    KeyStore.SecretKeyEntry sharedkeyentry = new KeyStore.SecretKeyEntry((SecretKey) shared);
-    KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection(cProps.keyStorePassword());
-    keyStore.setEntry(sourceId + "-" + destinationId + "-shared", sharedkeyentry, protectionParam);
-    keyStore.store(new FileOutputStream(new File(cProps.KEYSTORE_LOC)), cProps.keyStorePassword());
-
-    // TODO save pair in keystore
-    //  cProps.KSHelper.save(sourceId + "-" + destinationId + "-shared", );
-
-  }
-*/
 
   private static KSHelper getKeyStore(CustomProperties properties) throws
       PropertyException, GeneralSecurityException, IOException {
@@ -867,12 +890,59 @@ public class Client {
     listUsers(cProps, requestDataToGetUser, fakeArgs, true);
 
     // Restart socket connection
-    cProps.closeConnection();
     cProps.startConnection();
 
     // TODO AGGRESSIVE MODEEEEE??? - get all users instead of just this one every time we miss one?????
     return cProps.cache.getUser(userId);
   }
 
+  private static String decryptMessageText(byte[] encryptedText, Key key, byte[] iv, SEAHelper seaHelper) throws BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
+    byte[] decryptedText;
 
+    if (seaHelper.cipherModeUsesIV())
+      decryptedText = seaHelper.decrypt(encryptedText, key, Arrays.copyOfRange(iv, 0, iv.length));
+    else
+      decryptedText = seaHelper.decrypt(encryptedText, key);
+
+    return new String(decryptedText, StandardCharsets.UTF_8);
+  }
+
+  private static String decryptMessageFileSpec(byte[] encryptedFileSpec, Key key, byte[] iv, SEAHelper seaHelper) throws BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
+    byte[] decryptedFileSpec;
+    if (seaHelper.cipherModeUsesIV())
+      decryptedFileSpec = seaHelper.decrypt(encryptedFileSpec, key, Arrays.copyOfRange(iv, iv.length, iv.length * 2));
+    else
+      decryptedFileSpec = seaHelper.decrypt(encryptedFileSpec, key);
+
+    return new String(decryptedFileSpec, StandardCharsets.UTF_8);
+  }
+
+  private static byte[] decryptMessageFiles(byte[] encryptedFiles, Key key, byte[] iv, SEAHelper seaHelper) throws BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
+    byte[] decryptedFiles;
+    if (seaHelper.cipherModeUsesIV())
+      decryptedFiles = seaHelper.decrypt(encryptedFiles, key, Arrays.copyOfRange(iv, iv.length * 2, iv.length * 3));
+    else
+      decryptedFiles = seaHelper.decrypt(encryptedFiles, key);
+
+    return decryptedFiles;
+  }
+
+  private static Pair<SEAHelper, MacHelper> getSharedHelpers(String seaSpec, String macSpec) throws ClientException {
+    try {
+      MacHelper macHelper = new MacHelper(macSpec);
+
+      String[] trimmedSeaSpec = seaSpec.split("/");
+      if (trimmedSeaSpec.length != 3)
+        throw new ClientException("User has an invalid key spec.");
+
+      String seaAlg = trimmedSeaSpec[0];
+      String seaMode = trimmedSeaSpec[1];
+      String seaPadding = trimmedSeaSpec[2];
+      SEAHelper seaHelper = new SEAHelper(seaAlg, seaMode, seaPadding);
+
+      return new Pair<>(seaHelper, macHelper);
+    } catch (NoSuchAlgorithmException | NoSuchPaddingException | NoSuchProviderException e) {
+      throw new ClientException("User has an invalid key spec.");
+    }
+  }
 }

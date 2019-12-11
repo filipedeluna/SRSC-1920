@@ -49,7 +49,7 @@ public final class FileHelper {
     byte[] data = new byte[0];
 
     for (ValidFile validFile : validFiles)
-      Utils.joinByteArrays(data, readFile(validFile));
+      data = Utils.joinByteArrays(data, readFile(validFile));
 
     return data;
   }
@@ -58,8 +58,8 @@ public final class FileHelper {
     Path filePath = Paths.get(destinationFolder + "/" + fileName);
 
     // Check destination valid
-    if (Files.isDirectory(filePath) || !Files.isWritable(filePath))
-      throw new IOException("Invalid destination for file: " + filePath.toString());
+    //if (Files.isWritable(filePath))
+      //throw new IOException("Invalid destination for file: " + filePath.toString());
 
     // Delete previous file
     if (Files.exists(filePath))

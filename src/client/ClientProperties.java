@@ -69,22 +69,12 @@ final class ClientProperties {
 
   // SSL params
   private SSLSocketFactory sslSocketFactory;
-  public int serverPort;
-  public String serverAddress;
-  public String[] tlsProtocols;
-  public String[] tlsCiphersuites;
-  public SSLSocket sslSocket;
-  public int bufferSize;
-
-  // Server params
-  private String dhAlg;
-  private String dhHashAlg;
-  private BigInteger dhP;
-  private BigInteger dhG;
-  private int dhKeySize;
-
-  private String pubKeyAlg;
-  private String certSignAlg;
+  private int serverPort;
+  private String serverAddress;
+  private String[] tlsProtocols;
+  private String[] tlsCiphersuites;
+  private SSLSocket sslSocket;
+  private int bufferSize;
 
   ClientProperties(CustomProperties props, KSHelper ksHelper, KSHelper tsHelper, SSLSocketFactory sslSocketFactory) throws PropertyException, GeneralSecurityException, IOException {
     this.props = props;
@@ -124,16 +114,15 @@ final class ClientProperties {
     clientPublicKey = ksHelper.getPublicKey(props.getString(ClientProperty.PUB_KEY_NAME));
   }
 
-
   PrivateKey getPrivateKey() throws GeneralSecurityException {
     return (PrivateKey) ksHelper.getKey(pubKeyName);
   }
 
-  public PublicKey getServerPublicKey() {
+  PublicKey getServerPublicKey() {
     return serverPubKey;
   }
 
-  public PublicKey getClientPublicKey() throws KeyStoreException {
+  PublicKey getClientPublicKey() throws KeyStoreException {
     return ksHelper.getPublicKey(pubKeyName);
   }
 
@@ -141,25 +130,25 @@ final class ClientProperties {
     return props.getString(ClientProperty.KEYSTORE_PASS).toCharArray();
   }
 
-  public String getSeaSpec() {
+  String getSeaSpec() {
     return seaSpec;
   }
 
-  public String getMacSpec() {
+  String getMacSpec() {
     return macSpec;
   }
 
-  public String generateUUID(String username) {
+  String generateUUID(String username) {
     byte[] hash = uuidHashHelper.hash(username.getBytes(), clientPublicKey.getEncoded());
 
     return b64Helper.encode(hash);
   }
 
-  public void sendRequest(JsonObject jsonObject) throws IOException {
+  void sendRequest(JsonObject jsonObject) throws IOException {
     output.write(GSON.toJson(jsonObject).getBytes());
   }
 
-  public <T> T receiveRequest(Type type) throws ClientException {
+  <T> T receiveRequest(Type type) throws ClientException {
     JsonObject jsonObject;
     GsonResponse response;
 
@@ -193,14 +182,14 @@ final class ClientProperties {
     }
   }
 
-  public <T> T receiveRequestWithNonce(JsonObject requestData, Type type) throws ClientException {
+  <T> T receiveRequestWithNonce(JsonObject requestData, Type type) throws ClientException {
     try {
       T response = receiveRequest(type);
 
       if (!requestData.get("nonce").getAsString().equals(((OkResponseWithNonce) response).getNonce()))
         throw new ClientException("The nonce retrieved from the server does not match.");
 
-      return (T) response;
+      return response;
     } catch (JsonSyntaxException e) {
       throw new ClientException("Response with nonce was expected but not received");
     }
@@ -210,22 +199,18 @@ final class ClientProperties {
     return GSON.fromJson(jsonObject, type);
   }
 
-  public void establishSession(ClientSession session) {
+  void establishSession(ClientSession session) {
     this.session = session;
   }
 
-  public Key loadSharedKey(int clientId, int destinationId, DHKeyType type) throws PropertyException, UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
-    return ksHelper.getSharedKey(clientId, destinationId, type, keyStorePassword());
-  }
-
-  public void closeConnection() throws IOException {
+  void closeConnection() throws IOException {
     input.close();
     output.close();
     sslSocket.close();
     sslSocket = null;
   }
 
-  public void startConnection() throws IOException {
+  void startConnection() throws IOException {
     // check if previous connection was still on
     if (sslSocket != null) {
       input.close();
@@ -255,64 +240,100 @@ final class ClientProperties {
   void loadServerParams(ServerParameterMap map) throws GeneralSecurityException {
 
     // Load all the parameters and assign them
-    dhAlg = map.getParameter(ServerParameter.DH_ALG);
-    dhHashAlg = map.getParameter(ServerParameter.DH_HASH_ALG);
-    dhP = new BigInteger(map.getParameter(ServerParameter.DH_P));
-    dhG = new BigInteger(map.getParameter(ServerParameter.DH_G));
-    dhKeySize = Integer.parseInt(map.getParameter(ServerParameter.DH_KEYSIZE));
+    // Server params
+    String dhAlg = map.getParameter(ServerParameter.DH_ALG);
+    String dhHashAlg = map.getParameter(ServerParameter.DH_HASH_ALG);
+    BigInteger dhP = new BigInteger(map.getParameter(ServerParameter.DH_P));
+    BigInteger dhG = new BigInteger(map.getParameter(ServerParameter.DH_G));
+    int dhKeySize = Integer.parseInt(map.getParameter(ServerParameter.DH_KEYSIZE));
 
-    pubKeyAlg = map.getParameter(ServerParameter.PUB_KEY_ALG);
-    certSignAlg = map.getParameter(ServerParameter.CERT_SIG_ALG);
+    String pubKeyAlg = map.getParameter(ServerParameter.PUB_KEY_ALG);
+    String certSignAlg = map.getParameter(ServerParameter.CERT_SIG_ALG);
 
     // Create helpers from received params
     aeaHelper = new AEAHelper(pubKeyAlg, certSignAlg);
     dhHelper = new ClientDHHelper(dhAlg, dhHashAlg, dhKeySize, dhP, dhG);
   }
 
-  Pair<Key, Key> getSharedKeys(int destinationId) throws PropertyException, UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException, IOException, CertificateException, InvalidKeyException, InvalidAlgorithmParameterException, NoSuchPaddingException, BadPaddingException, InvalidKeySpecException, IllegalBlockSizeException, ClassNotFoundException, NoSuchProviderException {
+  Pair<Key, Key> getSharedKeys(int destinationId) throws PropertyException, NoSuchAlgorithmException, ClientException {
     // Get shared keys
-    Key sharedSeaKey = ksHelper.getSharedKey(session.getId(), destinationId, DHKeyType.SEA, keyStorePassword());
-    Key sharedMacKey = ksHelper.getSharedKey(session.getId(), destinationId, DHKeyType.MAC, keyStorePassword());
+    try {
+      Key sharedSeaKey = ksHelper.getSharedKey(session.getId(), destinationId, DHKeyType.SEA, keyStorePassword());
+      Key sharedMacKey = ksHelper.getSharedKey(session.getId(), destinationId, DHKeyType.MAC, keyStorePassword());
 
-    // If shared keys don't exist, generate them
-    if (sharedSeaKey == null || sharedMacKey == null) {
-      generateDHSharedKeys(destinationId);
+      // If shared keys don't exist, generate them
+      if (sharedSeaKey == null || sharedMacKey == null) {
+        generateDHSharedKeys(destinationId);
 
-      // Get them again
-      sharedSeaKey = ksHelper.getSharedKey(session.getId(), destinationId, DHKeyType.SEA, keyStorePassword());
-      sharedMacKey = ksHelper.getSharedKey(session.getId(), destinationId, DHKeyType.MAC, keyStorePassword());
+        // Get them again
+        sharedSeaKey = ksHelper.getSharedKey(session.getId(), destinationId, DHKeyType.SEA, keyStorePassword());
+        sharedMacKey = ksHelper.getSharedKey(session.getId(), destinationId, DHKeyType.MAC, keyStorePassword());
+      }
+
+      return new Pair<>(sharedSeaKey, sharedMacKey);
+    } catch (UnrecoverableKeyException | KeyStoreException e) {
+      throw new ClientException("Failed to get shared keys from keystore");
     }
-
-    return new Pair<>(sharedSeaKey, sharedMacKey);
   }
 
   /*
     Utils
   */
-
-  // TODO Catch some easy to understand exceptions all around... throwing 300 types isnt good
-  private void generateDHSharedKeys(int destinationId) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, KeyStoreException, IOException, CertificateException, IllegalBlockSizeException, ClassNotFoundException, InvalidAlgorithmParameterException, BadPaddingException, PropertyException, NoSuchProviderException {
-    // Get destination user's public keys
+  private void generateDHSharedKeys(int destinationId) throws PropertyException, ClientException {
     UserCacheEntry destinationUser = cache.getUser(destinationId);
-    PublicKey destinationDHPubSeaKey = dhHelper.generatePublicKey(new X509EncodedKeySpec(destinationUser.getDhSeaPubKey()));
-    PublicKey destinationDHPubMacKey = dhHelper.generatePublicKey(new X509EncodedKeySpec(destinationUser.getDhMacPubKey()));
+
+    // Get destination user's public keys
+    PublicKey destinationDHPubSeaKey;
+    PublicKey destinationDHPubMacKey;
+    try {
+      destinationDHPubSeaKey = dhHelper.generatePublicKey(new X509EncodedKeySpec(destinationUser.getDhSeaPubKey()));
+      destinationDHPubMacKey = dhHelper.generatePublicKey(new X509EncodedKeySpec(destinationUser.getDhMacPubKey()));
+    } catch (InvalidKeySpecException e) {
+      throw new ClientException("Destination user's public keys are corrupted.");
+    }
 
     // Get sessions private keys and generate the shared dh key
-    PrivateKey sessionPrivSeaDHKey = ksHelper.loadDHKeyPair(session.getUUID(), DHKeyType.SEA).getPrivate();
-    PrivateKey sessionPrivMacDHKey = ksHelper.loadDHKeyPair(session.getUUID(), DHKeyType.MAC).getPrivate();
+    PrivateKey sessionPrivSeaDHKey;
+    PrivateKey sessionPrivMacDHKey;
+    try {
+      sessionPrivSeaDHKey = ksHelper.loadDHKeyPair(session.getUUID(), DHKeyType.SEA).getPrivate();
+      sessionPrivMacDHKey = ksHelper.loadDHKeyPair(session.getUUID(), DHKeyType.MAC).getPrivate();
+    } catch (ClassNotFoundException e) {
+      throw new ClientException("Failed to read dh key data from file.");
+    } catch (IllegalBlockSizeException | InvalidAlgorithmParameterException | BadPaddingException | IOException | InvalidKeyException e) {
+      throw new ClientException("DH key file is corrupted.");
+    }
 
-    int seaKeySize = session.seaHelper.getMaxKeySize();
-    int macKeySize = session.macHelper.getMaxKeySize();
+    // Calculate max key size, but limiting to 512bits
+    int seaKeySize;
+    int macKeySize;
+    try {
+      seaKeySize = Math.min(session.seaHelper.getMaxKeySize(), 64);
+      macKeySize = Math.min(session.macHelper.getMaxKeySize(), 64);
+    } catch (NoSuchAlgorithmException | NoSuchProviderException | NoSuchPaddingException e) {
+      throw new ClientException("User shared key algorithms are invalid.");
+    }
 
-    byte[] sharedSeaKey = dhHelper.genSharedKey(sessionPrivSeaDHKey, destinationDHPubSeaKey, seaKeySize);
-    byte[] sharedMacKey = dhHelper.genSharedKey(sessionPrivMacDHKey, destinationDHPubMacKey, macKeySize);
+    // Generate the shared keys by phasing dh keys
+    byte[] sharedSeaKey;
+    byte[] sharedMacKey;
+    try {
+      sharedSeaKey = dhHelper.genSharedKey(sessionPrivSeaDHKey, destinationDHPubSeaKey, seaKeySize);
+      sharedMacKey = dhHelper.genSharedKey(sessionPrivMacDHKey, destinationDHPubMacKey, macKeySize);
+    } catch (InvalidKeyException e) {
+      throw new ClientException("Failed to generate shared keys.");
+    }
 
     // Generate secret keys from bytes
     SecretKey sharedSeaKeySpec = session.seaHelper.getKeyFromBytes(sharedSeaKey);
     SecretKey sharedMacKeySpec = session.macHelper.getKeyFromBytes(sharedMacKey);
 
     // Save the generated keys
-    ksHelper.saveSharedKey(session.getId(), destinationId, DHKeyType.SEA, sharedSeaKeySpec, keyStorePassword());
-    ksHelper.saveSharedKey(session.getId(), destinationId, DHKeyType.MAC, sharedMacKeySpec, keyStorePassword());
+    try {
+      ksHelper.saveSharedKey(session.getId(), destinationId, DHKeyType.SEA, sharedSeaKeySpec, keyStorePassword());
+      ksHelper.saveSharedKey(session.getId(), destinationId, DHKeyType.MAC, sharedMacKeySpec, keyStorePassword());
+    } catch (IOException | KeyStoreException | NoSuchAlgorithmException | CertificateException e) {
+      throw new ClientException("Failed to save generated shared keys.");
+    }
   }
 }
