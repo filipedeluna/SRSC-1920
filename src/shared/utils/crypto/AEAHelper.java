@@ -125,25 +125,6 @@ public final class AEAHelper {
     return (X509Certificate) certFactory.generateCertificate(new FileInputStream(file));
   }
 
-  public X509Certificate signCert(X509Certificate cert, X509Certificate issuerCert, PrivateKey issuerPrivateKey, int validityDays) throws CertificateException, InvalidCertificateInfoException, NoSuchProviderException, NoSuchAlgorithmException, InvalidKeyException, SignatureException {
-    byte[] inCertBytes = cert.getTBSCertificate();
-    X509CertInfo info = new X509CertInfo(inCertBytes);
-
-    long now = System.currentTimeMillis();
-
-    try {
-      info.set("validity", new CertificateValidity(new Date(now), new Date(now + ONE_DAY * validityDays)));
-      info.set(X509CertInfo.ISSUER, issuerCert.getSubjectDN());
-    } catch (IOException | CertificateException e) {
-      throw new InvalidCertificateInfoException();
-    }
-
-    X509CertImpl outCert = new X509CertImpl(info);
-    outCert.sign(issuerPrivateKey, issuerCert.getSigAlgName());
-
-    return outCert;
-  }
-
   public PKCS10CertificationRequest csrFromBytes(byte[] csrBytes) throws IOException {
     return new PKCS10CertificationRequest(csrBytes);
   }

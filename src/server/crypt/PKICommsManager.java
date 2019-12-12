@@ -12,8 +12,8 @@ import shared.errors.request.InvalidFormatException;
 import shared.errors.request.RequestException;
 import shared.http.HTTPStatus;
 import shared.utils.GsonUtils;
-import shared.utils.crypto.AEAHelper;
 import shared.utils.crypto.B64Helper;
+import shared.utils.crypto.util.CertificateEntry;
 import shared.utils.properties.CustomProperties;
 
 import javax.net.SocketFactory;
@@ -24,6 +24,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.logging.Level;
@@ -31,7 +34,7 @@ import java.util.logging.Logger;
 
 public final class PKICommsManager {
   private static final int ONE_SECOND = 1000;
-  private static final int ONE_MINUTE = 60 * ONE_SECOND;
+  private static final int ONE_HOUR = 60 * 60 * ONE_SECOND;
 
   private final Logger logger;
   private boolean debug;
@@ -46,17 +49,16 @@ public final class PKICommsManager {
   private String pkiServerAddress;
   private int pkiServerPort;
   private int pkiTimeout;
-
   private int pkiCheckValidity;
 
-  private final HashMap<String, Long> checkedClients;
+  private HashMap<String, CertificateEntry> certCache;
 
-  public PKICommsManager(CustomProperties properties, SSLContext sslContext, AEAHelper aeaHelper, Logger logger) throws PropertyException {
+  public PKICommsManager(CustomProperties properties, SSLContext sslContext, Logger logger) throws PropertyException {
     this.logger = logger;
     this.b64Helper = new B64Helper();
     this.gson = GsonUtils.buildGsonInstance();
 
-    checkedClients = new HashMap<>();
+    certCache = new HashMap<>();
     debug = properties.getBool(ServerProperty.DEBUG);
 
     // Get socket config
@@ -67,8 +69,8 @@ public final class PKICommsManager {
     // Get PKI parameters
     pkiServerAddress = properties.getString(ServerProperty.PKI_SERVER_ADDRESS);
     pkiServerPort = properties.getInt(ServerProperty.PKI_SERVER_PORT);
-    pkiCheckValidity = properties.getInt(ServerProperty.PKI_CHECK_VALIDITY) * ONE_MINUTE;
     pkiTimeout = properties.getInt(ServerProperty.PKI_TIMEOUT) * ONE_SECOND;
+    pkiCheckValidity = properties.getInt(ServerProperty.PKI_CHECK_VALIDITY) * ONE_HOUR;
   }
 
   public SSLSocket getSocket() throws IOException {
@@ -82,19 +84,47 @@ public final class PKICommsManager {
     return sslSocket;
   }
 
-  public void checkClientCertificateRevoked(X509Certificate clientCert, SSLSocket socket) throws GeneralSecurityException, CustomRequestException {
-    // No need to check if in cache and valid
-    if (certInCache(clientCert))
-      return;
-
-    // Get cert encode and send request
-    byte[] certBytes = clientCert.getEncoded();
-    String certEncoded = b64Helper.encode(certBytes);
+  public void checkClientCertificateRevoked(X509Certificate clientCert, SSLSocket socket) throws CustomRequestException, IOException {
+    // Get cert sn to verify if it is in cache
     String certSN = clientCert.getSerialNumber().toString();
 
-    ValidateCertificateRequest request = new ValidateCertificateRequest(certEncoded);
-
     try {
+      // Certificate found in cache
+      if (certCache.containsKey(certSN)) {
+        CertificateEntry certificate = certCache.get(certSN);
+
+        // Check if certificate validity is over
+        try {
+          certificate.getCertificate().checkValidity();
+        } catch (CertificateNotYetValidException | CertificateExpiredException e) {
+          throw new CustomRequestException("Certificate has expired.", HTTPStatus.UNAUTHORIZED);
+        }
+
+        // Check if certificate cache validity expired
+        if (certificate.stillValid(pkiCheckValidity)) {
+          // Certificate is valid
+          logger.log(Level.WARNING, "Certificate successfully validated - " + certSN);
+          return;
+        }
+
+        // Certificate is not valid, remove from cache and got ot PKI to get it
+        logger.log(Level.WARNING, "Certificate cache validity expired - " + certSN);
+        certCache.remove(certSN);
+      }
+
+      // Certificate not in cache, get it from the PKI
+      byte[] certBytes;
+      try {
+        certBytes = clientCert.getEncoded();
+      } catch (CertificateEncodingException e) {
+        throw new CustomRequestException("Certificate is not valid due to corrupted encoding.", HTTPStatus.UNAUTHORIZED);
+      }
+
+      String certEncoded = b64Helper.encode(certBytes);
+
+      // Build request to validate certificate and send it
+      ValidateCertificateRequest request = new ValidateCertificateRequest(certEncoded);
+
       OutputStream output = socket.getOutputStream();
       JsonReader input = new JsonReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
 
@@ -105,52 +135,26 @@ public final class PKICommsManager {
       JsonElement data = new JsonParser().parse(input);
 
       if (!data.isJsonObject())
-        throw new InvalidFormatException();
+        throw new CustomRequestException("Failed to verify Certificate due to PKI response corruption.", HTTPStatus.UNAUTHORIZED);
 
       // Verify validity in response object
       boolean valid = GsonUtils.getBool(data.getAsJsonObject(), "valid");
 
-      if (!valid) {
-        logger.log(Level.WARNING, "Refused certificate " + certSN);
-        throw new CustomRequestException("Certificate is not valid - Revoked or never emitted.", HTTPStatus.UNAUTHORIZED);
-      }
+      if (!valid)
+        throw new CustomRequestException("Certificate revoked or never emitted.", HTTPStatus.UNAUTHORIZED);
 
-      // Add to cache if valid
-      updateCacheEntry(certSN);
-    } catch (IOException | RequestException e) {
+      // Certificate is valid, insert in cache
+      certCache.put(certSN, new CertificateEntry(clientCert));
+      logger.log(Level.WARNING, "Certificate successfully validated - " + certSN);
+
+    } catch (RequestException e) {
+      logger.log(Level.WARNING, "Failed to validate certificate " + certSN + ": " + e.getMessage());
+
       if (debug)
         e.printStackTrace();
 
-      logger.log(Level.WARNING, "Failed to verify certificate " + certSN + ": " + e.getMessage());
-
-      throw new CustomRequestException("Failed to verify Certificate.", HTTPStatus.UNAUTHORIZED);
+      if (e instanceof CustomRequestException)
+        throw (CustomRequestException) e;
     }
-  }
-
-  private synchronized void updateCacheEntry(String certSN) {
-    checkedClients.remove(certSN);
-
-    checkedClients.put(certSN, System.currentTimeMillis());
-    logger.log(Level.WARNING, "Validated certificate: " + certSN);
-  }
-
-  private synchronized boolean certInCache(X509Certificate certificate) {
-    // Get SN
-    String certSN = certificate.getSerialNumber().toString();
-
-    // Check if it is in cache
-    if (!checkedClients.containsKey(certSN))
-      return false;
-
-    long now = System.currentTimeMillis();
-
-    // Check if still valid
-    if (checkedClients.get(certSN) + pkiCheckValidity < now) {
-      // Remove old validity first
-      checkedClients.remove(certSN);
-      return false;
-    }
-
-    return true;
   }
 }

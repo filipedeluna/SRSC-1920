@@ -70,7 +70,7 @@ final class ServerProperties {
     // Configure PKI Comms manager if pki enabled
     PKI_ENABLED = properties.getBool(ServerProperty.USE_PKI);
     if (PKI_ENABLED)
-      PKI_COMMS_MGR = new PKICommsManager(properties, sslContext, aeaHelper, logger);
+      PKI_COMMS_MGR = new PKICommsManager(properties, sslContext, logger);
   }
 
   private PrivateKey privateKey() throws GeneralSecurityException {
