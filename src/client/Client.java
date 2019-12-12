@@ -538,6 +538,18 @@ class Client {
 
     SendMessageResponse resp = cProps.receiveRequestWithNonce(requestData, SendMessageResponse.class);
 
+    // Add message to cache
+    cProps.cache.addMessage(
+        resp.getMessageId(),
+        new MessageCacheEntry(
+            cProps.session.getId(),
+            encryptedMessageBytes,
+            encryptedFileSpecBytes,
+            encryptedFilesBytes,
+            cipherIVBytes
+        )
+    );
+
     System.out.println("Successfully sent message to user " + destinationId + " with id " + resp.getMessageId());
   }
 
@@ -552,6 +564,7 @@ class Client {
 
     int senderId;
     Message message = null;
+
     if (messageCacheEntry == null) {
       // Get message object from the server response
       requestData.addProperty("messageId", messageId);
