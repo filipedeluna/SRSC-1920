@@ -630,8 +630,16 @@ class Client {
       iv = messageCacheEntry.getCipherIV();
     }
 
+    if (encryptedFileSpec.length != 0 && encryptedFiles.length == 0)
+      throw new ClientException("Message file spec is corrupted");
+
+    if (encryptedFileSpec.length == 0 && encryptedFiles.length != 0)
+      throw new ClientException("Message files are corrupted");
+
+    int ivSize = encryptedFiles.length > 0 ? 3 : 1;
+
     // Decrypt message parts
-    if (seaHelper.cipherModeUsesIV() && iv.length != 3 * seaHelper.ivSize())
+    if (seaHelper.cipherModeUsesIV() && iv.length != ivSize * seaHelper.ivSize())
       throw new ClientException("Message iv is corrupted");
 
     String text;
