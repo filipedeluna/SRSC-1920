@@ -131,7 +131,7 @@ public final class PKICommsManager {
     checkedClients.remove(certSN);
 
     checkedClients.put(certSN, System.currentTimeMillis());
-    logger.log(Level.FINE, "Validated certificate: " + certSN);
+    logger.log(Level.WARNING, "Validated certificate: " + certSN);
   }
 
   private synchronized boolean certInCache(X509Certificate certificate) {

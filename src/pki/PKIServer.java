@@ -33,6 +33,7 @@ final class PKIServer {
       // Create Logger and add a file handler to defined file
       String logFile = props.getString(PKIProperty.LOG_LOC);
       logger = Logger.getLogger("PKI Logger");
+      logger.setLevel(Level.ALL);
       logger.addHandler(new FileHandler(logFile, true));
 
       debugMode = props.getBool(PKIProperty.DEBUG);

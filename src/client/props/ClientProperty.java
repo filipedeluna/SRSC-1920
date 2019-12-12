@@ -35,8 +35,7 @@ public enum ClientProperty implements ICustomProperty {
   USE_PKI("use_pki", CustomPropertyType.BOOL),
   PKI_CERT_ALG("pki_cert_sign_alg", CustomPropertyType.STRING),
   PKI_PUBKEY_SIZE("pki_pubkey_size", CustomPropertyType.INT),
-  PKI_KEY_ALG("pki_pubkey_algorithm", CustomPropertyType.STRING),
-  NEW_KEY_NAME("new_key_name", CustomPropertyType.STRING);
+  PKI_KEY_ALG("pki_pubkey_algorithm", CustomPropertyType.STRING);
 
   /////////////////////////////////////////////////
 

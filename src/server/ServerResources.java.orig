@@ -86,7 +86,7 @@ final class ServerResources implements Runnable {
       // Log client request without any specific info.
       // Certificates emitted by CA should have unique serial numbers
       // This way, we can identify the principal if a DOS or other similar attack occurs
-      props.logger.log(Level.FINE, "Request: " + requestName + " made by " + clientCert.getSerialNumber() + ".");
+      props.logger.log(Level.WARNING, "Request: " + requestName + " made by " + clientCert.getSerialNumber() + ".");
 
       switch (request) {
         case CREATE:
@@ -490,7 +490,7 @@ final class ServerResources implements Runnable {
       // Log client request without any specific info.
       // Certificates emitted by CA should have unique serial numbers
       // This way, we can identify the principal if a DOS or other similar attack occurs
-      props.logger.log(Level.FINE, "Request: " + requestName + " made by " + clientCert.getSerialNumber() + ".");
+      props.logger.log(Level.WARNING, "Request: " + requestName + " made by " + clientCert.getSerialNumber() + ".");
 
       switch (request) {
         case CREATE:

@@ -910,7 +910,7 @@ class Client {
 
     KeyStore.PrivateKeyEntry keyEntry = new KeyStore.PrivateKeyEntry(keyPair.getPrivate(), chain);
     KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection("123asd".toCharArray());
-    String keyName = props.getString(ClientProperty.NEW_KEY_NAME);
+    String keyName = props.getString(ClientProperty.PUB_KEY_NAME);
 
     keyStore.deleteEntry(keyName);
     keyStore.setEntry(keyName, keyEntry, protectionParam);

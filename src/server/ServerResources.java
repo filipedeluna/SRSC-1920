@@ -2,6 +2,7 @@ package server;
 
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
+import shared.errors.ClientDisconnectedException;
 import shared.wrappers.Message;
 import shared.wrappers.Receipt;
 import shared.parameters.ServerParameterMap;
@@ -18,6 +19,7 @@ import shared.utils.GsonUtils;
 import shared.utils.SafeInputStreamReader;
 
 import javax.net.ssl.SSLSocket;
+import java.net.SocketException;
 import java.security.cert.X509Certificate;
 import java.security.*;
 import java.io.IOException;
@@ -68,7 +70,6 @@ final class ServerResources implements Runnable {
       client.close();
     } catch (Exception e) {
       handleException(e);
-      Thread.currentThread().interrupt();
     }
   }
 
@@ -89,7 +90,7 @@ final class ServerResources implements Runnable {
       // Log client request without any specific info.
       // Certificates emitted by CA should have unique serial numbers
       // This way, we can identify the principal if a DOS or other similar attack occurs
-      props.logger.log(Level.FINE, "Request: " + requestName + " made by " + clientCert.getSerialNumber() + ".");
+      props.logger.log(Level.WARNING, "Request: " + requestName + " made by " + clientCert.getSerialNumber() + ".");
 
       switch (request) {
         case CREATE:
@@ -344,8 +345,11 @@ final class ServerResources implements Runnable {
   /*
     UTILS
   */
-  private JsonObject parseRequest(JsonReader reader) throws InvalidFormatException {
+  private JsonObject parseRequest(JsonReader reader) throws InvalidFormatException, ClientDisconnectedException {
     JsonElement data = new JsonParser().parse(reader);
+
+    if (data instanceof JsonNull)
+      throw new ClientDisconnectedException();
 
     if (!data.isJsonObject())
       throw new InvalidFormatException();
@@ -355,6 +359,11 @@ final class ServerResources implements Runnable {
 
   private void handleException(Exception exception) {
     ErrorResponse response;
+
+    if (exception instanceof ClientDisconnectedException) {
+      props.logger.log(Level.WARNING, exception.getMessage());
+      return;
+    }
 
     if (exception instanceof IHTTPStatusException) {
       HTTPStatus status = ((IHTTPStatusException) exception).status();
@@ -375,19 +384,19 @@ final class ServerResources implements Runnable {
     try {
       send(response);
     } catch (IOException e) {
-      System.err.println("Failed to send error response to client");
+      if (e instanceof SocketException) {
+        System.err.println("Failed to send error response to client");
 
-      if (props.DEBUG_MODE)
-        e.printStackTrace();
+        if (props.DEBUG_MODE)
+          e.printStackTrace();
 
-      props.logger.log(Level.SEVERE, exception.getMessage());
+        props.logger.log(Level.SEVERE, exception.getMessage());
+      }
     }
 
     try {
       client.close();
-      Thread.currentThread().interrupt();
-    }
-    catch (Exception e) {
+    } catch (Exception e) {
       // Can't do anyting
     }
   }

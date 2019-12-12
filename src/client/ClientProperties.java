@@ -112,7 +112,7 @@ final class ClientProperties {
     KEYSTORE_LOC = props.getString(ClientProperty.KEYSTORE_LOC);
 
     // Can't get a public key if we haven't generated one yet
-    if (props.getBool(ClientProperty.USE_PKI)) {
+    if (!props.getBool(ClientProperty.USE_PKI)) {
       clientPublicKeyName = props.getString(ClientProperty.PUB_KEY_NAME);
       clientPublicKey = ksHelper.getPublicKey(props.getString(ClientProperty.PUB_KEY_NAME));
     }

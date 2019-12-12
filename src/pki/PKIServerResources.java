@@ -139,7 +139,7 @@ final class PKIServerResources implements Runnable {
     // Create payload and send response
     send(new SignResponse(signedCertEncoded));
 
-    props.logger.log(Level.FINE, "Certificate emitted with SN " + serialNumber);
+    props.logger.log(Level.WARNING, "Certificate emitted with SN " + serialNumber);
   }
 
   // Is Revoked
@@ -168,11 +168,11 @@ final class PKIServerResources implements Runnable {
 
       send(new ValidateResponse(valid));
 
-      props.logger.log(Level.FINE, "Certificate " + certSN + " validated");
+      props.logger.log(Level.WARNING, "Certificate " + certSN + " validated");
     } catch (CertificateException | SignatureException e) {
       // Cert does not belong to CA
       send(new ValidateResponse(false));
-      props.logger.log(Level.FINE, "Certificate " + certSN + " not validated");
+      props.logger.log(Level.WARNING, "Certificate " + certSN + " not validated");
     }
   }
 
@@ -191,14 +191,14 @@ final class PKIServerResources implements Runnable {
 
     try {
       props.DB.revoke(serialNumber);
-      props.logger.log(Level.FINE, "Certificate " + serialNumber + " revoked");
+      props.logger.log(Level.WARNING, "Certificate " + serialNumber + " revoked");
     } catch (DatabaseException e) {
       throw new CustomRequestException("Certificate not found.", HTTPStatus.NOT_FOUND);
     }
 
     send(new OKResponse());
 
-    props.logger.log(Level.FINE, "Certificate revoked with SN " + serialNumber);
+    props.logger.log(Level.WARNING, "Certificate revoked with SN " + serialNumber);
   }
 
   /*

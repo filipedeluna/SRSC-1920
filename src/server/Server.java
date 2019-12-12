@@ -34,6 +34,7 @@ final class Server {
       // Create Logger and add a file handler to defined file
       String logFile = properties.getString(ServerProperty.LOG_LOC);
       logger = Logger.getLogger("Server Logger");
+      logger.setLevel(Level.ALL);
       logger.addHandler(new FileHandler(logFile, true));
 
       debugMode = properties.getBool(ServerProperty.DEBUG);
