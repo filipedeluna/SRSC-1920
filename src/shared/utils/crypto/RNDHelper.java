@@ -44,8 +44,6 @@ public final class RNDHelper {
   }
 
   public byte[] getBytes(int size, boolean strong) {
-    checkUses(strong);
-
     byte[] randomBytes = new byte[size];
     chooseRandom(strong).nextBytes(randomBytes);
 
@@ -53,20 +51,14 @@ public final class RNDHelper {
   }
 
   public int getInt(boolean strong) {
-    checkUses(strong);
-
     return chooseRandom(strong).nextInt();
   }
 
   public float getFloat(boolean strong) {
-    checkUses(strong);
-
     return chooseRandom(strong).nextFloat();
   }
 
   public long getLong(boolean strong) {
-    checkUses(strong);
-
     return chooseRandom(strong).nextLong();
   }
 
@@ -75,6 +67,8 @@ public final class RNDHelper {
       strongUses++;
     else
       weakUses++;
+
+    checkUses();
 
     return strong ? strongRandom : weakRandom;
   }
@@ -86,7 +80,7 @@ public final class RNDHelper {
   // seedings virtually useless. But with a SHA instance,
   // it can be quite useful. The implementation will be left
   // for educational and testing purposes.
-  private void checkUses(boolean strong) {
+  private void checkUses() {
     // Always generate seeds with the strong random
     if (strongUses == MAX_USES) {
       strongRandom.setSeed(strongRandom.generateSeed(SEED_SIZE));

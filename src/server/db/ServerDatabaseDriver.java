@@ -375,8 +375,8 @@ public final class ServerDatabaseDriver {
   public ArrayList<Receipt> getReceipts(int messageId) throws CriticalDatabaseException {
     try {
       String insertQuery =
-          "SELECT r.message_id AS message_id, m.sender_id AS sender_id, r.date AS date, r.receiver_signature AS receiver_signature " +
-              "FROM receipts r JOIN messages m ON r.message_id = m.message_id WHERE message_id = ?;";
+          "SELECT r.message_id AS message_id, m.sender_id AS sender_id, r.date AS mdate, r.receiver_signature AS receiver_signature " +
+              "FROM receipts r JOIN messages m ON r.message_id = m.message_id WHERE m.message_id = ?;";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
       ps.setInt(1, messageId);
@@ -389,7 +389,7 @@ public final class ServerDatabaseDriver {
         receipts.add(new Receipt(
                 rs.getInt("message_id"),
                 rs.getInt("sender_id"),
-                rs.getString("date"),
+                rs.getString("mdate"),
                 rs.getString("receiver_signature")
             )
         );

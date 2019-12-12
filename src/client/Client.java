@@ -630,39 +630,54 @@ class Client {
       iv = messageCacheEntry.getCipherIV();
     }
 
+    // Verify if message has files or file spec to determine integrity and iv size
+    if (encryptedFileSpec.length != 0 && encryptedFiles.length == 0)
+      throw new ClientException("Message files are corrupted");
+
+    if (encryptedFileSpec.length == 0 && encryptedFiles.length != 0)
+      throw new ClientException("Message file spec is corrupted");
+
+    int ivCount = encryptedFiles.length > 0 ? 3 : 1;
+
     // Decrypt message parts
-    if (seaHelper.cipherModeUsesIV() && iv.length != 3 * seaHelper.ivSize())
+    if (seaHelper.cipherModeUsesIV() && iv.length != ivCount * seaHelper.ivSize())
       throw new ClientException("Message iv is corrupted");
 
     String text;
-    String fileSpec;
-    byte[] decryptedFiles;
+    String fileSpec = null;
+    byte[] decryptedFiles = new byte[0];
     try {
       text = decryptMessageText(encryptedText, sharedSeaKey, iv, seaHelper);
-      fileSpec = decryptMessageFileSpec(encryptedFileSpec, sharedSeaKey, iv, seaHelper);
-      decryptedFiles = decryptMessageFiles(encryptedFiles, sharedSeaKey, iv, seaHelper);
+
+      // We can use the IV count to deduce if there are attachments
+      if (ivCount > 1) {
+        fileSpec = decryptMessageFileSpec(encryptedFileSpec, sharedSeaKey, iv, seaHelper);
+        decryptedFiles = decryptMessageFiles(encryptedFiles, sharedSeaKey, iv, seaHelper);
+      }
     } catch (BadPaddingException | IllegalBlockSizeException | InvalidAlgorithmParameterException e) {
       throw new ClientException("Sea key is invalid or corrupted.");
     }
 
     // Parse filespec to start writing files
-    ArrayList<Pair<String, Integer>> fileSpecPairs = cProps.fileHelper.parseFileSpec(fileSpec);
+    if (ivCount > 1) {
+      ArrayList<Pair<String, Integer>> fileSpecPairs = cProps.fileHelper.parseFileSpec(fileSpec);
 
-    byte[] fileBytes;
-    if (!fileSpecPairs.isEmpty() && decryptedFiles.length == 0)
-      throw new ClientException("Message attachments are corrupted.");
+      byte[] fileBytes;
+      if (!fileSpecPairs.isEmpty() && decryptedFiles.length == 0)
+        throw new ClientException("Message attachments are corrupted.");
 
-    // Write decrypted files to system
-    for (Pair<String, Integer> fileSpecPair : fileSpecPairs) {
-      try {
-        fileBytes = Arrays.copyOfRange(decryptedFiles, 0, fileSpecPair.getB());
-        decryptedFiles = Arrays.copyOfRange(decryptedFiles, fileBytes.length, decryptedFiles.length);
+      // Write decrypted files to system
+      for (Pair<String, Integer> fileSpecPair : fileSpecPairs) {
+        try {
+          fileBytes = Arrays.copyOfRange(decryptedFiles, 0, fileSpecPair.getB());
+          decryptedFiles = Arrays.copyOfRange(decryptedFiles, fileBytes.length, decryptedFiles.length);
 
-        cProps.fileHelper.writeFile(fileSpecPair.getA(), fileBytes);
+          cProps.fileHelper.writeFile(fileSpecPair.getA(), fileBytes);
 
-        System.out.println("Wrote file: " + fileSpecPair.getA());
-      } catch (IOException e) {
-        System.err.println("Failed to write file: " + fileSpecPair.getA());
+          System.out.println("Wrote file: " + fileSpecPair.getA());
+        } catch (IOException e) {
+          System.err.println("Failed to write file: " + fileSpecPair.getA());
+        }
       }
     }
 
@@ -693,17 +708,28 @@ class Client {
     String currentDate = getCurrentDate();
 
     // Sign decrypted data with mac and add to request
-    byte[] decryptedContents = Utils.joinByteArrays(
-        text.getBytes(StandardCharsets.UTF_8),
-        fileSpec.getBytes(StandardCharsets.UTF_8),
-        decryptedFiles,
-        currentDate.getBytes(StandardCharsets.UTF_8)
-    );
+    byte[] decryptedContents;
+    if (ivCount > 1) {
+      decryptedContents = Utils.joinByteArrays(
+          text.getBytes(StandardCharsets.UTF_8),
+          fileSpec.getBytes(StandardCharsets.UTF_8),
+          decryptedFiles,
+          currentDate.getBytes(StandardCharsets.UTF_8)
+      );
+    } else {
+      decryptedContents = Utils.joinByteArrays(
+          text.getBytes(StandardCharsets.UTF_8),
+          currentDate.getBytes(StandardCharsets.UTF_8)
+      );
+    }
 
     byte[] signedDecryptedContents = macHelper.macHash(decryptedContents, sharedMacKey);
-    requestData.addProperty("receiverSignature", cProps.b64Helper.encode(signedDecryptedContents));
 
+    // Add signature and date to request header and send the request
+    requestData.addProperty("receiverSignature", cProps.b64Helper.encode(signedDecryptedContents));
     requestData.addProperty("date", currentDate);
+
+    cProps.sendRequest(requestData);
 
     System.out.println("Successfully sent receipt of message with id: " + messageId);
   }
@@ -714,7 +740,7 @@ class Client {
       throw new ClientException("User is not logged in.");
 
     // Send message id to obtain response
-    int messageId = Integer.parseInt(args[0]);
+    int messageId = Integer.parseInt(args[1]);
     requestData.addProperty("messageId", messageId);
     cProps.sendRequest(requestData);
 
@@ -760,30 +786,47 @@ class Client {
         iv
     );
 
-    if (!macHelper.verifyMacHash(contents, signature, sharedMacKey))
+    if (macHelper.verifyMacHash(contents, signature, sharedMacKey))
       throw new ClientException("Message has an invalid signature. It has been tampered with.");
 
+    // Verify if message has files or file spec to determine integrity and iv size
+    if (encryptedFileSpec.length != 0 && encryptedFiles.length == 0)
+      throw new ClientException("Message files are corrupted");
+
+    if (encryptedFileSpec.length == 0 && encryptedFiles.length != 0)
+      throw new ClientException("Message file spec is corrupted");
+
+    int ivCount = encryptedFiles.length > 0 ? 3 : 1;
+
     // Decrypt message parts
-    if (seaHelper.cipherModeUsesIV() && iv.length != 3 * seaHelper.ivSize())
+    if (seaHelper.cipherModeUsesIV() && iv.length != ivCount * seaHelper.ivSize())
       throw new ClientException("Message iv is corrupted");
 
     String text;
-    String fileSpec;
-    byte[] decryptedFiles;
+    String fileSpec = null;
+    byte[] decryptedFiles = new byte[0];
     try {
       text = decryptMessageText(encryptedText, sharedSeaKey, iv, seaHelper);
-      fileSpec = decryptMessageFileSpec(encryptedFileSpec, sharedSeaKey, iv, seaHelper);
-      decryptedFiles = decryptMessageFiles(encryptedFiles, sharedSeaKey, iv, seaHelper);
+
+      if (ivCount > 1) {
+        fileSpec = decryptMessageFileSpec(encryptedFileSpec, sharedSeaKey, iv, seaHelper);
+        decryptedFiles = decryptMessageFiles(encryptedFiles, sharedSeaKey, iv, seaHelper);
+      }
     } catch (BadPaddingException | IllegalBlockSizeException | InvalidAlgorithmParameterException e) {
       throw new ClientException("Sea key is invalid or corrupted.");
     }
 
     // Get decryptedData macHash
-    byte[] decryptedContents = Utils.joinByteArrays(
-        text.getBytes(StandardCharsets.UTF_8),
-        fileSpec.getBytes(StandardCharsets.UTF_8),
-        decryptedFiles
-    );
+    byte[] decryptedContents;
+
+    if (ivCount > 1) {
+      decryptedContents = Utils.joinByteArrays(
+          text.getBytes(StandardCharsets.UTF_8),
+          fileSpec.getBytes(StandardCharsets.UTF_8),
+          decryptedFiles
+      );
+    } else
+      decryptedContents = text.getBytes();
 
     // Check receipt validity 1 by 1
     int counterValid = 0;
@@ -940,6 +983,9 @@ class Client {
     JsonObject requestDataToGetUser = new JsonObject();
     requestDataToGetUser.addProperty("type", "list");
     requestDataToGetUser.addProperty("nonce", cProps.rndHelper.getNonce());
+
+    // Restart socket connection
+    cProps.startConnection();
 
     // Create "fake" args and do request, user will be added to cache
     String[] fakeArgs = new String[]{"", String.valueOf(userId)};
