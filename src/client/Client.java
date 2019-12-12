@@ -18,6 +18,7 @@ import shared.utils.Utils;
 import shared.utils.crypto.*;
 import shared.utils.crypto.util.DHKeyType;
 import shared.utils.properties.CustomProperties;
+import shared.utils.properties.CustomPropertyType;
 import shared.wrappers.Message;
 import shared.wrappers.Receipt;
 import shared.wrappers.User;
@@ -48,8 +49,10 @@ class Client {
 
     // Get properties from file
     CustomProperties properties = null;
+    boolean debug = false;
     try {
       properties = new CustomProperties(PROPS_PATH);
+      debug = properties.getBool(ClientProperty.DEBUG);
     } catch (PropertyException e) {
       System.err.println(e.getMessage());
       System.exit(-1);
@@ -149,14 +152,16 @@ class Client {
           cProps.closeConnection();
         } catch (ClientException e) {
           System.err.println(e.getMessage());
-          e.printStackTrace();
+          if (debug)
+            e.printStackTrace();
         } catch (ClassCastException e) {
           System.err.println("Received an invalid format message.");
         }
       }
     } catch (Exception e) {
       System.err.println("CRITICAL ERROR: " + e.getMessage());
-      e.printStackTrace();
+      if (debug)
+        e.printStackTrace();
       System.exit(-1);
     }
   }
@@ -510,7 +515,6 @@ class Client {
       requestData.addProperty("attachments", cProps.b64Helper.encode(encryptedFilesBytes));
     } else
       requestData.addProperty("attachments", "");
-
 
     // Add Cipher IVs to request
     if (cipherIVBytes.length != 0)

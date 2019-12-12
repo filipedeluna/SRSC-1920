@@ -124,7 +124,7 @@ final class ServerResources implements Runnable {
           params(nonce);
           break;
       }
-    } catch (ClassCastException | IllegalStateException | EntryNotFoundException e) {
+    } catch (ClassCastException | IllegalStateException e) {
       throw new InvalidRouteException();
     }
   }
@@ -169,7 +169,7 @@ final class ServerResources implements Runnable {
   }
 
   // List users details
-  private void listUsers(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException, EntryNotFoundException {
+  private void listUsers(JsonObject requestData, String nonce) throws RequestException, IOException, CriticalDatabaseException {
     // Get intended user id or none if supposed to get all users
     int userId;
 
@@ -182,12 +182,15 @@ final class ServerResources implements Runnable {
 
     ArrayList<User> users = new ArrayList<>();
 
-    // Detect if supposed to get 1 or multiple users
-    if (userId >= 0)
-      users.add(props.DB.getUserById(userId));
-    else
-      users = props.DB.getAllUsers();
-
+    try {
+      // Detect if supposed to get 1 or multiple users
+      if (userId >= 0)
+        users.add(props.DB.getUserById(userId));
+      else
+        users = props.DB.getAllUsers();
+    } catch (EntryNotFoundException e) {
+      throw new CustomRequestException("User not found", HTTPStatus.NOT_FOUND);
+    }
     // Send user list
     send(new ListUsersResponse(nonce, users));
   }

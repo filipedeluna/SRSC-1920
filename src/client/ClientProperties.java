@@ -76,6 +76,7 @@ final class ClientProperties {
   private String[] tlsCiphersuites;
   private SSLSocket sslSocket;
   private int bufferSize;
+  private int socketTimeout;
 
   // PKI
   private final String pkiAddress;
@@ -93,6 +94,7 @@ final class ClientProperties {
     tlsProtocols = props.getStringArr(ClientProperty.TLS_PROTOCOLS);
     tlsCiphersuites = props.getStringArr(ClientProperty.TLS_CIPHERSUITES);
     bufferSize = props.getInt(ClientProperty.BUFFER_SIZE_MB);
+    socketTimeout = props.getInt(ClientProperty.SOCKET_TIMEOUT);
 
     // Set up file helper
     fileHelper = new FileHelper(props.getString(ClientProperty.OUTPUT_FOLDER));
@@ -238,7 +240,7 @@ final class ClientProperties {
     else
       sslSocket = (SSLSocket) sslSocketFactory.createSocket(serverAddress, serverPort);
 
-    sslSocket.setSoTimeout(10 * 1000); // 10 seconds
+    sslSocket.setSoTimeout(socketTimeout * 1000);
 
     // Set enabled protocols and cipher suites and start SSL socket handshake with server
     sslSocket.setEnabledProtocols(tlsProtocols);

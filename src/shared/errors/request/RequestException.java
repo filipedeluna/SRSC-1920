@@ -7,7 +7,7 @@ public abstract class RequestException extends Exception implements IHTTPStatusE
   private final HTTPStatus status;
 
   RequestException(String s, HTTPStatus status) {
-    super("Request Exception: " + s + ".");
+    super(s);
 
     this.status = status;
   }

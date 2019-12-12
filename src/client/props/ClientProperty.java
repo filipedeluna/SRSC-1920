@@ -9,8 +9,10 @@ public enum ClientProperty implements ICustomProperty {
   // System
   OUTPUT_FOLDER("output_folder", CustomPropertyType.STRING),
   CACHE_SIZE("cache_size", CustomPropertyType.INT),
+  DEBUG("debug", CustomPropertyType.BOOL),
 
   // Network
+  SOCKET_TIMEOUT("socket_timeout", CustomPropertyType.INT),
   PKI_ADDRESS("pki_address", CustomPropertyType.STRING),
   PKI_PORT("pki_port", CustomPropertyType.INT),
   SERVER_ADDRESS("server_address", CustomPropertyType.STRING),
@@ -33,7 +35,7 @@ public enum ClientProperty implements ICustomProperty {
 
   // PKI
   USE_PKI("use_pki", CustomPropertyType.BOOL),
-  PKI_TOKEN("123asd", CustomPropertyType.STRING),
+  PKI_TOKEN("pki_token", CustomPropertyType.STRING),
   PKI_CERT_ALG("pki_cert_sign_alg", CustomPropertyType.STRING),
   PKI_PUBKEY_SIZE("pki_pubkey_size", CustomPropertyType.INT),
   PKI_KEY_ALG("pki_pubkey_algorithm", CustomPropertyType.STRING);
