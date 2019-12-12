@@ -28,11 +28,13 @@ import shared.utils.properties.CustomProperties;
 import javax.crypto.*;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
 import java.math.BigInteger;
 import java.security.*;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
@@ -112,10 +114,11 @@ final class ClientProperties {
     KEYSTORE_LOC = props.getString(ClientProperty.KEYSTORE_LOC);
 
     // Can't get a public key if we haven't generated one yet
+    clientPublicKeyName = props.getString(ClientProperty.PUB_KEY_NAME);
     if (!props.getBool(ClientProperty.USE_PKI)) {
-      clientPublicKeyName = props.getString(ClientProperty.PUB_KEY_NAME);
       clientPublicKey = ksHelper.getPublicKey(props.getString(ClientProperty.PUB_KEY_NAME));
     }
+
     // Load PKI params
     pkiAddress = props.getString(ClientProperty.PKI_ADDRESS);
     pkiPort = props.getInt(ClientProperty.PKI_PORT);
@@ -289,6 +292,33 @@ final class ClientProperties {
     } catch (UnrecoverableKeyException | KeyStoreException e) {
       throw new ClientException("Failed to get shared keys from keystore");
     }
+  }
+
+  public String getPKIToken() throws PropertyException {
+    return props.getString(ClientProperty.PKI_TOKEN);
+  }
+
+  public AEAHelper getPKIAEAHelper() throws PropertyException, NoSuchPaddingException, ClientException {
+    String pkiKeyAlg = props.getString(ClientProperty.PKI_KEY_ALG);
+    String pkiCertAlg = props.getString(ClientProperty.PKI_CERT_ALG);
+
+    try {
+      return new AEAHelper(pkiKeyAlg, pkiCertAlg);
+    } catch (NoSuchProviderException | CertificateException | NoSuchAlgorithmException e) {
+      throw new ClientException("Failed to create pki AEA helper. Parameters are probably incorrect.");
+    }
+  }
+
+  public void saveKeyPair(KeyPair keyPair, Certificate[] chain) throws PropertyException, IOException, ClientException {
+    try {
+      ksHelper.saveKeyPair(keyPair, chain, props.getString(ClientProperty.PUB_KEY_NAME), keyStorePassword());
+    } catch (NoSuchAlgorithmException | KeyStoreException | CertificateException e) {
+      throw new ClientException("Failed to save key in keystore. Key might be corrupted.");
+    }
+  }
+
+  public Pair<Integer, String> getPubKeyNameAndSize() throws PropertyException {
+    return new Pair<>(props.getInt(ClientProperty.PKI_PUBKEY_SIZE), props.getString(ClientProperty.PUB_KEY_NAME));
   }
 
   /*

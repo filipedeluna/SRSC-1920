@@ -68,7 +68,7 @@ class Client {
       // Connect to PKI to obtain cert
       if (properties.getBool(ClientProperty.USE_PKI)) {
         cProps.startConnection(true);
-        connectToPki(cProps, properties);
+        connectToPki(cProps);
         System.exit(0);
       }
 
@@ -873,25 +873,23 @@ class Client {
   }
 
   // This method lets the user register in the PKI
-  private static void connectToPki(ClientProperties cProps, CustomProperties props) throws GeneralSecurityException, PropertyException, IOException, ClientException {
-    // Load PKI params to connect to PKI. K
-    String pkiKeyAlg = props.getString(ClientProperty.PKI_KEY_ALG);
-    String pkiCertAlg = props.getString(ClientProperty.PKI_CERT_ALG);
-    int keySize = props.getInt(ClientProperty.PKI_PUBKEY_SIZE);
-    String pubKeyName = props.getString(ClientProperty.PUB_KEY_NAME);
+  private static void connectToPki(ClientProperties cProps) throws GeneralSecurityException, PropertyException, IOException, ClientException {
+    // Get pub key name and size properties
+    Pair<Integer, String> keyNameAndSize = cProps.getPubKeyNameAndSize();
 
-    AEAHelper aeaHelper = new AEAHelper(pkiKeyAlg, pkiCertAlg);
+    // Build specific pki AEA helper for key and cert manipulation
+    AEAHelper aeaHelper = cProps.getPKIAEAHelper();
 
     // Generate keypair and certificate from it
-    KeyPair keyPair = aeaHelper.genKeyPair(keySize);
-    PKCS10CertificationRequest csr = aeaHelper.generateCSR(pubKeyName, keyPair);
+    KeyPair keyPair = aeaHelper.genKeyPair(keyNameAndSize.getA());
+    PKCS10CertificationRequest csr = aeaHelper.generateCSR(keyNameAndSize.getB(), keyPair);
 
     // Start building request to sign user key pair
     JsonObject requestData = new JsonObject();
     B64Helper b64Helper = new B64Helper();
 
     requestData.addProperty("type", "sign");
-    requestData.addProperty("token", "123asd");
+    requestData.addProperty("token", cProps.getPKIToken());
     requestData.addProperty("certificationRequest", b64Helper.encode(csr.getEncoded()));
 
     // Send request and obtain response
@@ -899,22 +897,13 @@ class Client {
 
     SignResponse resp = cProps.receiveRequest(SignResponse.class);
 
-    KeyStore keyStore = cProps.ksHelper.getStore();
-
     // Get certificate and save it in the keystore
     String certificateEncoded = resp.getCertificate();
     byte[] certBytes = b64Helper.decode(certificateEncoded);
 
+    // Create key entry with attached generated chain
     X509Certificate cert = aeaHelper.getCertFromBytes(certBytes);
-    X509Certificate[] chain = new X509Certificate[] { cert };
-
-    KeyStore.PrivateKeyEntry keyEntry = new KeyStore.PrivateKeyEntry(keyPair.getPrivate(), chain);
-    KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection("123asd".toCharArray());
-    String keyName = props.getString(ClientProperty.PUB_KEY_NAME);
-
-    keyStore.deleteEntry(keyName);
-    keyStore.setEntry(keyName, keyEntry, protectionParam);
-    keyStore.store(new FileOutputStream(props.getString(ClientProperty.KEYSTORE_LOC)), "123asd".toCharArray());
+    cProps.saveKeyPair(keyPair, new X509Certificate[]{cert});
 
     System.out.println("Keypair successfully generated and signed by the pki.");
   }

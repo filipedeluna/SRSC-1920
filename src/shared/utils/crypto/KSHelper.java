@@ -1,5 +1,6 @@
 package shared.utils.crypto;
 
+import client.props.ClientProperty;
 import shared.errors.crypto.InvalidPublicKeyException;
 import shared.utils.Utils;
 import shared.utils.crypto.util.DHKeyType;
@@ -14,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.*;
+import java.security.KeyStore.PrivateKeyEntry;
 import java.security.KeyStore.ProtectionParameter;
 import java.security.KeyStore.SecretKeyEntry;
 import java.security.cert.Certificate;
@@ -145,6 +147,15 @@ public class KSHelper {
     trustManagerFactory.init(store);
 
     return trustManagerFactory;
+  }
+
+  public void saveKeyPair(KeyPair keyPair, Certificate[] chain, String keyName, char[] pass) throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
+    PrivateKeyEntry keyEntry = new PrivateKeyEntry(keyPair.getPrivate(), chain);
+    ProtectionParameter protectionParam = new KeyStore.PasswordProtection("123asd".toCharArray());
+
+    store.deleteEntry(keyName);
+    store.setEntry(keyName, keyEntry, protectionParam);
+    store.store(new FileOutputStream(keyStoreLoc), pass);
   }
 
   /*
