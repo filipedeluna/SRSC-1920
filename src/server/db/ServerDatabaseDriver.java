@@ -313,6 +313,7 @@ public final class ServerDatabaseDriver {
 
       return new Message(
           rs.getInt("sender_id"),
+          rs.getInt("receiver_id"),
           rs.getString("text"),
           rs.getString("attachment_data"),
           b64Helper.encode(rs.getBytes("attachments")),

@@ -8,7 +8,7 @@ public class MessageCacheEntry extends CacheEntry {
   private final byte[] cipherIV;
 
   // All the entries are still encrypted but already decoded
-  public MessageCacheEntry(int senderId, byte[] text, byte[] attachmentData, byte[] attachments, byte[] cipherIV) {
+  public MessageCacheEntry(int senderId, int receiverId, byte[] text, byte[] attachmentData, byte[] attachments, byte[] cipherIV) {
     this.senderId = senderId;
     this.text = text;
     this.attachmentData = attachmentData;

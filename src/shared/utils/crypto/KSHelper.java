@@ -151,7 +151,7 @@ public class KSHelper {
 
   public void saveKeyPair(KeyPair keyPair, Certificate[] chain, String keyName, char[] pass) throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
     PrivateKeyEntry keyEntry = new PrivateKeyEntry(keyPair.getPrivate(), chain);
-    ProtectionParameter protectionParam = new KeyStore.PasswordProtection("123asd".toCharArray());
+    ProtectionParameter protectionParam = new KeyStore.PasswordProtection(pass);
 
     store.deleteEntry(keyName);
     store.setEntry(keyName, keyEntry, protectionParam);

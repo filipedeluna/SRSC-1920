@@ -543,6 +543,7 @@ class Client {
         resp.getMessageId(),
         new MessageCacheEntry(
             cProps.session.getId(),
+            destinationId,
             encryptedMessageBytes,
             encryptedFileSpecBytes,
             encryptedFilesBytes,
@@ -687,6 +688,7 @@ class Client {
           message.getId(),
           new MessageCacheEntry(
               message.getSenderId(),
+              message.getReceiverId(),
               encryptedText,
               encryptedFileSpec,
               encryptedFiles,
@@ -754,7 +756,7 @@ class Client {
       throw new ClientException("Message was not sent by user. Can't verify receipts.");
 
     // Check user already exists in cache. Fetch him otherwise
-    UserCacheEntry receiptSender = cProps.cache.getUser(message.getSenderId());
+    UserCacheEntry receiptSender = cProps.cache.getUser(message.getReceiverId());
 
     if (receiptSender == null)
       receiptSender = fetchUser(cProps, message.getSenderId());
@@ -768,7 +770,7 @@ class Client {
     MacHelper macHelper = sharedHelpers.getB();
 
     // Get shared key pairs
-    Pair<Key, Key> sharedKeys = cProps.getSharedKeys(message.getSenderId());
+    Pair<Key, Key> sharedKeys = cProps.getSharedKeys(message.getReceiverId());
     Key sharedSeaKey = sharedKeys.getA();
     Key sharedMacKey = sharedKeys.getB();
 
