@@ -302,7 +302,7 @@ final class ServerResources implements Runnable {
       // Set message as read
       props.DB.setMessageAsRead(messageId);
     } catch (FailedToInsertException | EntryNotFoundException e) {
-      throw new CustomRequestException("Message id not found", HTTPStatus.NOT_FOUND);
+      throw new CustomRequestException("Message or user id not found", HTTPStatus.NOT_FOUND);
     }
   }
 

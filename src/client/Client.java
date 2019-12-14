@@ -761,7 +761,7 @@ class Client {
         iv
     );
 
-    if (macHelper.verifyMacHash(contents, signature, sharedMacKey))
+    if (!macHelper.verifyMacHash(contents, signature, sharedMacKey))
       throw new ClientException("Message has an invalid signature. It has been tampered with.");
 
     // Verify if message has files or file spec to determine integrity and iv size

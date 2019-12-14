@@ -80,6 +80,7 @@ public final class ServerDatabaseDriver {
               "date               TEXT    NOT NULL, " +
               "receiver_signature TEXT NOT NULL, " + // Reader signature of message contents with private key
               "FOREIGN KEY (message_id) REFERENCES messages(message_id)" +
+              "FOREIGN KEY (sender_id) REFERENCES users(user_id)" +
               ");";
 
       connection.createStatement().execute(query);
@@ -350,11 +351,11 @@ public final class ServerDatabaseDriver {
   public void insertReceipt(Receipt rcpt) throws CriticalDatabaseException, FailedToInsertException {
     try {
       // Insert receipt
-      String insertQuery = "INSERT INTO receipts (message_id, date, receiver_signature) VALUES (?, ?, ?);";
+      String insertQuery = "INSERT INTO receipts (message_id, sender_id, date, receiver_signature) VALUES (?, ?, ?, ?);";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
       ps.setInt(1, rcpt.getMessageId());
-      ps.setInt(2, rcpt.getMessageId());
+      ps.setInt(2, rcpt.getSenderId());
       ps.setString(3, rcpt.getDate());
       ps.setString(4, rcpt.getReceiverSignature());
 
@@ -377,9 +378,7 @@ public final class ServerDatabaseDriver {
 
   public ArrayList<Receipt> getReceipts(int messageId) throws CriticalDatabaseException {
     try {
-      String insertQuery =
-          "SELECT r.message_id AS message_id, m.sender_id AS sender_id, r.date AS mdate, r.receiver_signature AS receiver_signature " +
-              "FROM receipts r JOIN messages m ON r.message_id = m.message_id WHERE m.message_id = ?;";
+      String insertQuery = "SELECT * FROM receipts WHERE message_id = ?;";
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
       ps.setInt(1, messageId);
@@ -392,7 +391,7 @@ public final class ServerDatabaseDriver {
         receipts.add(new Receipt(
                 rs.getInt("message_id"),
                 rs.getInt("sender_id"),
-                rs.getString("mdate"),
+                rs.getString("date"),
                 rs.getString("receiver_signature")
             )
         );
