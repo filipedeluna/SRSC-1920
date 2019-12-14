@@ -522,7 +522,7 @@ class Client {
         cipherIVBytes
     );
 
-    byte[] authenticatedMessageData = macHelper.macHash(messageData, sharedMacKey);
+    byte[] authenticatedMessageData = macHelper.hash(messageData, sharedMacKey);
     requestData.addProperty("senderSignature", cProps.b64Helper.encode(authenticatedMessageData));
 
     // Send request
@@ -610,7 +610,7 @@ class Client {
           iv
       );
 
-      if (!macHelper.verifyMacHash(contents, signature, sharedMacKey))
+      if (!macHelper.verifyHash(contents, signature, sharedMacKey))
         throw new ClientException("Message has an invalid signature");
     } else {
       encryptedText = messageCacheEntry.getText();
@@ -714,7 +714,7 @@ class Client {
       );
     }
 
-    byte[] signedDecryptedContents = macHelper.macHash(decryptedContents, sharedMacKey);
+    byte[] signedDecryptedContents = macHelper.hash(decryptedContents, sharedMacKey);
 
     // Add signature and date to request header and send the request
     requestData.addProperty("receiverSignature", cProps.b64Helper.encode(signedDecryptedContents));
@@ -769,7 +769,7 @@ class Client {
         iv
     );
 
-    if (!macHelper.verifyMacHash(contents, signature, sharedMacKey))
+    if (!macHelper.verifyHash(contents, signature, sharedMacKey))
       throw new ClientException("Message has an invalid signature. It has been tampered with.");
 
     // Verify if message has files or file spec to determine integrity and iv size
@@ -839,7 +839,7 @@ class Client {
       }
 
       // Verify signature
-      if (macHelper.verifyMacHash(verificationData, receiptSignature, sharedMacKey))
+      if (macHelper.verifyHash(verificationData, receiptSignature, sharedMacKey))
         results.add(new Pair<>("valid", "user id: " + receipt.getSenderId() + "date: " + receipt.getDate()));
       else
         results.add(new Pair<>("invalid/Forged", "user id: " + receipt.getSenderId() + " date: " + receipt.getDate()));
