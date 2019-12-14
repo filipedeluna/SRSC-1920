@@ -9,6 +9,7 @@ import shared.Pair;
 import shared.errors.db.*;
 import shared.parameters.ServerParameterMap;
 import shared.parameters.ServerParameter;
+import sun.java2d.xr.XRRenderer;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -103,11 +104,12 @@ public final class ServerDatabaseDriver {
   public int insertUser(User user) throws CriticalDatabaseException, DuplicateEntryException {
     try {
       // Insert user
-      String insertQuery = "INSERT INTO users (uuid, pub_key, dh_sea_pub_key, dh_mac_pub_key, sea_spec, mac_spec, sec_data_signature) VALUES (?, ?, ?, ?, ?, ?, ?);";
+      String statement = "INSERT INTO users (uuid, pub_key, dh_sea_pub_key, dh_mac_pub_key, sea_spec, mac_spec, sec_data_signature) VALUES (?, ?, ?, ?, ?, ?, ?);";
 
-      PreparedStatement ps = connection.prepareStatement(insertQuery);
+      PreparedStatement ps = connection.prepareStatement(statement);
       ps.setString(1, user.getUuid());
       ps.setString(2, user.getPubKey());
+
       // Security data
       ps.setString(3, user.getDhSeaPubKey());
       ps.setString(4, user.getDhMacPubKey());
@@ -119,7 +121,12 @@ public final class ServerDatabaseDriver {
 
       ResultSet rs = ps.getGeneratedKeys();
 
-      return rs.getInt(1);
+      int userId = rs.getInt(1);
+
+      rs.close();
+      ps.close();
+
+      return userId;
     } catch (SQLException e) {
       if (e.getErrorCode() == ERR_UNIQUE_CONSTRAINT)
         throw new DuplicateEntryException();
@@ -130,9 +137,9 @@ public final class ServerDatabaseDriver {
 
   public User getUserById(int id) throws CriticalDatabaseException, EntryNotFoundException {
     try {
-      String selectUser = "SELECT * FROM users WHERE user_id = ?;";
+      String statement = "SELECT * FROM users WHERE user_id = ?;";
 
-      PreparedStatement ps = connection.prepareStatement(selectUser);
+      PreparedStatement ps = connection.prepareStatement(statement);
       ps.setString(1, String.valueOf(id));
 
       ResultSet rs = ps.executeQuery();
@@ -140,7 +147,7 @@ public final class ServerDatabaseDriver {
       if (!rs.next())
         throw new EntryNotFoundException();
 
-      return new User(
+      User user = new User(
           rs.getInt("user_id"),
           rs.getString("pub_key"),
           rs.getString("dh_sea_pub_key"),
@@ -149,6 +156,11 @@ public final class ServerDatabaseDriver {
           rs.getString("mac_spec"),
           rs.getString("sec_data_signature")
       );
+
+      rs.close();
+      ps.close();
+
+      return user;
     } catch (SQLException e) {
       throw new CriticalDatabaseException(e);
     }
@@ -156,9 +168,9 @@ public final class ServerDatabaseDriver {
 
   public User getUserByUUID(String uuid) throws CriticalDatabaseException, EntryNotFoundException {
     try {
-      String selectUser = "SELECT * FROM users WHERE uuid = ?;";
+      String statement = "SELECT * FROM users WHERE uuid = ?;";
 
-      PreparedStatement ps = connection.prepareStatement(selectUser);
+      PreparedStatement ps = connection.prepareStatement(statement);
       ps.setString(1, uuid);
 
       ResultSet rs = ps.executeQuery();
@@ -166,7 +178,7 @@ public final class ServerDatabaseDriver {
       if (!rs.next())
         throw new EntryNotFoundException();
 
-      return new User(
+      User user = new User(
           rs.getInt("user_id"),
           rs.getString("pub_key"),
           rs.getString("dh_sea_pub_key"),
@@ -175,6 +187,10 @@ public final class ServerDatabaseDriver {
           rs.getString("mac_spec"),
           rs.getString("sec_data_signature")
       );
+
+      rs.close();
+
+      return user;
     } catch (SQLException e) {
       throw new CriticalDatabaseException(e);
     }
@@ -183,9 +199,9 @@ public final class ServerDatabaseDriver {
 
   public ArrayList<User> getAllUsers() throws CriticalDatabaseException {
     try {
-      String selectUser = "SELECT * FROM users;";
+      String statement = "SELECT * FROM users;";
 
-      PreparedStatement ps = connection.prepareStatement(selectUser);
+      PreparedStatement ps = connection.prepareStatement(statement);
 
       ResultSet rs = ps.executeQuery();
 
@@ -203,6 +219,9 @@ public final class ServerDatabaseDriver {
         ));
       }
 
+      rs.close();
+      ps.close();
+
       return users;
     } catch (SQLException e) {
       throw new CriticalDatabaseException(e);
@@ -214,9 +233,9 @@ public final class ServerDatabaseDriver {
   */
   public ArrayList<Integer> getUnreadMessages(int userId) throws CriticalDatabaseException {
     try {
-      String insertQuery = "SELECT * FROM messages WHERE receiver_id = ? AND read = 0;";
+      String statement = "SELECT * FROM messages WHERE receiver_id = ? AND read = 0;";
 
-      PreparedStatement ps = connection.prepareStatement(insertQuery);
+      PreparedStatement ps = connection.prepareStatement(statement);
       ps.setInt(1, userId);
 
       ResultSet rs = ps.executeQuery();
@@ -225,6 +244,8 @@ public final class ServerDatabaseDriver {
 
       while (rs.next())
         messageIds.add(rs.getInt("message_id"));
+
+      rs.close();
 
       return messageIds;
     } catch (SQLException e) {
@@ -235,30 +256,30 @@ public final class ServerDatabaseDriver {
   public Pair<ArrayList<String>, ArrayList<Integer>> getAllMessages(int userId) throws CriticalDatabaseException {
     try {
       // Get Received messages
-      String insertQuery = "SELECT * FROM messages WHERE receiver_id = ?;";
+      String statement = "SELECT * FROM messages WHERE receiver_id = ?;";
 
-      PreparedStatement ps = connection.prepareStatement(insertQuery);
+      PreparedStatement ps = connection.prepareStatement(statement);
       ps.setInt(1, userId);
 
       ResultSet rs = ps.executeQuery();
 
       ArrayList<String> receivedMessageIds = new ArrayList<>();
 
-      // Verify if message has been read
+      // Verify if message has been read and insert formatted name
       int read;
       int messageId;
 
       while (rs.next()) {
         read = rs.getInt("read");
-        messageId = rs.getInt("receiver_id");
+        messageId = rs.getInt("message_id");
 
         receivedMessageIds.add((read == 1 ? "_" : "") + messageId);
       }
 
       // Get Sent messages
-      insertQuery = "SELECT * FROM messages WHERE sender_id = ?;";
+      statement = "SELECT * FROM messages WHERE sender_id = ?;";
 
-      ps = connection.prepareStatement(insertQuery);
+      ps = connection.prepareStatement(statement);
       ps.setInt(1, userId);
 
       rs = ps.executeQuery();
@@ -266,7 +287,10 @@ public final class ServerDatabaseDriver {
       ArrayList<Integer> sentMessageIds = new ArrayList<>();
 
       while (rs.next())
-        sentMessageIds.add(rs.getInt("sender_id"));
+        sentMessageIds.add(rs.getInt("message_id"));
+
+      rs.close();
+      ps.close();
 
       return new Pair<>(receivedMessageIds, sentMessageIds);
     } catch (SQLException e) {
@@ -276,10 +300,10 @@ public final class ServerDatabaseDriver {
 
   public int insertMessage(Message msg) throws CriticalDatabaseException, FailedToInsertException {
     try {
-      String insertQuery = "INSERT INTO messages (sender_id, receiver_id, text, attachment_data, attachments, cipher_iv, sender_signature) " +
+      String statement = "INSERT INTO messages (sender_id, receiver_id, text, attachment_data, attachments, cipher_iv, sender_signature) " +
           "VALUES (?, ?, ?, ?, ?, ?, ?);";
 
-      PreparedStatement ps = connection.prepareStatement(insertQuery);
+      PreparedStatement ps = connection.prepareStatement(statement);
       ps.setInt(1, msg.getSenderId());
       ps.setInt(2, msg.getReceiverId());
       ps.setString(3, msg.getText());
@@ -292,7 +316,12 @@ public final class ServerDatabaseDriver {
 
       ResultSet rs = ps.getGeneratedKeys();
 
-      return rs.getInt(1);
+      int messageId = rs.getInt(1);
+
+      rs.close();
+      ps.close();
+
+      return messageId;
     } catch (SQLException e) {
       if (e.getErrorCode() == ERR_FOREIGN_KEY_CONSTRAINT)
         throw new FailedToInsertException();
@@ -303,9 +332,9 @@ public final class ServerDatabaseDriver {
 
   public Message getMessage(int messageId) throws CriticalDatabaseException, EntryNotFoundException {
     try {
-      String insertQuery = "SELECT * FROM messages WHERE message_id = ?;";
+      String statement = "SELECT * FROM messages WHERE message_id = ?;";
 
-      PreparedStatement ps = connection.prepareStatement(insertQuery);
+      PreparedStatement ps = connection.prepareStatement(statement);
       ps.setInt(1, messageId);
 
       ResultSet rs = ps.executeQuery();
@@ -313,7 +342,7 @@ public final class ServerDatabaseDriver {
       if (!rs.next())
         throw new EntryNotFoundException();
 
-      return new Message(
+      Message message = new Message(
           rs.getInt("sender_id"),
           rs.getInt("receiver_id"),
           rs.getString("text"),
@@ -322,6 +351,11 @@ public final class ServerDatabaseDriver {
           rs.getString("cipher_iv"),
           rs.getString("sender_signature")
       );
+
+      rs.close();
+      ps.close();
+
+      return message;
     } catch (SQLException e) {
       throw new CriticalDatabaseException(e);
     }
@@ -329,9 +363,9 @@ public final class ServerDatabaseDriver {
 
   public void setMessageAsRead(int message_id) throws CriticalDatabaseException, EntryNotFoundException {
     try {
-      String selectUser = "UPDATE messages SET read = 1 WHERE message_id = ?;";
+      String statement = "UPDATE messages SET read = 1 WHERE message_id = ?;";
 
-      PreparedStatement ps = connection.prepareStatement(selectUser);
+      PreparedStatement ps = connection.prepareStatement(statement);
       ps.setInt(1, message_id);
 
       int updated = ps.executeUpdate();
@@ -339,6 +373,7 @@ public final class ServerDatabaseDriver {
       if (updated == 0)
         throw new EntryNotFoundException();
 
+      ps.close();
     } catch (SQLException e) {
       throw new CriticalDatabaseException(e);
     }
@@ -361,13 +396,7 @@ public final class ServerDatabaseDriver {
 
       ps.executeUpdate();
 
-      // Set message as read
-      String updateQuery = "UPDATE messages (read) VALUES (1) WHERE message_id = ?;";
-
-      connection.prepareStatement(updateQuery);
-      ps.setInt(1, rcpt.getMessageId());
-
-      ps.executeUpdate();
+      ps.close();
     } catch (SQLException e) {
       if (e.getErrorCode() == ERR_FOREIGN_KEY_CONSTRAINT)
         throw new FailedToInsertException();
@@ -378,9 +407,9 @@ public final class ServerDatabaseDriver {
 
   public ArrayList<Receipt> getReceipts(int messageId) throws CriticalDatabaseException {
     try {
-      String insertQuery = "SELECT * FROM receipts WHERE message_id = ?;";
+      String statement = "SELECT * FROM receipts WHERE message_id = ?;";
 
-      PreparedStatement ps = connection.prepareStatement(insertQuery);
+      PreparedStatement ps = connection.prepareStatement(statement);
       ps.setInt(1, messageId);
 
       ResultSet rs = ps.executeQuery();
@@ -396,6 +425,9 @@ public final class ServerDatabaseDriver {
             )
         );
       }
+
+      rs.close();
+      ps.close();
 
       return receipts;
     } catch (SQLException e) {
@@ -419,6 +451,7 @@ public final class ServerDatabaseDriver {
       if (updated == 0)
         throw new FailedToInsertException();
 
+      ps.close();
     } catch (SQLException e) {
       throw new CriticalDatabaseException(e);
     }
@@ -431,6 +464,8 @@ public final class ServerDatabaseDriver {
       PreparedStatement ps = connection.prepareStatement(statement);
 
       ps.executeUpdate();
+
+      ps.close();
     } catch (SQLException e) {
       throw new CriticalDatabaseException(e);
     }
@@ -451,6 +486,9 @@ public final class ServerDatabaseDriver {
             rs.getString("name"),
             rs.getString("value"));
       }
+
+      rs.close();
+      ps.close();
 
       return params;
     } catch (SQLException e) {

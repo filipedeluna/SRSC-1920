@@ -25,14 +25,7 @@ class ClientSession {
     this.dhSeaKeyPair = dhSeaKeyPair;
     this.dhMacKeyPair = dhMacKeyPair;
 
-    // Start helpers
-    String[] splitSpec = seaSpec.split("/");
-
-    String algorithm = splitSpec[0];
-    String mode = splitSpec[1];
-    String padding = splitSpec[2];
-
-    seaHelper = new SEAHelper(algorithm, mode, padding);
+    seaHelper = new SEAHelper(seaSpec);
     macHelper = new MacHelper(macSpec);
   }
 

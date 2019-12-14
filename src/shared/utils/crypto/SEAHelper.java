@@ -18,18 +18,25 @@ public final class SEAHelper {
 
   private final RNDHelper random;
 
-  public SEAHelper(String algorithm, String mode, String padding) throws NoSuchProviderException, NoSuchAlgorithmException, NoSuchPaddingException {
+  public SEAHelper(String seaSpec) throws NoSuchProviderException, NoSuchAlgorithmException, NoSuchPaddingException {
     this.random = new RNDHelper();
-    this.mode = mode;
+
+    String[] splitSpec = seaSpec.split("/");
+
+    if (splitSpec.length != 3)
+      throw new NoSuchAlgorithmException("Invalid sea spec.");
+
+    String alg = splitSpec[0];
+    mode = splitSpec[1];
 
     // Force removal of unnecessary padding for cipher types
     if (mode.equals("GCM") || mode.equals("CCM"))
-      spec = algorithm + "/" + mode + "/NoPadding";
+      spec = alg + "/" + mode + "/NoPadding";
     else
-      spec = algorithm + "/" + mode + "/" + padding;
+      spec = seaSpec;
 
     cipher = Cipher.getInstance(spec, PROVIDER);
-    keyGen = KeyGenerator.getInstance(algorithm, PROVIDER);
+    keyGen = KeyGenerator.getInstance(alg, PROVIDER);
   }
 
   public byte[] decrypt(byte[] buff, Key key, byte[] iv) throws BadPaddingException, IllegalBlockSizeException, InvalidAlgorithmParameterException, InvalidKeyException {

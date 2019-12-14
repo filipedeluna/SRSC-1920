@@ -295,8 +295,8 @@ final class ServerResources implements Runnable {
     // Get signature date
     String date = GsonUtils.getString(requestData, "date");
 
-    // Insert message receipt
     try {
+      // Insert message receipt
       props.DB.insertReceipt(new Receipt(messageId, senderId, date, receiverSignature));
 
       // Set message as read

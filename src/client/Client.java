@@ -559,6 +559,7 @@ class Client {
     MessageCacheEntry messageCacheEntry = cProps.cache.getMessage(messageId);
 
     int senderId;
+    int receiverId;
     Message message = null;
 
     if (messageCacheEntry == null) {
@@ -570,10 +571,13 @@ class Client {
 
       // Get message sender
       senderId = message.getSenderId();
-    } else
+      receiverId = message.getReceiverId();
+    } else {
       senderId = messageCacheEntry.getSenderId();
+      receiverId = messageCacheEntry.getReceiverId();
+    }
 
-    if (message.getReceiverId() != cProps.session.getId())
+    if (receiverId != cProps.session.getId())
       throw new ClientException("Message is not intended for user.");
 
     // Check user already exists in cache. Fetch him otherwise
@@ -619,18 +623,8 @@ class Client {
       iv = messageCacheEntry.getCipherIV();
     }
 
-    // Verify if message has files or file spec to determine integrity and iv size
-    if (encryptedFileSpec.length != 0 && encryptedFiles.length == 0)
-      throw new ClientException("Message files are corrupted");
-
-    if (encryptedFileSpec.length == 0 && encryptedFiles.length != 0)
-      throw new ClientException("Message file spec is corrupted");
-
-    int ivCount = encryptedFiles.length > 0 ? 3 : 1;
-
-    // Decrypt message parts
-    if (seaHelper.cipherModeUsesIV() && iv.length != ivCount * seaHelper.ivSize())
-      throw new ClientException("Message iv is corrupted");
+    // Validate the iv and decrypt message parts
+    int ivCount = validateMessageIv(encryptedFileSpec, encryptedFiles, iv, seaHelper);
 
     String text;
     String fileSpec = null;
@@ -772,18 +766,8 @@ class Client {
     if (!macHelper.verifyHash(contents, signature, sharedMacKey))
       throw new ClientException("Message has an invalid signature. It has been tampered with.");
 
-    // Verify if message has files or file spec to determine integrity and iv size
-    if (encryptedFileSpec.length != 0 && encryptedFiles.length == 0)
-      throw new ClientException("Message files are corrupted");
-
-    if (encryptedFileSpec.length == 0 && encryptedFiles.length != 0)
-      throw new ClientException("Message file spec is corrupted");
-
-    int ivCount = encryptedFiles.length > 0 ? 3 : 1;
-
-    // Decrypt message parts
-    if (seaHelper.cipherModeUsesIV() && iv.length != ivCount * seaHelper.ivSize())
-      throw new ClientException("Message iv is corrupted");
+    // Validate the iv and decrypt message parts
+    int ivCount = validateMessageIv(encryptedFileSpec, encryptedFiles, iv, seaHelper);
 
     String text;
     String fileSpec = null;
@@ -1032,14 +1016,10 @@ class Client {
     try {
       MacHelper macHelper = new MacHelper(macSpec);
 
-      String[] trimmedSeaSpec = seaSpec.split("/");
-      if (trimmedSeaSpec.length != 3)
+      if ( seaSpec.split("/").length != 3)
         throw new ClientException("User has an invalid key spec.");
 
-      String seaAlg = trimmedSeaSpec[0];
-      String seaMode = trimmedSeaSpec[1];
-      String seaPadding = trimmedSeaSpec[2];
-      SEAHelper seaHelper = new SEAHelper(seaAlg, seaMode, seaPadding);
+      SEAHelper seaHelper = new SEAHelper(seaSpec);
 
       return new Pair<>(seaHelper, macHelper);
     } catch (NoSuchAlgorithmException | NoSuchPaddingException | NoSuchProviderException e) {
@@ -1064,5 +1044,22 @@ class Client {
     Pair<Key, Key> sharedKeys = cProps.getSharedKeys(otherId);
 
     return new Pair<>(sharedHelpers, sharedKeys);
+  }
+
+  private static int validateMessageIv(byte[] encryptedFileSpec, byte[] encryptedFiles, byte[] iv, SEAHelper seaHelper) throws ClientException {
+    // Verify if message has files or file spec to determine integrity and iv size
+    if (encryptedFileSpec.length != 0 && encryptedFiles.length == 0)
+      throw new ClientException("Message files are corrupted");
+
+    if (encryptedFileSpec.length == 0 && encryptedFiles.length != 0)
+      throw new ClientException("Message file spec is corrupted");
+
+    int ivCount = encryptedFiles.length > 0 ? 3 : 1;
+
+    // Decrypt message parts
+    if (seaHelper.cipherModeUsesIV() && iv.length != ivCount * seaHelper.ivSize())
+      throw new ClientException("Message iv is corrupted");
+
+    return ivCount;
   }
 }

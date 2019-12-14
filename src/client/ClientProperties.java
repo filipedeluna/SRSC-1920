@@ -28,7 +28,6 @@ import shared.utils.properties.CustomProperties;
 import javax.crypto.*;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
@@ -86,6 +85,9 @@ final class ClientProperties {
     this.props = props;
     this.ksHelper = ksHelper;
     this.tshelper = tsHelper;
+
+    // Test crypto props validity immediately
+    testCryptoProps();
 
     // Load SSL params
     this.sslSocketFactory = sslSocketFactory;
@@ -326,6 +328,11 @@ final class ClientProperties {
   /*
     Utils
   */
+  private void testCryptoProps() throws PropertyException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException {
+    new MacHelper(props.getString(ClientProperty.MAC_SPEC));
+    new SEAHelper(props.getString(ClientProperty.SEA_SPEC));
+  }
+
   private void generateDHSharedKeys(int destinationId) throws PropertyException, ClientException {
     UserCacheEntry destinationUser = cache.getUser(destinationId);
 
@@ -356,7 +363,7 @@ final class ClientProperties {
     int macKeySize;
     try {
       seaKeySize = Math.min(session.seaHelper.getMaxKeySize(), 64);
-      macKeySize = Math.min(session.macHelper.getMaxKeySize(), 64);
+      macKeySize = Math.min(session.macHelper.getDigestSize(), 64);
     } catch (NoSuchAlgorithmException | NoSuchProviderException | NoSuchPaddingException e) {
       throw new ClientException("User shared key algorithms are invalid.");
     }

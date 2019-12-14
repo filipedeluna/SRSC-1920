@@ -1,5 +1,6 @@
 package shared.utils.crypto;
 
+import org.bouncycastle.crypto.Mac;
 import org.bouncycastle.crypto.digests.*;
 import org.bouncycastle.crypto.engines.*;
 import org.bouncycastle.crypto.macs.CMac;
@@ -7,88 +8,134 @@ import org.bouncycastle.crypto.macs.GMac;
 import org.bouncycastle.crypto.macs.HMac;
 import org.bouncycastle.crypto.modes.GCMBlockCipher;
 import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.params.ParametersWithIV;
+import shared.utils.Utils;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.*;
+import java.util.Arrays;
 
 public final class MacHelper {
-  private CMac cmac;
-  private GMac gmac;
-  private HMac hmac;
+  private static final int GMAC_IV_SIZE = 12; // 96 bit - NIST Special Publication 800-38D
+  private Mac mac;
   private int length;
 
-  public MacHelper(String macSpec) throws NoSuchProviderException, NoSuchAlgorithmException {
-    // Check if algorithm is a HMAC or GMAC or CMAC construction
-    this.length = length;
-    String macAlg;
+  private RNDHelper rndHelper = new RNDHelper();
 
+  public MacHelper(String macSpec) throws NoSuchAlgorithmException {
+    // Check algorithm spec construction
     try {
-      macAlg = macSpec.split(" ")[0].toUpperCase();
       length = Integer.parseInt(macSpec.split(" ")[1]);
-
     } catch (NumberFormatException | NullPointerException e) {
       throw new NoSuchAlgorithmException("Invalid algorithm: " + macSpec);
-
     }
 
-    switch (macAlg) {
+    // Check if algorithm is a HMAC or GMAC or CMAC construction
+    switch (macSpec.split(" ")[0].toUpperCase()) {
       // CMACs-------------------------------
       case "AES-CMAC":
-        cmac = new CMac(new AESEngine(), length);
+        mac = new CMac(new AESEngine(), length);
         break;
       case "BLOWFISH-CMAC":
-        cmac = new CMac(new BlowfishEngine(), length);
+        mac = new CMac(new BlowfishEngine(), length);
         break;
       case "DES-CMAC":
-        cmac = new CMac(new DESEngine(), length);
+        mac = new CMac(new DESEngine(), length);
         break;
       case "THREEFISH-CMAC":
-        cmac = new CMac(new ThreefishEngine(512), length);
+        try {
+          int size = Integer.parseInt(macSpec.split(" ")[2]);
+          mac = new CMac(new ThreefishEngine(size), length);
+        } catch (NullPointerException | NumberFormatException e) {
+          throw new NoSuchAlgorithmException("Invalid size for ThreeFish");
+        }
         break;
-      case "RC6C-MAC":
-        cmac = new CMac(new RC6Engine(), length);
+      case "DESEDE-MAC":
+        mac = new CMac(new DESedeEngine(), length);
         break;
-      case "IDEACMAC":
-        cmac = new CMac(new IDEAEngine(), length);
+      case "SEED-CMAC":
+        mac = new CMac(new SEEDEngine(), length);
         break;
       // GMACs-------------------------------
       case "AES-GMAC":
-        gmac = new GMac(new GCMBlockCipher(new AESEngine()), length);
+        mac = new GMac(new GCMBlockCipher(new AESEngine()), length);
         break;
-      case "BLOWFISH-GMAC":
-        gmac = new GMac(new GCMBlockCipher(new BlowfishEngine()), length);
+      case "CAT6-GMAC":
+        mac = new GMac(new GCMBlockCipher(new CAST6Engine()), length);
         break;
-      case "DES-GMAC":
-        gmac = new GMac(new GCMBlockCipher(new DESEngine()), length);
+      case "NOEKEON-GMAC":
+        mac = new GMac(new GCMBlockCipher(new NoekeonEngine()), length);
         break;
-      case "THREEFISH-GMAC":
-        gmac = new GMac(new GCMBlockCipher(new ThreefishEngine(512)), length);
+      case "SEED-GMAC":
+        mac = new GMac(new GCMBlockCipher(new SEEDEngine()), length);
         break;
       case "RC6-GMAC":
-        gmac = new GMac(new GCMBlockCipher(new RC6Engine()), length);
+        mac = new GMac(new GCMBlockCipher(new RC6Engine()), length);
         break;
-      case "IDEA-GMAC":
-        gmac = new GMac(new GCMBlockCipher(new IDEAEngine()), length);
+      case "ARIA-GMAC":
+        mac = new GMac(new GCMBlockCipher(new ARIAEngine()), length);
+        break;
+      case "SHACAL2-GMAC":
+        mac = new GMac(new GCMBlockCipher(new Shacal2Engine()), length);
+        break;
+      case "SM4-GMAC":
+        mac = new GMac(new GCMBlockCipher(new SM4Engine()), length);
         break;
       // HMACs-------------------------------
       case "MD5-HMAC":
-        hmac = new HMac(new MD5Digest());
+        mac = new HMac(new MD5Digest());
         break;
       case "SHA1-HMAC":
-        hmac = new HMac(new SHA1Digest());
+        mac = new HMac(new SHA1Digest());
         break;
       case "SHA2-HMAC":
         if (length == 256)
-          hmac = new HMac(new SHA256Digest());
+          mac = new HMac(new SHA256Digest());
         else if (length == 384)
-          hmac = new HMac(new SHA384Digest());
+          mac = new HMac(new SHA384Digest());
         else if (length == 512)
-          hmac = new HMac(new SHA512Digest());
+          mac = new HMac(new SHA512Digest());
         else
           throw new NoSuchAlgorithmException("Invalid size for SHA2.");
+        break;
       case "SHA3-HMAC":
-        hmac = new HMac(new SHA3Digest(length));
+        mac = new HMac(new SHA3Digest(length));
+        break;
+      case "RIPEMD-HMAC":
+        if (length == 128)
+          mac = new HMac(new RIPEMD128Digest());
+        else if (length == 160)
+          mac = new HMac(new RIPEMD160Digest());
+        else if (length == 256)
+          mac = new HMac(new RIPEMD256Digest());
+        else if (length == 320)
+          mac = new HMac(new RIPEMD320Digest());
+        else
+          throw new NoSuchAlgorithmException("Invalid size for RIPEMD.");
+        break;
+      case "KECCAK-HMAC":
+        mac = new HMac(new KeccakDigest(length));
+        break;
+      case "WHIRLPOOL-HMAC":
+        mac = new HMac(new WhirlpoolDigest());
+        break;
+      case "DSTU7564-HMAC":
+        mac = new HMac(new DSTU7564Digest(length));
+        break;
+      case "TIGER-HMAC":
+        mac = new HMac(new TigerDigest());
+        break;
+      case "GOST3411-HMAC":
+        mac = new HMac(new GOST3411Digest());
+        break;
+      case "SKEIN-HMAC":
+        try {
+          int size = Integer.parseInt(macSpec.split(" ")[2]);
+          mac = new HMac(new SkeinDigest(length, size));
+        } catch (NullPointerException | NumberFormatException e) {
+          throw new NoSuchAlgorithmException("Invalid parameters for skein");
+        }
         break;
       default:
         throw new NoSuchAlgorithmException("Invalid algorithm: " + macSpec);
@@ -96,47 +143,56 @@ public final class MacHelper {
   }
 
   public boolean verifyHash(byte[] data, byte[] hash, Key key) throws NoSuchAlgorithmException {
+    // Special case for gmac that needs to process the attached IV
+    if (mac instanceof GMac)
+      return verifyGmac(data, hash, key);
+
     byte[] reHashedBytes = hash(data, key);
 
     return MessageDigest.isEqual(reHashedBytes, hash);
   }
 
-  public byte[] hash(byte[] data, Key key) throws NoSuchAlgorithmException {
-    KeyParameter keyParameter = new KeyParameter(key.getEncoded());
+  private boolean verifyGmac(byte[] data, byte[] hash, Key key) {
+    // Separate used iv from actual hash
+    byte[] hashIv = Arrays.copyOfRange(hash, 0, GMAC_IV_SIZE);
+    byte[] hashFixed = Arrays.copyOfRange(hash, GMAC_IV_SIZE, hash.length);
 
+    mac.init(new ParametersWithIV(new KeyParameter(key.getEncoded()), hashIv));
+    mac.update(data, 0, data.length);
+
+    byte[] reHashedBytes = new byte[hash.length - GMAC_IV_SIZE];
+
+    mac.doFinal(reHashedBytes, 0);
+
+    return MessageDigest.isEqual(reHashedBytes, hashFixed);
+  }
+
+  public byte[] hash(byte[] data, Key key) throws NoSuchAlgorithmException {
     byte[] out;
 
-    if (hmac != null) {
-      hmac.init(keyParameter);
-      hmac.update(data, 0, data.length);
+    // Check the type of hash algorithm and hash data accordingly
+    if (mac instanceof HMac || mac instanceof CMac) {
+      mac.init(new KeyParameter(key.getEncoded()));
+      mac.update(data, 0, data.length);
 
       out = new byte[length];
 
-      hmac.doFinal(out, 0);
+      mac.doFinal(out, 0);
 
       return out;
     }
 
-    if (gmac != null) {
-      gmac.init(keyParameter);
-      gmac.update(data, 0, data.length);
+    if (mac instanceof GMac) {
+      byte[] iv = rndHelper.getBytes(GMAC_IV_SIZE, false);
+
+      mac.init(new ParametersWithIV(new KeyParameter(key.getEncoded()), iv));
+      mac.update(data, 0, data.length);
 
       out = new byte[length];
 
-      hmac.doFinal(out, 0);
+      mac.doFinal(out, 0);
 
-      return out;
-    }
-
-    if (cmac != null) {
-      cmac.init(keyParameter);
-      cmac.update(data, 0, data.length);
-
-      out = new byte[length];
-
-      cmac.doFinal(out, 0);
-
-      return out;
+      return Utils.joinByteArrays(iv, out);
     }
 
     throw new NoSuchAlgorithmException("No mac algorithm defined."); // Should never happen
@@ -146,7 +202,10 @@ public final class MacHelper {
     return new SecretKeySpec(keyBytes, "MAC"); //TODO Does this matter? Will it work?
   }
 
-  public int getMaxKeySize() {
+  public int getDigestSize() {
+    if (mac instanceof HMac)
+      return ((HMac) mac).getUnderlyingDigest().getDigestSize();
+
     return length / 8; // TODO does this make sense? It is the digest size always, supposedly
   }
 }

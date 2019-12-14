@@ -42,7 +42,7 @@ public class KSHelper {
 
     // use GCM to guarantee integrity when encrypting dh generated shared keys
     if (!isTrustStore) {
-      seaHelper = new SEAHelper("AES", "GCM", "NoPadding");
+      seaHelper = new SEAHelper("AES/GCM/NoPadding");
       seaKey = seaHelper.getKeyFromBytes(seaHelper.trimKeyToAlg(String.valueOf(keyStorePass).getBytes()));
     }
   }
