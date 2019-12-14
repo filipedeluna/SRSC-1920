@@ -1,6 +1,8 @@
 import client.utils.FileHelper;
 import shared.Pair;
 
+import java.security.Provider;
+import java.security.Security;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -10,11 +12,11 @@ public class TESTER {
     //System.out.println(KeySizeFinder.findMaxSea("AES"));
 
 
-    //Provider provider = Security.getProvider("BC");
+    Provider provider = Security.getProvider("BC");
 
-    // for (Provider.Service service : provider.getServices()) {
-    //System.out.println(service.getType() + " " +  service.getAlgorithm());
-    //}
+    for (Provider.Service service : provider.getServices()) {
+    System.out.println(service.getType() + " " +  service.getAlgorithm());
+    }
 
 
     FileHelper fh = new FileHelper("");
