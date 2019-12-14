@@ -686,6 +686,7 @@ class Client {
 
     requestData.addProperty("type", "receipt");
     requestData.addProperty("messageId", messageId);
+    requestData.addProperty("senderId", cProps.session.getId());
 
     // Get current date
     String currentDate = getCurrentDate();

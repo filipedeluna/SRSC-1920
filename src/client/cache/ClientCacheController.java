@@ -61,8 +61,11 @@ public final class ClientCacheController {
   }
 
   public MessageCacheEntry getMessage(int messageId) {
-    addMessageAccess(messageId);
-
+    try {
+      addMessageAccess(messageId);
+    }catch (Exception e){
+      return null;
+    }
     return messageCache.get(messageId);
   }
 
