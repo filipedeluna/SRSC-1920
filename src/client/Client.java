@@ -326,13 +326,10 @@ class Client {
   }
 
   private static void listUsers(ClientProperties cProps, JsonObject requestData, String[] args, boolean silent) throws IOException, ClientException {
-    // Add id if inserted and send the request
-    try {
-      if (args.length == 2)
-        requestData.addProperty("userId", Integer.valueOf(args[1]));
-    } catch (NumberFormatException e) {
-      throw new ClientException("User id has an invalid format.");
-    }
+    // Check user logged in and add his id to request and send it
+    if (cProps.session == null)
+      throw new ClientException("User is not logged in.");
+    requestData.addProperty("userId", cProps.session.getId());
 
     cProps.sendRequest(requestData);
 
@@ -390,14 +387,10 @@ class Client {
   }
 
   private static void listNewMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
-    // Add id of user to get new messages if it exists
-    if (args.length > 1)
-      try {
-        int userId = Integer.parseInt(args[1]);
-        requestData.addProperty("userId", userId);
-      } catch (NumberFormatException e) {
-        throw new ClientException("User id has an invalid format.");
-      }
+    // Check user logged in and add his id to request and send it
+    if (cProps.session == null)
+      throw new ClientException("User is not logged in.");
+    requestData.addProperty("userId", cProps.session.getId());
 
     cProps.sendRequest(requestData);
 
@@ -443,10 +436,14 @@ class Client {
     String fileSpec = "";
     ArrayList<ValidFile> validFiles = null;
 
-    // Get files to send
-    if (args.length > 3) {
-      validFiles = cProps.fileHelper.getFiles(Arrays.copyOfRange(args, 3, args.length));
-      fileSpec = cProps.fileHelper.getFileSpec(validFiles);
+    try {
+      // Get files to send
+      if (args.length > 3) {
+        validFiles = cProps.fileHelper.getFiles(Arrays.copyOfRange(args, 3, args.length));
+        fileSpec = cProps.fileHelper.getFileSpec(validFiles);
+      }
+    } catch (IOException e) {
+      throw new ClientException("Failed to get files for attachment.");
     }
 
     // Check user already exists in cache. Fetch him otherwise
@@ -532,8 +529,11 @@ class Client {
     // Add message to cache
     cProps.cache.addMessage(
         resp.getMessageId(),
-        new MessageCacheEntry(
+        new
+
+            MessageCacheEntry(
             cProps.session.getId(),
+
             destinationId,
             encryptedMessageBytes,
             encryptedFileSpecBytes,
@@ -568,6 +568,9 @@ class Client {
       senderId = message.getSenderId();
     } else
       senderId = messageCacheEntry.getSenderId();
+
+    if (message.getReceiverId() != cProps.session.getId())
+      throw new ClientException("Message is not intended for user.");
 
     // Check user already exists in cache. Fetch him otherwise
     Pair<Pair<SEAHelper, MacHelper>, Pair<Key, Key>> sharedParameters = getUsersParameters(cProps, senderId);
@@ -824,11 +827,18 @@ class Client {
           receipt.getDate().getBytes(StandardCharsets.UTF_8)
       );
 
-      receiptSignature = cProps.b64Helper.decode(receipt.getReceiverSignature());
+      // Try to decode signature
+      try {
+        receiptSignature = cProps.b64Helper.decode(receipt.getReceiverSignature());
+      } catch (IllegalArgumentException e) {
+        receiptSignature = new byte[0];
+      }
+
+      // Verify signature
       if (macHelper.verifyMacHash(verificationData, receiptSignature, sharedMacKey))
         results.add(new Pair<>("valid", "user id: " + receipt.getSenderId() + "date: " + receipt.getDate()));
       else
-        results.add(new Pair<>("invalid/Forged", "user id: " + receipt.getSenderId() + "date: " + receipt.getDate()));
+        results.add(new Pair<>("invalid/Forged", "user id: " + receipt.getSenderId() + " date: " + receipt.getDate()));
     }
 
     // Print results
