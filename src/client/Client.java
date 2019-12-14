@@ -122,10 +122,10 @@ class Client {
               listUsers(cProps, requestData, cmdArgs, false);
               break;
             case NEW:
-              listNewMessages(cProps, requestData, cmdArgs);
+              listNewMessages(cProps, requestData);
               break;
             case ALL:
-              listAllMessages(cProps, requestData, cmdArgs);
+              listAllMessages(cProps, requestData);
               break;
             case SEND:
               sendMessages(cProps, requestData, cmdArgs);
@@ -331,6 +331,13 @@ class Client {
       throw new ClientException("User is not logged in.");
     requestData.addProperty("userId", cProps.session.getId());
 
+    // Add id if inserted and send the request
+    try {
+      if (args.length == 2)
+        requestData.addProperty("userId", Integer.valueOf(args[1]));
+    } catch (NumberFormatException e) {
+      throw new ClientException("User id has an invalid format.");
+    }
     cProps.sendRequest(requestData);
 
     // Get response and check the nonce
@@ -386,7 +393,7 @@ class Client {
     }
   }
 
-  private static void listNewMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
+  private static void listNewMessages(ClientProperties cProps, JsonObject requestData) throws IOException, ClientException {
     // Check user logged in and add his id to request and send it
     if (cProps.session == null)
       throw new ClientException("User is not logged in.");
@@ -401,14 +408,11 @@ class Client {
     System.out.println("Obtained the following unread message ids: (" + resp.getNewMessageIds().toString() + ").");
   }
 
-  private static void listAllMessages(ClientProperties cProps, JsonObject requestData, String[] args) throws IOException, ClientException {
-    // Add id of user to get new messages
-    try {
-      int userId = Integer.parseInt(args[1]);
-      requestData.addProperty("userId", userId);
-    } catch (NumberFormatException e) {
-      throw new ClientException("User id has an invalid format.");
-    }
+  private static void listAllMessages(ClientProperties cProps, JsonObject requestData) throws IOException, ClientException {
+    // Check user logged in and add his id to request and send it
+    if (cProps.session == null)
+      throw new ClientException("User is not logged in.");
+    requestData.addProperty("userId", cProps.session.getId());
 
     cProps.sendRequest(requestData);
 
