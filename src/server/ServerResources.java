@@ -287,6 +287,7 @@ final class ServerResources implements Runnable {
   private synchronized void insertReceipt(JsonObject requestData) throws RequestException, CriticalDatabaseException {
     // Get read message id
     int messageId = GsonUtils.getInt(requestData, "messageId");
+    int senderId = GsonUtils.getInt(requestData, "senderId");
 
     // Get receiver signature -> message contents signature
     String receiverSignature = GsonUtils.getString(requestData, "receiverSignature");
@@ -296,7 +297,7 @@ final class ServerResources implements Runnable {
 
     // Insert message receipt
     try {
-      props.DB.insertReceipt(new Receipt(messageId, date, receiverSignature));
+      props.DB.insertReceipt(new Receipt(messageId, senderId, date, receiverSignature));
 
       // Set message as read
       props.DB.setMessageAsRead(messageId);

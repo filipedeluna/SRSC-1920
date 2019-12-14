@@ -18,7 +18,6 @@ import shared.utils.Utils;
 import shared.utils.crypto.*;
 import shared.utils.crypto.util.DHKeyType;
 import shared.utils.properties.CustomProperties;
-import shared.utils.properties.CustomPropertyType;
 import shared.wrappers.Message;
 import shared.wrappers.Receipt;
 import shared.wrappers.User;
@@ -450,24 +449,16 @@ class Client {
       fileSpec = cProps.fileHelper.getFileSpec(validFiles);
     }
 
-    UserCacheEntry destinationUser = cProps.cache.getUser(destinationId);
+    // Check user already exists in cache. Fetch him otherwise
+    Pair<Pair<SEAHelper, MacHelper>, Pair<Key, Key>> sharedParameters = getUsersParameters(cProps, destinationId);
 
-    // If user is not in cache, we will have to request the server to get him
-    if (destinationUser == null)
-      destinationUser = fetchUser(cProps, destinationId);
-
-    // Check if we have user now
-    if (destinationUser == null)
-      throw new ClientException("Couldn't get message receiver from server.");
-
-    // Get shared keys
-    Pair<Key, Key> sharedKeys = cProps.getSharedKeys(destinationId);
-    Key sharedSeaKey = sharedKeys.getA();
-    Key sharedMacKey = sharedKeys.getB();
-
-    // Get client ciphers from the current session
-    MacHelper macHelper = cProps.session.macHelper;
+    // Create ciphers with other users params
     SEAHelper seaHelper = cProps.session.seaHelper;
+    MacHelper macHelper = cProps.session.macHelper;
+
+    // Get shared key pairs
+    Key sharedSeaKey = sharedParameters.getB().getA();
+    Key sharedMacKey = sharedParameters.getB().getB();
 
     // Start encrypting message contents
     byte[] tempCipherIVBytes;
@@ -578,26 +569,16 @@ class Client {
     } else
       senderId = messageCacheEntry.getSenderId();
 
-    // Get message sender
-    UserCacheEntry messageSender = cProps.cache.getUser(senderId);
-
-    // Verify if we have required user to verify signatures
-    if (messageSender == null)
-      messageSender = fetchUser(cProps, senderId);
-
-    // Check if we have user now
-    if (messageSender == null)
-      throw new ClientException("Couldn't get message sender from server.");
+    // Check user already exists in cache. Fetch him otherwise
+    Pair<Pair<SEAHelper, MacHelper>, Pair<Key, Key>> sharedParameters = getUsersParameters(cProps, senderId);
 
     // Create ciphers with other users params
-    Pair<SEAHelper, MacHelper> sharedHelpers = getSharedHelpers(messageSender.getSeaSpec(), messageSender.getMacSpec());
-    SEAHelper seaHelper = sharedHelpers.getA();
-    MacHelper macHelper = sharedHelpers.getB();
+    SEAHelper seaHelper = sharedParameters.getA().getA();
+    MacHelper macHelper = sharedParameters.getA().getB();
 
     // Get shared key pairs
-    Pair<Key, Key> sharedKeys = cProps.getSharedKeys(senderId);
-    Key sharedSeaKey = sharedKeys.getA();
-    Key sharedMacKey = sharedKeys.getB();
+    Key sharedSeaKey = sharedParameters.getB().getA();
+    Key sharedMacKey = sharedParameters.getB().getB();
 
     // Validate message contents by verifying mac
     byte[] encryptedText;
@@ -756,23 +737,15 @@ class Client {
       throw new ClientException("Message was not sent by user. Can't verify receipts.");
 
     // Check user already exists in cache. Fetch him otherwise
-    UserCacheEntry receiptSender = cProps.cache.getUser(message.getReceiverId());
-
-    if (receiptSender == null)
-      receiptSender = fetchUser(cProps, message.getSenderId());
-
-    if (receiptSender == null)
-      throw new ClientException("Failed to fetch receipt sender from server.");
+    Pair<Pair<SEAHelper, MacHelper>, Pair<Key, Key>> sharedParameters = getUsersParameters(cProps, message.getReceiverId());
 
     // Create ciphers with other users params
-    Pair<SEAHelper, MacHelper> sharedHelpers = getSharedHelpers(receiptSender.getSeaSpec(), receiptSender.getMacSpec());
-    SEAHelper seaHelper = sharedHelpers.getA();
-    MacHelper macHelper = sharedHelpers.getB();
+    SEAHelper seaHelper = sharedParameters.getA().getA();
+    MacHelper macHelper = sharedParameters.getA().getB();
 
     // Get shared key pairs
-    Pair<Key, Key> sharedKeys = cProps.getSharedKeys(message.getReceiverId());
-    Key sharedSeaKey = sharedKeys.getA();
-    Key sharedMacKey = sharedKeys.getB();
+    Key sharedSeaKey = sharedParameters.getB().getA();
+    Key sharedMacKey = sharedParameters.getB().getB();
 
     // Validate message contents by verifying mac, check if it has been tampered with
     byte[] encryptedText = cProps.b64Helper.decode(message.getText());
@@ -831,11 +804,20 @@ class Client {
       decryptedContents = text.getBytes();
 
     // Check receipt validity 1 by 1
-    int counterValid = 0;
-    int counterInvalid = 0;
     byte[] verificationData;
     byte[] receiptSignature;
+
+    ArrayList<Pair<String, String>> results = new ArrayList<>();
     for (Receipt receipt : receipts) {
+      // Check user already exists in cache. Fetch him otherwise
+      sharedParameters = getUsersParameters(cProps, receipt.getSenderId());
+
+      // Create ciphers with other users params
+      macHelper = sharedParameters.getA().getB();
+
+      // Get shared key pairs
+      sharedMacKey = sharedParameters.getB().getB();
+
       verificationData = Utils.joinByteArrays(
           decryptedContents,
           receipt.getDate().getBytes(StandardCharsets.UTF_8)
@@ -843,15 +825,15 @@ class Client {
 
       receiptSignature = cProps.b64Helper.decode(receipt.getReceiverSignature());
       if (macHelper.verifyMacHash(verificationData, receiptSignature, sharedMacKey))
-        counterValid++;
+        results.add(new Pair<>("valid", "user id: " + receipt.getSenderId() + "date: " + receipt.getDate()));
       else
-        counterInvalid++;
+        results.add(new Pair<>("invalid/Forged", "user id: " + receipt.getSenderId() + "date: " + receipt.getDate()));
     }
 
     // Print results
-    System.out.println("Showing status for message: " + messageId + " receipts:");
-    System.out.println("Valid Receipts: " + counterValid);
-    System.out.println("Invalid/Forged Receipts: : " + counterInvalid);
+    for (Pair<String, String> resultPair : results) {
+      System.out.println("Message status: " + resultPair.getA() + " - " + resultPair.getB() + ".");
+    }
   }
 
   private static KSHelper getKeyStore(CustomProperties properties) throws
@@ -1048,5 +1030,24 @@ class Client {
     } catch (NoSuchAlgorithmException | NoSuchPaddingException | NoSuchProviderException e) {
       throw new ClientException("User has an invalid key spec.");
     }
+  }
+
+  private static Pair<Pair<SEAHelper, MacHelper>, Pair<Key, Key>> getUsersParameters(ClientProperties cProps, int otherId) throws IOException, ClientException, NoSuchAlgorithmException, PropertyException {
+    // Check user already exists in cache. Fetch him otherwise
+    UserCacheEntry otherUser = cProps.cache.getUser(otherId);
+
+    if (otherUser == null)
+      otherUser = fetchUser(cProps, otherId);
+
+    if (otherUser == null)
+      throw new ClientException("Failed to fetch receipt sender from server.");
+
+    // Create ciphers with other users params
+    Pair<SEAHelper, MacHelper> sharedHelpers = getSharedHelpers(otherUser.getSeaSpec(), otherUser.getMacSpec());
+
+    // Get shared key pairs
+    Pair<Key, Key> sharedKeys = cProps.getSharedKeys(otherId);
+
+    return new Pair<>(sharedHelpers, sharedKeys);
   }
 }

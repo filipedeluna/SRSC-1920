@@ -76,6 +76,7 @@ public final class ServerDatabaseDriver {
       query =
           "CREATE TABLE IF NOT EXISTS receipts (" +
               "message_id         INTEGER NOT NULL, " +
+              "sender_id          INTEGER NOT NULL, " +
               "date               TEXT    NOT NULL, " +
               "receiver_signature TEXT NOT NULL, " + // Reader signature of message contents with private key
               "FOREIGN KEY (message_id) REFERENCES messages(message_id)" +
@@ -353,8 +354,9 @@ public final class ServerDatabaseDriver {
 
       PreparedStatement ps = connection.prepareStatement(insertQuery);
       ps.setInt(1, rcpt.getMessageId());
-      ps.setString(2, rcpt.getDate());
-      ps.setString(3, rcpt.getReceiverSignature());
+      ps.setInt(2, rcpt.getMessageId());
+      ps.setString(3, rcpt.getDate());
+      ps.setString(4, rcpt.getReceiverSignature());
 
       ps.executeUpdate();
 
