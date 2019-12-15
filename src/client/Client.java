@@ -431,9 +431,14 @@ class Client {
       throw new ClientException("User is not logged in.");
 
     // Get client and destination id
-    int destinationId = Integer.parseInt(args[1]);
+    int destinationId;
+    try {
+      destinationId = Integer.parseInt(args[1]);
+    } catch (NumberFormatException e) {
+      throw new ClientException("Invalid destination id.");
+    }
     requestData.addProperty("senderId", cProps.session.getId());
-    requestData.addProperty("receiverId", Integer.parseInt(args[1]));
+    requestData.addProperty("receiverId", destinationId);
 
     // Validate message parameters
     String message = args[2];
@@ -646,14 +651,16 @@ class Client {
       ArrayList<Pair<String, Integer>> fileSpecPairs = cProps.fileHelper.parseFileSpec(fileSpec);
 
       byte[] fileBytes;
-      if (!fileSpecPairs.isEmpty() && decryptedFiles.length == 0)
+      byte[] tempDecryptedFiles = decryptedFiles;
+
+      if (!fileSpecPairs.isEmpty() && tempDecryptedFiles.length == 0)
         throw new ClientException("Message attachments are corrupted.");
 
       // Write decrypted files to system
       for (Pair<String, Integer> fileSpecPair : fileSpecPairs) {
         try {
           fileBytes = Arrays.copyOfRange(decryptedFiles, 0, fileSpecPair.getB());
-          decryptedFiles = Arrays.copyOfRange(decryptedFiles, fileBytes.length, decryptedFiles.length);
+          tempDecryptedFiles = Arrays.copyOfRange(tempDecryptedFiles, fileBytes.length, tempDecryptedFiles.length);
 
           cProps.fileHelper.writeFile(fileSpecPair.getA(), fileBytes);
 
@@ -689,30 +696,30 @@ class Client {
     requestData.addProperty("messageId", messageId);
     requestData.addProperty("senderId", cProps.session.getId());
 
-    // Get current date
-    String currentDate = getCurrentDate();
-
     // Sign decrypted data with mac and add to request
-    byte[] decryptedContents;
+    byte[] decryptedContents = text.getBytes(StandardCharsets.UTF_8);
+
     if (ivCount > 1) {
       decryptedContents = Utils.joinByteArrays(
-          text.getBytes(StandardCharsets.UTF_8),
           fileSpec.getBytes(StandardCharsets.UTF_8),
-          decryptedFiles,
-          currentDate.getBytes(StandardCharsets.UTF_8)
-      );
-    } else {
-      decryptedContents = Utils.joinByteArrays(
-          text.getBytes(StandardCharsets.UTF_8),
-          currentDate.getBytes(StandardCharsets.UTF_8)
+          decryptedFiles
       );
     }
 
-    byte[] signedDecryptedContents = macHelper.hash(decryptedContents, sharedMacKey);
+    // Add date
+    String currentDate = getCurrentDate();
+    requestData.addProperty("date", currentDate);
+
+    decryptedContents = Utils.joinByteArrays(
+        decryptedContents,
+        currentDate.getBytes(StandardCharsets.UTF_8)
+    );
+
+    // Sign receipt with receiver cipher
+    byte[] signedDecryptedContents = cProps.session.macHelper.hash(decryptedContents, sharedMacKey);
 
     // Add signature and date to request header and send the request
     requestData.addProperty("receiverSignature", cProps.b64Helper.encode(signedDecryptedContents));
-    requestData.addProperty("date", currentDate);
 
     cProps.sendRequest(requestData);
 
@@ -784,16 +791,13 @@ class Client {
     }
 
     // Get decryptedData macHash
-    byte[] decryptedContents;
+    byte[] decryptedContents = text.getBytes(StandardCharsets.UTF_8);
 
-    if (ivCount > 1) {
+    if (ivCount > 1)
       decryptedContents = Utils.joinByteArrays(
-          text.getBytes(StandardCharsets.UTF_8),
           fileSpec.getBytes(StandardCharsets.UTF_8),
           decryptedFiles
       );
-    } else
-      decryptedContents = text.getBytes(StandardCharsets.UTF_8);
 
     // Check receipt validity 1 by 1
     byte[] verificationData;
@@ -801,7 +805,7 @@ class Client {
 
     ArrayList<Pair<String, String>> results = new ArrayList<>();
     for (Receipt receipt : receipts) {
-      // Check user already exists in cache. Fetch him otherwise
+      // Get receipt sender ciphers and shared keys
       sharedParameters = getUsersParameters(cProps, receipt.getSenderId());
 
       // Create ciphers with other users params
@@ -824,9 +828,9 @@ class Client {
 
       // Verify signature
       if (macHelper.verifyHash(verificationData, receiptSignature, sharedMacKey))
-        results.add(new Pair<>("valid", "user id: " + receipt.getSenderId() + "date: " + receipt.getDate()));
+        results.add(new Pair<>("valid", "user id: " + receipt.getSenderId() + " date: " + receipt.getDate()));
       else
-        results.add(new Pair<>("invalid/Forged", "user id: " + receipt.getSenderId() + " date: " + receipt.getDate()));
+        results.add(new Pair<>("Invalid/Forged", "user id: " + receipt.getSenderId() + " date: " + receipt.getDate()));
     }
 
     // Print results
@@ -1016,7 +1020,7 @@ class Client {
     try {
       MacHelper macHelper = new MacHelper(macSpec);
 
-      if ( seaSpec.split("/").length != 3)
+      if (seaSpec.split("/").length != 3)
         throw new ClientException("User has an invalid key spec.");
 
       SEAHelper seaHelper = new SEAHelper(seaSpec);
