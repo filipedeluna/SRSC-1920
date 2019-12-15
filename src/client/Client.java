@@ -793,7 +793,7 @@ class Client {
           decryptedFiles
       );
     } else
-      decryptedContents = text.getBytes();
+      decryptedContents = text.getBytes(StandardCharsets.UTF_8);
 
     // Check receipt validity 1 by 1
     byte[] verificationData;
@@ -869,8 +869,8 @@ class Client {
     System.out.println(
         "CREATE <username>" + "\n" +
             "LIST (userId)?" + "\n" +
-            "NEW <messageBoxOwnerId>" + "\n" +
-            "ALL <messageBoxOwnerId>" + "\n" +
+            "NEW" + "\n" +
+            "ALL" + "\n" +
             "SEND <destinationId> <messageText> (<attachmentFilePath>)*" + "\n" +
             "RECEIVE <messageId>" + "\n" +
             "STATUS <messageId>" + "\n" +
@@ -985,7 +985,7 @@ class Client {
     byte[] decryptedText;
 
     if (seaHelper.cipherModeUsesIV())
-      decryptedText = seaHelper.decrypt(encryptedText, key, Arrays.copyOfRange(iv, 0, iv.length));
+      decryptedText = seaHelper.decrypt(encryptedText, key, Arrays.copyOfRange(iv, 0, seaHelper.ivSize()));
     else
       decryptedText = seaHelper.decrypt(encryptedText, key);
 
@@ -995,7 +995,7 @@ class Client {
   private static String decryptMessageFileSpec(byte[] encryptedFileSpec, Key key, byte[] iv, SEAHelper seaHelper) throws BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
     byte[] decryptedFileSpec;
     if (seaHelper.cipherModeUsesIV())
-      decryptedFileSpec = seaHelper.decrypt(encryptedFileSpec, key, Arrays.copyOfRange(iv, iv.length, iv.length * 2));
+      decryptedFileSpec = seaHelper.decrypt(encryptedFileSpec, key, Arrays.copyOfRange(iv, seaHelper.ivSize(), seaHelper.ivSize() * 2));
     else
       decryptedFileSpec = seaHelper.decrypt(encryptedFileSpec, key);
 
@@ -1005,7 +1005,7 @@ class Client {
   private static byte[] decryptMessageFiles(byte[] encryptedFiles, Key key, byte[] iv, SEAHelper seaHelper) throws BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
     byte[] decryptedFiles;
     if (seaHelper.cipherModeUsesIV())
-      decryptedFiles = seaHelper.decrypt(encryptedFiles, key, Arrays.copyOfRange(iv, iv.length * 2, iv.length * 3));
+      decryptedFiles = seaHelper.decrypt(encryptedFiles, key, Arrays.copyOfRange(iv, seaHelper.ivSize() * 2, seaHelper.ivSize() * 3));
     else
       decryptedFiles = seaHelper.decrypt(encryptedFiles, key);
 
