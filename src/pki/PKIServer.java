@@ -17,7 +17,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 final class PKIServer {
-  private static final String PROPS_PATH = "src/pki/props/pki.properties";
+  private static final String PROPS_PATH = "pki.properties";
 
   @SuppressWarnings("InfiniteLoopStatement")
   public static void main(String[] args) {

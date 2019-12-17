@@ -18,7 +18,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 final class Server {
-  private static final String PROPS_PATH = "src/server/props/server.properties";
+  private static final String PROPS_PATH = "server.properties";
 
   @SuppressWarnings("InfiniteLoopStatement")
   public static void main(String[] args) {

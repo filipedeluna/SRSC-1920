@@ -163,7 +163,9 @@ public class KSHelper {
   */
 
   private Path getDHKeyPairPath(String username, DHKeyType type) {
-    return Paths.get("src/client/crypt/keys/" + username + "-" + type.getVal());
+    String ksFolderPath = Paths.get(keyStoreLoc).toAbsolutePath().getParent().toString();
+    System.out.println(ksFolderPath);
+    return Paths.get(ksFolderPath + "/keys/" + username + "-" + type);
   }
 
 }

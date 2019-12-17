@@ -39,7 +39,7 @@ import java.util.Arrays;
 import java.util.Date;
 
 class Client {
-  private static final String PROPS_PATH = "src/client/props/client.properties";
+  private static final String PROPS_PATH = "client.properties";
   private static final boolean DEBUG_MODE = true;
 
   public static void main(String[] args) {
