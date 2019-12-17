@@ -7,3 +7,5 @@ src/client/crypt/*-sea
 src/client/crypt/*-mac
 src/client/crypt/keys
 src/client/files
+package/client/keys/
+package/client/files/
