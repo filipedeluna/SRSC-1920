@@ -1,0 +1,22 @@
+Geral:
+-É preciso executar o comando:
+	chmod -R 777 à pasta package para permitir as aplicações criarem os ficheiros necessários
+
+Ordem de inicialização:
+
+1º - PKI:
+-Apagar a BD, criar uma keystore com o key pair, criar apartir dessa chave, os certificados que vão estar nas trustStores dos clientes e do servidor.
+-Configurar o ficheiro de parametrizações pki.properties 
+
+2º - Server:
+-Apagar a BD, apagar os LOGS, criar uma keystore e uma trustore para criar um keypair do servidor.
+-Configurar o ficheiro de parametrizações server.properties, e na primeira vez do servidor a correr usar a propriedade "params_reset = true", das outras vezes é ao criterio do utilizador
+
+3º - Cliente:
+-De forma analoga ao servidor, criar a key store e a truststore.
+-Configurar o ficheiro properties do cliente client.properties.
+-Ter o PKI a correr.
+-Da primeira vez a correr o cliente, e necessario usar a propriedade "use_pki = true" para gerar a chave publica assinada pelo PKI, enviando CSR ao PKI.
+
+
+
