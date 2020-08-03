@@ -1,2 +1,8 @@
-# 19SRSCTP2
+# SRSC Project 19-20
 repo para o proj SRSC 19-20
+
+This handout was developed for the Computer Systems and Networks Security course at FCT-UNL. It's an implementation of a secure messaging repository system using  symmetric and asymmetric cryptography  for data encryption over secureSSL channels. The program allows users to share text and/or files.
+
+The system was made to be almost fully parameterized for ease of testing and user freedom of choice. The system uses Diffie-Hellman public key cryptography to ensure the secrecy of all data exchanged between users. All the messages are fully encrypted, protected and authenticated. The user and message receipt data are signed to ensure non-repudiation. 
+
+The system uses a simplified Public Key Infrastructure to distribute, validate, as well as revoke certificates. This PKI is the root of trust of all the principals involved in the system. Certificate chains are used between the involved principals, to  communicate over TLS secured channels, with the PKI certificate being the  root certificate. Both  the  PKI  and  mailbox  server  resort  to  an  SQLite local database to store all their data. The mailbox server and clients have a cache implementation to prevent unnecessary, redundant communications. Many other systems are in place to raise overall system security by preventing Denial of Service,  spoofing, replaying, sniffing, SQL injections and other types of attacks. A message exchange protocol was also created to allow for easy processing of message attachments (files), along with helper classes for all kinds of cryptographic operations.
