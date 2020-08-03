@@ -1,5 +1,4 @@
 # SRSC Project 19-20
-repo para o proj SRSC 19-20
 
 This handout was developed for the Computer Systems and Networks Security course at FCT-UNL. It's an implementation of a secure messaging repository system using  symmetric and asymmetric cryptography  for data encryption over secureSSL channels. The program allows users to share text and/or files.
 
