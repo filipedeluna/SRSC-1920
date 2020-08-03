@@ -1,22 +1,19 @@
-Geral:
--É preciso executar o comando:
-	chmod -R 777 à pasta package para permitir as aplicações criarem os ficheiros necessários
+General Info:
+- You will need to chmod -R 755 the packagefolder to allow the applications to write their necessary files.
 
-Ordem de inicialização:
+Initialization order:
 
-1º - PKI:
--Apagar a BD, criar uma keystore com o key pair, criar apartir dessa chave, os certificados que vão estar nas trustStores dos clientes e do servidor.
--Configurar o ficheiro de parametrizações pki.properties 
+1st - PKI:
+- Delete the DB and create a new keystore with a key pair. From this key pair, create certificates to place in the client and server trust stores.
+- Configure the pki.properties file
 
-2º - Server:
--Apagar a BD, apagar os LOGS, criar uma keystore e uma trustore para criar um keypair do servidor.
--Configurar o ficheiro de parametrizações server.properties, e na primeira vez do servidor a correr usar a propriedade "params_reset = true", das outras vezes é ao criterio do utilizador
+2nd - Server:
+- Delete the DB and logs, create a trustore and keystore to store the new keypair which will be create using the PKI.
+- Configure server.properties and, for the first time running, set "params_reset = true". This process may take a long time.
 
-3º - Cliente:
--De forma analoga ao servidor, criar a key store e a truststore.
--Configurar o ficheiro properties do cliente client.properties.
--Ter o PKI a correr.
--Da primeira vez a correr o cliente, e necessario usar a propriedade "use_pki = true" para gerar a chave publica assinada pelo PKI, enviando CSR ao PKI.
-
+3rd - Client:
+- Create the keystore and truststore.
+- Configure the client.properties file.
+- Start up the PKI and set "use_pki = true" before starting up the client, in order to generate the public key obtained by having the PKI sign the client's CSR.
 
 
